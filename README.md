@@ -18,9 +18,9 @@
 
 ## 技术栈
 
-- Expo SDK 55
+- Expo SDK 56
 - Expo Router v6
-- React Native 0.83
+- React Native 0.85
 - TypeScript strict
 - SQLite（`expo-sqlite`）
 

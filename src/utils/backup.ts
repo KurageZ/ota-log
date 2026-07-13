@@ -868,22 +868,14 @@ export async function shareBackupFile(uri: string): Promise<void> {
 }
 
 export async function importBackup(db: Repositories): Promise<boolean> {
-  let pickedFile: File;
-  try {
-    const picked = await File.pickFileAsync(undefined);
-    pickedFile = Array.isArray(picked) ? picked[0] : picked;
-  } catch {
+  const picked = await File.pickFileAsync({ mimeTypes: 'application/zip' });
+  if (picked.canceled || !picked.result) {
     Alert.alert('没有选到文件');
     return false;
   }
+  const pickedFile = picked.result;
 
   try {
-    const filename = pickedFile.name.toLowerCase();
-    if (filename.endsWith('.zip')) {
-      return await importZipBackup(db, pickedFile);
-    }
-
-    // Some document providers return a temporary display name without the original extension.
     return await importZipBackup(db, pickedFile);
   } catch (error) {
     Alert.alert('恢复失败', getErrorMessage(error));

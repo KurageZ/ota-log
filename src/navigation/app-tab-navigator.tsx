@@ -1,9 +1,10 @@
 import { Tabs } from 'expo-router';
+import type { ColorValue } from 'react-native';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import { CustomFloatingTabBar } from './CustomFloatingTabBar';
 import { FloatingTabBarVisibilityProvider } from './FloatingTabBarVisibility';
 
-function TabIcon({ name, color, focused, size = 20 }: { name: AppIconName; color: string; focused: boolean; size?: number }) {
+function TabIcon({ name, color, focused, size = 20 }: { name: AppIconName; color: ColorValue; focused: boolean; size?: number }) {
   return <AppIcon name={name} variant={focused ? 'active' : 'inactive'} size={size} color={color} />;
 }
 

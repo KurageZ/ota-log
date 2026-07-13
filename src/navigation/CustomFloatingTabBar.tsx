@@ -1,4 +1,4 @@
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import {
   GlassView,
   isGlassEffectAPIAvailable,
@@ -355,7 +355,7 @@ export function CustomFloatingTabBar({ state, descriptors, navigation }: BottomT
             colorScheme={isDark ? 'dark' : 'light'}
             glassEffectStyle="regular"
             pointerEvents="none"
-            style={[StyleSheet.absoluteFillObject, { borderRadius: shellBorderRadius }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: shellBorderRadius }]}
             tintColor={withAlpha(colors.tabBar, 0.32)}
           />
         ) : null}

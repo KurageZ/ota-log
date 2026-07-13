@@ -4,7 +4,6 @@ import {
   Dimensions,
   Easing,
   Image,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -118,7 +117,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
 }: FullscreenImageViewerProps<T>) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
-  const { height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   // react-native-image-viewing remounts when imageIndex changes; treat it as open-time initial state.
   const [initialImageIndex, setInitialImageIndex] = useState(0);
@@ -258,6 +257,9 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
       outputRange: [0, 0, 1],
     }),
   }), [transitionAnimation]);
+  const openingWithTransition = Boolean(initialTransitionOrigin);
+  const showOpeningTransition = openingWithTransition && (transitionActive || transitionOrigin === null);
+  const transitionItem = items[clampIndex(selectedIndex)] ?? currentItem;
   useEffect(() => {
     if (!visible || !initialTransitionOrigin || items.length === 0) {
       setTransitionActive(false);
@@ -392,50 +394,94 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     const item = items[clampIndex(imageIndex)] ?? null;
 
     return (
-      <Animated.View
-        pointerEvents={controlsVisible ? 'auto' : 'none'}
-        style={{
-          paddingTop: insets.top + 6,
-          minHeight: insets.top + HEADER_HEIGHT,
-          paddingHorizontal: 16,
-          flexDirection: 'row',
-          alignItems: 'center',
-          ...headerAnimatedStyle,
-        }}
-      >
-        <HeaderButton
-          icon="close"
-          color={colors.white}
-          onPress={onClose}
-          restBackgroundColor={colors.heroDecorWeak}
-          pressedBackgroundColor={colors.heroDecor}
-        />
-        <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 12 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.heroEyebrow }}>
-            {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
-          </Text>
-        </View>
-        {onEdit && item ? (
+      <>
+        {showOpeningTransition && transitionAnimatedStyle && transitionItem ? (
+          <View
+            testID="image-opening-transition"
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: screenWidth,
+              height: screenHeight,
+            }}
+          >
+            <Animated.View
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: '#000000',
+                ...transitionBackdropStyle,
+              }}
+            />
+            <Animated.View
+              style={{
+                position: 'absolute',
+                overflow: 'hidden',
+                backgroundColor: transitionCoverLoaded ? '#000000' : 'transparent',
+                ...transitionAnimatedStyle,
+              }}
+            >
+              <Image
+                source={{ uri: transitionItem.photoUri }}
+                resizeMode="cover"
+                fadeDuration={0}
+                onLoad={handleTransitionCoverLoad}
+                onError={handleTransitionCoverError}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </Animated.View>
+          </View>
+        ) : null}
+
+        <Animated.View
+          testID="image-viewer-header-controls"
+          pointerEvents={!showOpeningTransition && controlsVisible ? 'auto' : 'none'}
+          style={{
+            paddingTop: insets.top + 6,
+            minHeight: insets.top + HEADER_HEIGHT,
+            paddingHorizontal: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            ...headerAnimatedStyle,
+            opacity: showOpeningTransition ? 0 : headerAnimatedStyle.opacity,
+          }}
+        >
           <HeaderButton
-            icon="edit"
+            icon="close"
             color={colors.white}
-            onPress={() => onEdit(item)}
+            onPress={onClose}
             restBackgroundColor={colors.heroDecorWeak}
             pressedBackgroundColor={colors.heroDecor}
           />
-        ) : null}
-        {onDelete && item ? (
-          <View style={{ marginLeft: onEdit ? 8 : 0 }}>
-            <HeaderButton
-              icon="trash"
-              color={colors.danger}
-              onPress={() => onDelete(item)}
-              restBackgroundColor={colors.dangerSoft}
-              pressedBackgroundColor={colors.dangerBorder}
-            />
+          <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 12 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.heroEyebrow }}>
+              {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
+            </Text>
           </View>
-        ) : null}
-      </Animated.View>
+          {onEdit && item ? (
+            <HeaderButton
+              icon="edit"
+              color={colors.white}
+              onPress={() => onEdit(item)}
+              restBackgroundColor={colors.heroDecorWeak}
+              pressedBackgroundColor={colors.heroDecor}
+            />
+          ) : null}
+          {onDelete && item ? (
+            <View style={{ marginLeft: onEdit ? 8 : 0 }}>
+              <HeaderButton
+                icon="trash"
+                color={colors.danger}
+                onPress={() => onDelete(item)}
+                restBackgroundColor={colors.dangerSoft}
+                pressedBackgroundColor={colors.dangerBorder}
+              />
+            </View>
+          ) : null}
+        </Animated.View>
+      </>
     );
   }, [
     clampIndex,
@@ -448,11 +494,20 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     colors.heroEyebrow,
     colors.white,
     headerAnimatedStyle,
+    handleTransitionCoverError,
+    handleTransitionCoverLoad,
     insets.top,
     items,
     onClose,
     onDelete,
     onEdit,
+    screenHeight,
+    screenWidth,
+    showOpeningTransition,
+    transitionAnimatedStyle,
+    transitionBackdropStyle,
+    transitionCoverLoaded,
+    transitionItem,
   ]);
 
   const FooterComponent = useCallback(({ imageIndex }: IndexComponentProps) => {
@@ -488,6 +543,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
             shadowRadius: 22,
             elevation: 10,
             ...footerAnimatedStyle,
+            opacity: showOpeningTransition ? 0 : footerAnimatedStyle.opacity,
           }}
         >
           <Pressable
@@ -554,75 +610,30 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     renderDetails,
     sheetBackgroundColor,
     sheetBorderColor,
+    showOpeningTransition,
   ]);
-
-  const openingWithTransition = Boolean(initialTransitionOrigin);
-  const showOpeningTransition = openingWithTransition && (transitionActive || transitionOrigin === null);
 
   if (!visible || images.length === 0 || !currentItem) {
     return null;
   }
 
-  const transitionItem = items[clampIndex(selectedIndex)] ?? currentItem;
-
   return (
-    <>
-      <ImageViewing
-        images={images}
-        imageIndex={initialImageIndex}
-        visible={visible}
-        onRequestClose={onClose}
-        onImageIndexChange={handleImageIndexChange}
-        onImageLoad={handleViewerImageLoad}
-        imageHidden={showOpeningTransition}
-        keyExtractor={(_, index) => items[index]?.id ?? String(index)}
-        HeaderComponent={HeaderComponent}
-        FooterComponent={hasDetails ? FooterComponent : undefined}
-        presentationStyle="overFullScreen"
-        animationType={initialTransitionOrigin ? 'none' : 'fade'}
-        backgroundColor={showOpeningTransition ? 'transparent' : '#000000'}
-        swipeToCloseEnabled
-        doubleTapToZoomEnabled
-      />
-
-      <Modal
-        visible={showOpeningTransition && Boolean(transitionAnimatedStyle)}
-        transparent
-        presentationStyle="overFullScreen"
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={onClose}
-      >
-        <View pointerEvents="none" style={{ flex: 1 }}>
-          <Animated.View
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundColor: '#000000',
-              ...transitionBackdropStyle,
-            }}
-          />
-          {transitionAnimatedStyle ? (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                overflow: 'hidden',
-                backgroundColor: transitionCoverLoaded ? '#000000' : 'transparent',
-                ...transitionAnimatedStyle,
-              }}
-            >
-              <Image
-                source={{ uri: transitionItem.photoUri }}
-                resizeMode="cover"
-                fadeDuration={0}
-                onLoad={handleTransitionCoverLoad}
-                onError={handleTransitionCoverError}
-                style={{ width: '100%', height: '100%' }}
-              />
-            </Animated.View>
-          ) : null}
-        </View>
-      </Modal>
-    </>
+    <ImageViewing
+      images={images}
+      imageIndex={initialImageIndex}
+      visible={visible}
+      onRequestClose={onClose}
+      onImageIndexChange={handleImageIndexChange}
+      onImageLoad={handleViewerImageLoad}
+      imageHidden={showOpeningTransition}
+      keyExtractor={(_, index) => items[index]?.id ?? String(index)}
+      HeaderComponent={HeaderComponent}
+      FooterComponent={hasDetails ? FooterComponent : undefined}
+      presentationStyle="overFullScreen"
+      animationType={initialTransitionOrigin ? 'none' : 'fade'}
+      backgroundColor={showOpeningTransition ? 'transparent' : '#000000'}
+      swipeToCloseEnabled
+      doubleTapToZoomEnabled
+    />
   );
 }

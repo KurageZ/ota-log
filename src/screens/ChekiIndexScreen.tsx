@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
 } from 'react-native';
@@ -127,16 +127,19 @@ function ChekiGridThumbnail({
   height,
   colors,
   chrome = 'framed',
+  imageRef,
 }: {
   uri: string;
   width: number;
   height: number;
   colors: ThemeColors;
   chrome?: ChekiThumbnailChrome;
+  imageRef?: Ref<Image>;
 }) {
   if (chrome === 'bare') {
     return (
       <Image
+        ref={imageRef}
         source={{ uri }}
         resizeMethod="resize"
         style={{
@@ -167,6 +170,7 @@ function ChekiGridThumbnail({
       backgroundColor: colors.card,
     }}>
       <Image
+        ref={imageRef}
         source={{ uri }}
         resizeMethod="resize"
         style={{
@@ -198,9 +202,10 @@ function ChekiThumbnailButton({
   chrome?: ChekiThumbnailChrome;
 }) {
   const thumbnailRef = useRef<View>(null);
+  const thumbnailImageRef = useRef<Image>(null);
 
   const handlePress = useCallback(() => {
-    const node = thumbnailRef.current;
+    const node = thumbnailImageRef.current ?? thumbnailRef.current;
     if (!node) {
       onOpen(cheki, viewerChekis, null);
       return;
@@ -213,11 +218,13 @@ function ChekiThumbnailButton({
           y,
           width: measuredWidth,
           height: measuredHeight,
-          borderRadius: chrome === 'bare' ? CHEKI_BARE_THUMBNAIL_RADIUS : CHEKI_FRAME_RADIUS,
+          borderRadius: chrome === 'bare'
+            ? CHEKI_BARE_THUMBNAIL_RADIUS
+            : Math.max(6, CHEKI_FRAME_RADIUS - getChekiFrameInsets(width).side),
         }
         : null);
     });
-  }, [cheki, chrome, onOpen, viewerChekis]);
+  }, [cheki, chrome, onOpen, viewerChekis, width]);
 
   return (
     <View ref={thumbnailRef} collapsable={false}>
@@ -231,6 +238,7 @@ function ChekiThumbnailButton({
           height={height}
           colors={colors}
           chrome={chrome}
+          imageRef={thumbnailImageRef}
         />
       </TouchableOpacity>
     </View>

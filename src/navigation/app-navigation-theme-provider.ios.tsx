@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { useAppTheme } from '../theme/appTheme';
 
 export function AppNavigationThemeProvider({ children }: { children: ReactNode }) {

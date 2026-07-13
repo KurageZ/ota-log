@@ -511,7 +511,7 @@ export default function ArtistDetailScreen() {
                   <LinearGradient
                     colors={backdropPalette.heroOverlayTopColors}
                     locations={[0, 0.28, 1]}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                   />
                   <LinearGradient
                     colors={backdropPalette.heroOverlayBottomColors}
@@ -881,7 +881,7 @@ export default function ArtistDetailScreen() {
                   <LinearGradient
                     colors={backdropPalette.heroOverlayTopColors}
                     locations={[0, 0.28, 1]}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                   />
                   <LinearGradient
                     colors={backdropPalette.heroOverlayBottomColors}

@@ -161,6 +161,10 @@ patchFile('dist/components/ImageItem/ImageItem.ios.js', [
     '<Animated.Image source={imageSrc} fadeDuration={0} style={imageStylesWithOpacity} onLoad={() => { setLoaded(true); if (typeof onLoad === "function") { onLoad(); } }}/>',
     '<Animated.Image source={imageSrc} fadeDuration={0} style={displayedImageStyles} onLoad={() => { setLoaded(true); if (typeof onLoad === "function") { onLoad(); } }}/>',
   ],
+  [
+    '{(!loaded || !imageDimensions) && <ImageLoading />}',
+    '{!imageHidden && (!loaded || !imageDimensions) && <ImageLoading />}',
+  ],
 ]);
 
 patchFile('dist/hooks/usePanResponder.d.ts', [
@@ -229,5 +233,9 @@ patchFile('dist/components/ImageItem/ImageItem.android.js', [
   [
     '        delayLongPress,\n    });',
     '        delayLongPress,\n        onTap,\n    });',
+  ],
+  [
+    '{(!isLoaded || !imageDimensions) && <ImageLoading />}',
+    '{!imageHidden && (!isLoaded || !imageDimensions) && <ImageLoading />}',
   ],
 ]);

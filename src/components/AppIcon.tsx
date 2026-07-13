@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { View } from 'react-native';
-import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
+import type { ColorValue, StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { Lucide } from '@react-native-vector-icons/lucide';
 import { Heart } from 'lucide-react-native';
 
@@ -215,8 +215,8 @@ function SelectedRadioIcon({
   style,
 }: {
   size: number;
-  color: string;
-  secondaryColor: string;
+  color: ColorValue;
+  secondaryColor: ColorValue;
   style?: StyleProp<TextStyle>;
 }) {
   const dotSize = Math.max(6, Math.round(size * 0.42));
@@ -258,8 +258,8 @@ export function AppIcon({
   name: AppIconName;
   variant?: AppIconVariant;
   size?: number;
-  color: string;
-  secondaryColor?: string;
+  color: ColorValue;
+  secondaryColor?: ColorValue;
   style?: StyleProp<TextStyle>;
 }) {
   const icon = getAppIconGlyph(name, variant);

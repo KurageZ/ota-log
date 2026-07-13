@@ -183,7 +183,8 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             setIsImportingBackup(true);
-            await importBackup(db);
+            const restored = await importBackup(db);
+            if (!restored) return;
             await reloadSettingsContext();
             Alert.alert('恢复完成', '数据已恢复。');
           } catch (error) {

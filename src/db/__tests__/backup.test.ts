@@ -1,7 +1,9 @@
 import Database from 'better-sqlite3';
+import { File } from 'expo-file-system';
+import { Alert } from 'react-native';
 import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
-import { buildBackupData, restoreBackupData } from '../../utils/backup';
+import { buildBackupData, importBackup, restoreBackupData } from '../../utils/backup';
 import { ArtistRepository } from '../../repositories/ArtistRepository';
 import { EventRepository } from '../../repositories/EventRepository';
 import { TripRepository } from '../../repositories/TripRepository';
@@ -15,12 +17,25 @@ import { Repositories } from '../../context/DBContext';
 
 jest.mock('expo-file-system', () => ({
   Directory: class {},
-  File: class {},
+  File: { pickFileAsync: jest.fn() },
   Paths: {
     cache: { uri: 'file:///cache/' },
     document: { uri: 'file:///documents/' },
   },
 }));
+
+describe('backup file picker', () => {
+  test('handles the SDK 56 canceled result without treating it as a File', async () => {
+    const pickFileAsyncMock = File.pickFileAsync as jest.Mock;
+    pickFileAsyncMock.mockResolvedValue({ canceled: true, result: null });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    await expect(importBackup({} as Repositories)).resolves.toBe(false);
+
+    expect(pickFileAsyncMock).toHaveBeenCalledWith({ mimeTypes: 'application/zip' });
+    expect(alertSpy).toHaveBeenCalledWith('没有选到文件');
+  });
+});
 
 jest.mock('expo-file-system/legacy', () => ({
   copyAsync: jest.fn(),
