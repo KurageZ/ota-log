@@ -1,0 +1,1462 @@
+{
+  "draft": true,
+  "generated_at": "2026-05-27T12:18:24.960Z",
+  "artistCatalog": [
+    {
+      "id": "fixture-artist-001",
+      "name": "FixtureArtist001_Official",
+      "short_name": "FixtureArtist001"
+    },
+    {
+      "id": "fixture-artist-002",
+      "name": "FixtureArtist002_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-003",
+      "name": "FixtureArtist003_Official",
+      "short_name": "FixtureArtist003"
+    },
+    {
+      "id": "fixture-artist-004",
+      "name": "FixtureArtist004_Official",
+      "short_name": "FixtureArtist004"
+    },
+    {
+      "id": "fixture-artist-005",
+      "name": "FixtureArtist005_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-006",
+      "name": "FixtureArtist006_Official",
+      "short_name": "FixtureArtist006"
+    },
+    {
+      "id": "fixture-artist-007",
+      "name": "FixtureArtist007_Official",
+      "short_name": "FixtureArtist007"
+    },
+    {
+      "id": "fixture-artist-008",
+      "name": "FixtureArtist008_Official",
+      "short_name": "FixtureArtist008"
+    },
+    {
+      "id": "fixture-artist-009",
+      "name": "FixtureArtist009_Official",
+      "short_name": "FixtureArtist009"
+    },
+    {
+      "id": "fixture-artist-010",
+      "name": "FixtureArtist010_Official",
+      "short_name": "FixtureArtist010"
+    },
+    {
+      "id": "fixture-artist-011",
+      "name": "FixtureArtist011_Official",
+      "short_name": "FixtureArtist011"
+    },
+    {
+      "id": "fixture-artist-012",
+      "name": "FixtureArtist012_Official",
+      "short_name": "FixtureArtist012"
+    },
+    {
+      "id": "fixture-artist-013",
+      "name": "FixtureArtist013_Official",
+      "short_name": "FixtureArtist013"
+    },
+    {
+      "id": "fixture-artist-014",
+      "name": "FixtureArtist014_Official",
+      "short_name": "FixtureArtist014"
+    },
+    {
+      "id": "fixture-artist-015",
+      "name": "FixtureArtist015_Official",
+      "short_name": "FixtureArtist015"
+    },
+    {
+      "id": "fixture-artist-016",
+      "name": "FixtureArtist016_Official",
+      "short_name": "FixtureArtist016"
+    },
+    {
+      "id": "fixture-artist-017",
+      "name": "FixtureArtist017_Official",
+      "short_name": "FixtureArtist017"
+    },
+    {
+      "id": "fixture-artist-018",
+      "name": "FixtureArtist018_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-019",
+      "name": "FixtureArtist019_Official",
+      "short_name": "FixtureArtist019"
+    },
+    {
+      "id": "fixture-artist-020",
+      "name": "FixtureArtist020_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-021",
+      "name": "FixtureArtist021_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-022",
+      "name": "FixtureArtist022_Official",
+      "short_name": "FixtureArtist022"
+    },
+    {
+      "id": "fixture-artist-023",
+      "name": "FixtureArtist023_Official",
+      "short_name": "FixtureArtist023"
+    },
+    {
+      "id": "fixture-artist-024",
+      "name": "FixtureArtist024_Official",
+      "short_name": "FixtureArtist024"
+    },
+    {
+      "id": "fixture-artist-025",
+      "name": "FixtureArtist025_Official",
+      "short_name": "FixtureArtist025"
+    },
+    {
+      "id": "fixture-artist-026",
+      "name": "FixtureArtist026_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-027",
+      "name": "FixtureArtist027_Official",
+      "short_name": "FixtureArtist027"
+    },
+    {
+      "id": "fixture-artist-028",
+      "name": "FixtureArtist028_Official",
+      "short_name": null
+    },
+    {
+      "id": "fixture-artist-029",
+      "name": "FixtureArtist029_Official",
+      "short_name": "FixtureArtist029"
+    },
+    {
+      "id": "fixture-artist-030",
+      "name": "FixtureArtist030_Official",
+      "short_name": "FixtureArtist030"
+    },
+    {
+      "id": "fixture-artist-031",
+      "name": "FixtureArtist031_Official",
+      "short_name": "FixtureArtist031"
+    },
+    {
+      "id": "fixture-artist-032",
+      "name": "FixtureArtist032_Official",
+      "short_name": "FixtureArtist032"
+    },
+    {
+      "id": "fixture-artist-033",
+      "name": "FixtureArtist033_Official",
+      "short_name": "FixtureArtist033"
+    },
+    {
+      "id": "fixture-artist-034",
+      "name": "FixtureArtist034_Official",
+      "short_name": "FixtureArtist034"
+    },
+    {
+      "id": "fixture-artist-035",
+      "name": "FixtureArtist035_Official",
+      "short_name": "FixtureArtist035"
+    },
+    {
+      "id": "fixture-artist-036",
+      "name": "FixtureArtist036_Official",
+      "short_name": "FixtureArtist036"
+    },
+    {
+      "id": "fixture-artist-037",
+      "name": "FixtureArtist037_Official",
+      "short_name": "FixtureArtist037"
+    },
+    {
+      "id": "fixture-artist-038",
+      "name": "FixtureArtist038_Official",
+      "short_name": "FixtureArtist038"
+    },
+    {
+      "id": "fixture-artist-039",
+      "name": "FixtureArtist039_Official",
+      "short_name": "FixtureArtist039"
+    },
+    {
+      "id": "fixture-artist-040",
+      "name": "FixtureArtist040_Official",
+      "short_name": "FixtureArtist040"
+    },
+    {
+      "id": "fixture-artist-041",
+      "name": "FixtureArtist041_Official",
+      "short_name": "FixtureArtist041"
+    },
+    {
+      "id": "fixture-artist-042",
+      "name": "FixtureArtist042_Official",
+      "short_name": "FixtureArtist042"
+    },
+    {
+      "id": "fixture-artist-043",
+      "name": "FixtureArtist043_Official",
+      "short_name": "FixtureArtist043"
+    },
+    {
+      "id": "fixture-artist-044",
+      "name": "FixtureArtist044_Official",
+      "short_name": "FixtureArtist044"
+    },
+    {
+      "id": "fixture-artist-045",
+      "name": "FixtureArtist045_Official",
+      "short_name": "FixtureArtist045"
+    },
+    {
+      "id": "fixture-artist-046",
+      "name": "FixtureArtist046_Official",
+      "short_name": "FixtureArtist046"
+    },
+    {
+      "id": "fixture-artist-047",
+      "name": "FixtureArtist047_Official",
+      "short_name": "FixtureArtist047"
+    },
+    {
+      "id": "fixture-artist-048",
+      "name": "FixtureArtist048_Official",
+      "short_name": "FixtureArtist048"
+    },
+    {
+      "id": "fixture-artist-049",
+      "name": "FixtureArtist049_Official",
+      "short_name": "FixtureArtist049"
+    },
+    {
+      "id": "fixture-artist-050",
+      "name": "FixtureArtist050_Official",
+      "short_name": "FixtureArtist050"
+    },
+    {
+      "id": "fixture-artist-051",
+      "name": "FixtureArtist051_Official",
+      "short_name": "FixtureArtist051"
+    },
+    {
+      "id": "fixture-artist-052",
+      "name": "FixtureArtist052_Official",
+      "short_name": "FixtureArtist052"
+    },
+    {
+      "id": "fixture-artist-053",
+      "name": "FixtureArtist053_Official",
+      "short_name": "FixtureArtist053"
+    },
+    {
+      "id": "fixture-artist-054",
+      "name": "FixtureArtist054_Official",
+      "short_name": "FixtureArtist054"
+    },
+    {
+      "id": "fixture-artist-055",
+      "name": "FixtureArtist055_Official",
+      "short_name": "FixtureArtist055"
+    },
+    {
+      "id": "fixture-artist-056",
+      "name": "FixtureArtist056_Official",
+      "short_name": "FixtureArtist056"
+    },
+    {
+      "id": "fixture-artist-057",
+      "name": "FixtureArtist057_Official",
+      "short_name": "FixtureArtist057"
+    }
+  ],
+  "cases": [
+    {
+      "id": "ee15b446-81ed-4eb2-9ede-c7b1b1b88b0d",
+      "referenceYear": 2026,
+      "rawText": "【live 活动情报】#ultimaidols##ultimatum game#\n【转抽】当日票🎫 一张\n🌋【ultimatum game 】⛩️🌀\n时间：05月31日 11:30 open\n地点：育音堂小镇c厅\n参演：\nFixtureArtist040\nFixtureArtist011_Official\nFixtureArtist009\nFixtureArtist030\n\n———🎫 🔗见评 ———\n普通80/当日120",
+      "baseline": {
+        "title": "【live 活动情报】#ultimaidols##ultimatum game#",
+        "event_date": "2026-05-31",
+        "event_time": "12:30",
+        "city": "上海",
+        "venue": "育音堂小镇C厅",
+        "ticket_price": 80,
+        "linkedArtistIds": [
+          "fixture-artist-040",
+          "fixture-artist-011",
+          "fixture-artist-009",
+          "fixture-artist-030"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "🌋【ultimatum game 】⛩️🌀",
+          "event_date": "2026-05-31",
+          "event_time": "11:30",
+          "city": "上海",
+          "venue": "育音堂小镇C厅",
+          "artist": null,
+          "ticket_price": 80,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist040",
+              "source": "lineup",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist011_Official",
+              "source": "lineup",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist009",
+              "source": "lineup",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist030",
+              "source": "lineup",
+              "order": 3
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-040",
+            "fixture-artist-011",
+            "fixture-artist-009",
+            "fixture-artist-030"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "89142739-5e28-4687-a402-dc882ee3ec84",
+      "referenceYear": 2026,
+      "rawText": "【🪸@珊珊Shio-LapisLazuli 2026生日特别LIVE情报公开🪸】\n─────────\n\nULTIMATUM GAME & 珊珊BIRTHDAY SPECIAL～魔法使之夜～\n\n🪸2026.05.30 at 育音堂小镇C厅\n\nOPEN\n18:00\n\nSTART\n18:30\n\nGUEST\n@FixtureArtist030_Official \n@FixtureArtist040_Official \n@FixtureArtist011_Official \n@FixtureArtist051_Official \n@FixtureArtist027_Official \n\nTICKET\n\n🎫🔗稍后见评论区💬\n─────────\n\n珊珊Shio生日限定商品情报公开！\n现已上架开售！\n❖❖❖❖❖❖❖❖❖\n\n新商品内容🆕\n❖珊珊生日主题长袖T恤\n❖珊珊生日主题短袖T恤\n❖珊珊生日主题立牌\n❖珊珊生日主题键帽\n❖珊珊生日主题护腕\n\n※购买SET附赠：珊珊生日主题TO签亲笔留言相卡，数量有限，购买时需备注长短T恤尺码，详情参考海报。\n\n❖珊珊生日主题拍立得（仅含TO无签名）\n\n🪸主题拍立得上架时间26.05.20 14:00\n\n🪸主题拍立得同id限购2张，id以微商城为准，如误填真实姓名可联系官v（ultima030）进行更改（24小时后如有余量可重复购买）\n\n🪸配送方式\n现场自提仅限26.05.30演出当天，未领取将到付邮寄\n\n#FixtureArtist023_Official# \n\n如需搭建应援请联系官博提前登记，截止日期2026.05.26，未进行登记讲不予搭建，感谢配合\n---\n\n转关 抽当日活动普通票入场两位 抽奖详情",
+      "baseline": {
+        "title": "ULTIMATUM GAME & 珊珊BIRTHDAY SPECIAL～魔法使之夜～",
+        "event_date": "2026-05-30",
+        "event_time": "18:30",
+        "city": "上海",
+        "venue": "育音堂小镇C厅",
+        "ticket_price": 100,
+        "linkedArtistIds": [
+          "fixture-artist-030",
+          "fixture-artist-040",
+          "fixture-artist-051",
+          "fixture-artist-027",
+          "fixture-artist-011",
+          "fixture-artist-023"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "ULTIMATUM GAME & 珊珊BIRTHDAY SPECIAL～魔法使之夜～",
+          "event_date": "2026-05-30",
+          "event_time": "18:30",
+          "city": "上海",
+          "venue": "育音堂小镇C厅",
+          "artist": null,
+          "ticket_price": null,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist030_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist040_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist011_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist051_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist027_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist023_Official",
+              "source": "hashtag",
+              "order": 5
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-030",
+            "fixture-artist-040",
+            "fixture-artist-011",
+            "fixture-artist-051",
+            "fixture-artist-027",
+            "fixture-artist-023"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "043623eb-b856-4e55-86f7-022b7e938a0f",
+      "referenceYear": 2026,
+      "rawText": "#fixtureartist011# \n\nSooth the pain & DANCE TO THE BEAT！！\n\nFixtureArtist011_Official x NNNK TWOMAN LIVE \n& \n🪩星歌BIRTHDAY SPECIAL🩷\n～Dance to the Beat!～\n\n🕐 5/24（日）\n📍上海·新歌空间\n\n❗️互换打歌服❗️\n❗️互换原创曲❗️\n❗️全新合作❗️\n\n🪩OPEN 13:30 START 14:00\n🩷GUEST @FixtureArtist017_Official \n🪩TICKET\n生日票：280元（优先入场+星歌生日签名20cm大立牌+星歌单人带签五寸拍立得/FixtureArtist011_Official&NNNK全员无签五寸拍立得+星歌留言相卡）\nVIP票：200元（优先入场+2man纪念T恤）\n一般票：100元\n（本场演出门票支持积分兑换）\n\n🎫🔗：见评论\n\n【转+关】抽普通票*2",
+      "baseline": {
+        "title": "FixtureArtist011_Official x NNNK TWOMAN LIVE",
+        "event_date": "2026-05-24",
+        "event_time": "14:00",
+        "city": "上海",
+        "venue": "新歌空间",
+        "ticket_price": 100,
+        "linkedArtistIds": [
+          "fixture-artist-017",
+          "fixture-artist-011"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "FixtureArtist011_Official x NNNK TWOMAN LIVE",
+          "event_date": "2026-05-24",
+          "event_time": "14:00",
+          "city": "上海",
+          "venue": "新歌空间",
+          "artist": null,
+          "ticket_price": 100,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist017_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "fixtureartist011",
+              "source": "hashtag",
+              "order": 1
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-017",
+            "fixture-artist-011"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "d7b8f854-48d2-49f6-8bea-ff3b6816ff3d",
+      "referenceYear": 2026,
+      "rawText": "✨【SKT事务所活动情报解禁】✨\n\n以「NEXUS」为名，\n连接声音、情绪与存在的交汇点。\n属于我们的第一声共鸣，即将在此刻响起——\n\nSKT NEXUS LIVE Vol.01\n\n🗓️演出时间\n2026年5月10日\n19:00 OPEN｜19:20 START\n\n📍演出地点\n上海市黄浦区南京东路800号\n第一百货C馆7楼 世界树剧场\n\n🎁现场抽奖环节\n仅此一夜・限定放出\nSKT全体成员签名限定T恤 x1（限VIP观众）\n单独团体签名海报 ×5（限VIP观众）\n⚠️追加：单独团体全员手机合影x15（限VIP观众）\n全体观众均有机会获得随机礼品若干\n\n🎫票务信息\n268 VIP｜优先入场 + 首场限定T恤\n普通入场｜无料\n\n🔎V票购买地址详见评论区\n🕙VIP开售时间：2026年5月2日 22:00\n\n🎤参演团体：\n@FixtureArtist054_Official\n@FixtureArtist019_Official\n@FixtureArtist036_Official\n@FixtureArtist029_Official\n@FixtureArtist046_Official\n\n🧱+关  抽vip🎫一枚and偶活基金88x2 http://t.cn/AXJUQN8y",
+      "baseline": {
+        "title": "SKT NEXUS LIVE Vol.01",
+        "event_date": "2026-05-10",
+        "event_time": "19:20",
+        "city": "上海",
+        "venue": "世界树剧场",
+        "ticket_price": 0,
+        "linkedArtistIds": [
+          "fixture-artist-029",
+          "fixture-artist-036",
+          "fixture-artist-046",
+          "fixture-artist-054",
+          "fixture-artist-019"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "SKT NEXUS LIVE Vol.01",
+          "event_date": "2026-05-10",
+          "event_time": "19:20",
+          "city": "上海",
+          "venue": "世界树剧场",
+          "artist": null,
+          "ticket_price": 0,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist054_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist019_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist036_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist029_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist046_Official",
+              "source": "mention",
+              "order": 4
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-054",
+            "fixture-artist-019",
+            "fixture-artist-036",
+            "fixture-artist-029",
+            "fixture-artist-046"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "26241e6e-43e7-4730-a220-f81532bf8fba",
+      "referenceYear": 2026,
+      "rawText": "☠5.7 风起Vol.3 | 地偶×乐队直撞 ☠\n——————\n🧱+🍎 抽两张门票\n\n🕘 TIME｜22:00–22:30 (20:00开始演出)\n📍 PLACE｜酒球会\n🎫 门票：扫码海报\n\n🎸 阵容：@FixtureArtist020_Official @色撞Colorflict-Kinoko @世界以痛待我_我以待以待哟 ➕ 3位乐手老师\n\n🎵 SET LIST：\n蒲公英 / 星物语 / 最后的向往·茧&破\nSignal Mayday / Guushin / 黑い週末\n*后三首与@FixtureArtist028_Official 合演（band set）\n\n✨ 特典：平终皆可 ————（需前特请 DM）\n🔗 电切：网页链接\n（下单备注 ID＋时间，默认 2 张包邮✅）\n——————\n🪗演出时间表 已放P2➡️\n\n色撞Colorflict#地下偶像##starlink偶像计划##朋克# 抽奖详情",
+      "baseline": {
+        "title": "☠5.7 风起Vol.3 | 地偶×乐队直撞 ☠",
+        "event_date": "2026-05-07",
+        "event_time": "20:00",
+        "city": "杭州",
+        "venue": "酒球会",
+        "ticket_price": 68,
+        "linkedArtistIds": [
+          "fixture-artist-021",
+          "fixture-artist-028"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "☠5.7 风起Vol.3 | 地偶×乐队直撞 ☠",
+          "event_date": "2026-05-07",
+          "event_time": "20:00",
+          "city": "杭州",
+          "venue": "酒球会",
+          "artist": null,
+          "ticket_price": null,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist020_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "色撞Colorflict-Kinoko",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "世界以痛待我_我以待以待哟",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist028_Official",
+              "source": "mention",
+              "order": 3
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-020",
+            "fixture-artist-028"
+          ],
+          "unmatchedArtistNames": [
+            "色撞Colorflict-Kinoko",
+            "世界以痛待我_我以待以待哟"
+          ]
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "5ab65172-0f31-4bf3-b155-135cd5f9cdc9",
+      "referenceYear": 2026,
+      "rawText": "【⛓️主催情报解禁⛓️】\n\nYuiitsu Fes ～小鳥姫の茶話会～\n\n🫖 ０４／２５（土）\n🐦 YGG世界树剧场\n🎀 OPEN11:40 / START12:30\n\n⛲️FixtureArtist025/FixtureArtist053/FixtureArtist052/FixtureArtist051/StarAxis/VESPERA/SPARKLE/FixtureArtist015/FixtureArtist022_Official/YUMEUTSUTSU/FixtureArtist032_Official/FixtureArtist054/Aether Lurk\n\n衣装感谢：@Krad_Lanrete \n\n🎫门票🎫\n优先票 ¥388（优先入场+5寸拍立得合影券［*可以对SLMT事务所旗下团体使用］）\n      Yuiitsu Fes ～小鳥姫の茶話会～ 优先票 http://t.cn/AXxauqNW\n\n普通票 ¥48\n    🔍见评论区\n\n转➕关抽2️⃣0️⃣0️⃣🧧 http://t.cn/AXxamWkU",
+      "baseline": {
+        "title": "Yuiitsu Fes ～小鳥姫の茶話会～",
+        "event_date": "2026-04-25",
+        "event_time": "11:40",
+        "city": "上海",
+        "venue": "世界树剧场",
+        "ticket_price": 48,
+        "linkedArtistIds": [
+          "fixture-artist-029",
+          "fixture-artist-032",
+          "fixture-artist-047",
+          "fixture-artist-053",
+          "fixture-artist-048",
+          "fixture-artist-050",
+          "fixture-artist-051",
+          "fixture-artist-052",
+          "fixture-artist-054",
+          "fixture-artist-056",
+          "fixture-artist-015",
+          "fixture-artist-010",
+          "fixture-artist-022"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "Yuiitsu Fes ～小鳥姫の茶話会～",
+          "event_date": "2026-04-25",
+          "event_time": "11:40",
+          "city": "上海",
+          "venue": "世界树剧场",
+          "artist": null,
+          "ticket_price": 48,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist025",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist053",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist052",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist051",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "StarAxis",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "VESPERA",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "SPARKLE",
+              "source": "mention",
+              "order": 6
+            },
+            {
+              "rawName": "FixtureArtist015",
+              "source": "mention",
+              "order": 7
+            },
+            {
+              "rawName": "FixtureArtist022_Official",
+              "source": "mention",
+              "order": 8
+            },
+            {
+              "rawName": "YUMEUTSUTSU",
+              "source": "mention",
+              "order": 9
+            },
+            {
+              "rawName": "FixtureArtist032_Official",
+              "source": "mention",
+              "order": 10
+            },
+            {
+              "rawName": "FixtureArtist054",
+              "source": "mention",
+              "order": 11
+            },
+            {
+              "rawName": "Aether Lurk",
+              "source": "mention",
+              "order": 12
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-025",
+            "fixture-artist-053",
+            "fixture-artist-052",
+            "fixture-artist-051",
+            "fixture-artist-015",
+            "fixture-artist-022",
+            "fixture-artist-032",
+            "fixture-artist-054"
+          ],
+          "unmatchedArtistNames": [
+            "StarAxis",
+            "VESPERA",
+            "SPARKLE",
+            "YUMEUTSUTSU",
+            "Aether Lurk"
+          ]
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "c97aa820-9dd1-4dc9-b804-d161814b5ea7",
+      "referenceYear": 2026,
+      "rawText": "#fixtureartist011# \n\n🪽𝔜𝔬𝔲 𝔞𝔯𝔢 𝔪𝔶 𝔣𝔞𝔳𝔬𝔯𝔦𝔱𝔢 𝔭𝔯𝔢𝔶.🩸\n\nULTIMATUM GAME & 海羽 BIRTHDAY SPECIAL～海天使の深海狩猎宴～\n情报公开📢\n\n@海羽Rione-VORTEX \n\n4/25（六）in 上海·育音堂小镇C厅\n\n𝖜𝖆𝖎𝖙𝖎𝖓𝖌 𝖋𝖔𝖗 𝖞𝖔𝖚…\n\n【转+关】抽海羽Rione特典券*2 http://t.cn/AXxl3PC1",
+      "baseline": {
+        "title": "ULTIMATUM GAME & 海羽 BIRTHDAY SPECIAL～海天使の深海狩猎宴～",
+        "event_date": "2026-04-25",
+        "event_time": "19:00",
+        "city": "上海",
+        "venue": "育音堂小镇C厅",
+        "ticket_price": 100,
+        "linkedArtistIds": [
+          "fixture-artist-040",
+          "fixture-artist-011",
+          "fixture-artist-023",
+          "fixture-artist-030"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "ULTIMATUM GAME & 海羽 BIRTHDAY SPECIAL～海天使の深海狩猎宴～",
+          "event_date": "2026-04-25",
+          "event_time": null,
+          "city": "上海",
+          "venue": "育音堂小镇C厅",
+          "artist": null,
+          "ticket_price": null,
+          "artist_mentions": [
+            {
+              "rawName": "fixtureartist011",
+              "source": "hashtag",
+              "order": 0
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-011",
+            "fixture-artist-040",
+            "fixture-artist-023",
+            "fixture-artist-030"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "1f7ab819-4848-4d28-af03-542a17799873",
+      "referenceYear": 2026,
+      "rawText": "🌤️🌥️ULTIMATUM GAME情报 🌧️☀️\n\nULTIMATUM GAME & 烏野冬BIRTHDAY SPECIAL~心空予報~☔️\n\n4/18（六）in 上海·新歌空间\n\nOPEN\n17:30\n\nSTART\n18:00\n\nGUEST\n@FixtureArtist054_Official \n@FixtureArtist036_Official \n@FixtureArtist040_Official \n@FixtureArtist011_Official \n@FixtureArtist030_Official \n@FixtureArtist019_Official \n@FixtureArtist007_Official \n\n💧💧💧💧💧💧\n\nTICKET\n\n🎫🔗见评论区💬\n\n💧💧💧💧💧💧\n\n阴蓝的雨，洗淡了心的颜色\n\n空气潮湿，连记忆都渐渐模糊\n\n穿过雨声，光抵达心的每一个角落 http://t.cn/AXICZJYy",
+      "baseline": {
+        "title": "烏野冬BIRTHDAY SPECIAL~心空予報~☔️",
+        "event_date": "2026-04-18",
+        "event_time": "18:00",
+        "city": "上海",
+        "venue": "新歌空间",
+        "ticket_price": 100,
+        "linkedArtistIds": [
+          "fixture-artist-054",
+          "fixture-artist-036",
+          "fixture-artist-040",
+          "fixture-artist-011",
+          "fixture-artist-030",
+          "fixture-artist-019",
+          "fixture-artist-007",
+          "fixture-artist-023"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "烏野冬BIRTHDAY SPECIAL~心空予報~☔️",
+          "event_date": "2026-04-18",
+          "event_time": "18:00",
+          "city": "上海",
+          "venue": "新歌空间",
+          "artist": null,
+          "ticket_price": null,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist054_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist036_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist040_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist011_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist030_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist019_Official",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "FixtureArtist007_Official",
+              "source": "mention",
+              "order": 6
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-054",
+            "fixture-artist-036",
+            "fixture-artist-040",
+            "fixture-artist-011",
+            "fixture-artist-030",
+            "fixture-artist-019",
+            "fixture-artist-007",
+            "fixture-artist-023"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "bd9b67ed-bc6a-43ad-8263-fd36e185472e",
+      "referenceYear": 2026,
+      "rawText": "#fixtureartist040# \n      \n                  ⛩️  FixtureArtist040 ·一周年 ⛩️\n              1st Anniversary One-man Live \n                      「 Endless Defiance 」\n\n　　　　　　 ༒ 2026.04.05 ༒\n                     ༒ 育音堂小镇C厅 ༒\n\n⛩️OPEN 19:30 START 20:00\n⛩️VIP：优先入场，全员五寸拍立得（无签）＋纪念外套（p2四选一）\n🎫🔗：见评 \n*全场禁止摄影摄像 http://t.cn/AXITTK73",
+      "baseline": {
+        "title": "FixtureArtist040 1st Anniversary One-man Live",
+        "event_date": "2026-04-05",
+        "event_time": "20:00",
+        "city": "上海",
+        "venue": "育音堂小镇C厅",
+        "ticket_price": 100,
+        "linkedArtistIds": [
+          "fixture-artist-040"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "FixtureArtist040 1st Anniversary One-man Live",
+          "event_date": "2026-04-05",
+          "event_time": "20:00",
+          "city": "上海",
+          "venue": "育音堂小镇C厅",
+          "artist": null,
+          "ticket_price": null,
+          "artist_mentions": [
+            {
+              "rawName": "fixtureartist040",
+              "source": "hashtag",
+              "order": 0
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-040"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "333dda36-20b1-43e4-8139-c13cc33360de",
+      "referenceYear": 2026,
+      "rawText": "【04/04】\n「🎭ULTIMATE PERSONA～愚人节 SPECIAL LIVE 2026～」\n\n🗓️04月04日（SAT.）\n📍上海·育音堂小镇C厅（上海市长宁区昭化路658号地下一层）\n⌛️OPEN 17:30/ START 18:00\n🎟️·穿着任意Ultimaidols t恤入场🈚料❗️❗️（数量有限，需秀动预付1D）【已完售】\n     ·普通票 ¥100\n     ·VIP票 ¥300（VIP福利见海报）\n     ※以上票种需+1D¥20。\n    \n🎁【Ultimaidols愚人节限定周边公开】🎁\n* 限定立牌 50元/个 （现货数量有限仅现场购买）\n【当日微商城同时开放预约下单 需后续领取 4.10日截单】\n\n🃏𝔸𝕡𝕣𝕚𝕝 𝔽𝕠𝕠𝕝𝕤! 🎉😜\n\n#ultimaidols#",
+      "baseline": {
+        "title": "「🎭ULTIMATE PERSONA～愚人节 SPECIAL LIVE 2026～」",
+        "event_date": "2026-04-04",
+        "event_time": "18:00",
+        "city": "上海",
+        "venue": "育音堂小镇C厅",
+        "ticket_price": 20,
+        "linkedArtistIds": [
+          "fixture-artist-011",
+          "fixture-artist-040",
+          "fixture-artist-023",
+          "fixture-artist-030"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "「🎭ULTIMATE PERSONA～愚人节 SPECIAL LIVE 2026～」",
+          "event_date": "2026-04-04",
+          "event_time": "18:00",
+          "city": "上海",
+          "venue": "育音堂小镇C厅",
+          "artist": null,
+          "ticket_price": 100,
+          "artist_mentions": []
+        },
+        "match": {
+          "matchedArtistIds": [],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "9fa19805-37fb-4911-bfee-7427923c4e4e",
+      "referenceYear": 2026,
+      "rawText": "✦•······················•✦\nPIKA Festival 16\n地下偶像音乐节\n✦•······················•✦\n时间：2026年3月15日（日）\n10:45入场   11:00开演   终特至18:00\n演出地点：1701 Live House\n特典地点：1701 Open Space\n票务：码坪\n预售55￥  现场60￥\n✦•······················•✦\n【柏瑞美 X PIKA Festival】💄\n携手共赴音乐盛宴！🎉\n为热爱加冕，为闪耀助力！\n@柏瑞美PRAMY \n✦•······················•✦\n出演：\n@FixtureArtist042_Official new！\n@苏苏Yukina_FixtureArtist013 new！\n@FixtureArtist005_Official new！\n@FixtureArtist003_Official \n@FixtureArtist006_Official \n@FixtureArtist038_Official  \n@FixtureArtist049_Official \n@烁光星体_ScintiLLA \n@FixtureArtist016_Official \n@FixtureArtist031_Official \n生日sp：\n@FixtureArtist002_Official \n@-云里Kumori-FixtureArtist003 \n#Pikafes[超话]##pikafes##地下偶像##发电工作室#",
+      "baseline": {
+        "title": "PIKA Festival 16",
+        "event_date": "2026-03-15",
+        "event_time": "11:00",
+        "city": "南京",
+        "venue": "1701 Live House",
+        "ticket_price": 55,
+        "linkedArtistIds": [
+          "fixture-artist-003",
+          "fixture-artist-006",
+          "fixture-artist-031",
+          "fixture-artist-038",
+          "fixture-artist-042",
+          "fixture-artist-005",
+          "fixture-artist-049",
+          "fixture-artist-013",
+          "fixture-artist-016"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "PIKA Festival 16",
+          "event_date": "2026-03-15",
+          "event_time": "11:00",
+          "city": "南京",
+          "venue": "1701 Live House",
+          "artist": null,
+          "ticket_price": 55,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist042_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "苏苏Yukina_FixtureArtist013",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist005_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist003_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist006_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist038_Official",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "FixtureArtist049_Official",
+              "source": "mention",
+              "order": 6
+            },
+            {
+              "rawName": "烁光星体_ScintiLLA",
+              "source": "mention",
+              "order": 7
+            },
+            {
+              "rawName": "FixtureArtist016_Official",
+              "source": "mention",
+              "order": 8
+            },
+            {
+              "rawName": "FixtureArtist031_Official",
+              "source": "mention",
+              "order": 9
+            },
+            {
+              "rawName": "FixtureArtist002_Official",
+              "source": "mention",
+              "order": 10
+            },
+            {
+              "rawName": "-云里Kumori-FixtureArtist003",
+              "source": "mention",
+              "order": 11
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-042",
+            "fixture-artist-005",
+            "fixture-artist-003",
+            "fixture-artist-006",
+            "fixture-artist-038",
+            "fixture-artist-049",
+            "fixture-artist-016",
+            "fixture-artist-031",
+            "fixture-artist-002"
+          ],
+          "unmatchedArtistNames": [
+            "苏苏Yukina_FixtureArtist013",
+            "烁光星体_ScintiLLA",
+            "-云里Kumori-FixtureArtist003"
+          ]
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "6b895089-4913-4c15-b251-d74e9089459f",
+      "referenceYear": 2026,
+      "rawText": "【星跃金陵Fes Vol.31】\n🐎马上开箱🐎\n\n📆时间：\n2026年3月7日（周六）   Start 13:20\n🔻地点：\n南京市山西路1号 KUMOLL二楼\n🎫无料入场\n\n❤️出席团体\n@FixtureArtist031_Official \n@FixtureArtist037_Official \n@FixtureArtist038_Official \n@FixtureArtist003_Official \n@FixtureArtist041_Official \n@FixtureArtist004_Official \n@FixtureArtist046_offical \n@FixtureArtist049_Official \n@FixtureArtist057_Official \n@FixtureArtist042_Official",
+      "baseline": {
+        "title": "【星跃金陵Fes Vol.31】",
+        "event_date": "2026-03-07",
+        "event_time": "13:20",
+        "city": "南京",
+        "venue": "KUMOLL",
+        "ticket_price": 0,
+        "linkedArtistIds": [
+          "fixture-artist-003",
+          "fixture-artist-004",
+          "fixture-artist-031",
+          "fixture-artist-037",
+          "fixture-artist-038",
+          "fixture-artist-041",
+          "fixture-artist-046",
+          "fixture-artist-049",
+          "fixture-artist-057"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "【星跃金陵Fes Vol.31】",
+          "event_date": "2026-03-07",
+          "event_time": "13:20",
+          "city": "南京",
+          "venue": "KUMOLL",
+          "artist": null,
+          "ticket_price": 0,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist031_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist037_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist038_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist003_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist041_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist004_Official",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "FixtureArtist046_offical",
+              "source": "mention",
+              "order": 6
+            },
+            {
+              "rawName": "FixtureArtist049_Official",
+              "source": "mention",
+              "order": 7
+            },
+            {
+              "rawName": "FixtureArtist057_Official",
+              "source": "mention",
+              "order": 8
+            },
+            {
+              "rawName": "FixtureArtist042_Official",
+              "source": "mention",
+              "order": 9
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-031",
+            "fixture-artist-037",
+            "fixture-artist-038",
+            "fixture-artist-003",
+            "fixture-artist-041",
+            "fixture-artist-004",
+            "fixture-artist-046",
+            "fixture-artist-049",
+            "fixture-artist-057",
+            "fixture-artist-042"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "37da4668-f922-44da-ba14-5a736051a58c",
+      "referenceYear": 2026,
+      "rawText": "【星跃金陵Fes Vol.29】🎉\n📆时间：\n2026年1月11日   Start 12：00\n🔻地点：\n南京市山西路1号 KUMOLL二楼\n🎫无料入场\n❤️出席团体\n@FixtureArtist026_Official \n@FixtureArtist042_Official \n@FixtureArtist005_Official \n@FixtureArtist039_Official \n@FixtureArtist038_Official \n@FixtureArtist041_Official \n@FixtureArtist003_Official \n@FixtureArtist016_Official \n@FixtureArtist012_Official \n@FixtureArtist037_Official \n@FixtureArtist031_Official \n@FixtureArtist049_Official \n\n🎂：@YURI_TheWorld 🎉",
+      "baseline": {
+        "title": "【星跃金陵Fes Vol.29】🎉",
+        "event_date": "2026-01-11",
+        "event_time": "12:00",
+        "city": "南京",
+        "venue": "KUMOLL",
+        "ticket_price": 0,
+        "linkedArtistIds": [
+          "fixture-artist-026",
+          "fixture-artist-003",
+          "fixture-artist-031",
+          "fixture-artist-037",
+          "fixture-artist-038",
+          "fixture-artist-039",
+          "fixture-artist-041",
+          "fixture-artist-005",
+          "fixture-artist-049",
+          "fixture-artist-016",
+          "fixture-artist-012",
+          "fixture-artist-042"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "【星跃金陵Fes Vol.29】🎉",
+          "event_date": "2026-01-11",
+          "event_time": "12:00",
+          "city": "南京",
+          "venue": "KUMOLL",
+          "artist": null,
+          "ticket_price": 0,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist026_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist042_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist005_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist039_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist038_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist041_Official",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "FixtureArtist003_Official",
+              "source": "mention",
+              "order": 6
+            },
+            {
+              "rawName": "FixtureArtist016_Official",
+              "source": "mention",
+              "order": 7
+            },
+            {
+              "rawName": "FixtureArtist012_Official",
+              "source": "mention",
+              "order": 8
+            },
+            {
+              "rawName": "FixtureArtist037_Official",
+              "source": "mention",
+              "order": 9
+            },
+            {
+              "rawName": "FixtureArtist031_Official",
+              "source": "mention",
+              "order": 10
+            },
+            {
+              "rawName": "FixtureArtist049_Official",
+              "source": "mention",
+              "order": 11
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-026",
+            "fixture-artist-042",
+            "fixture-artist-005",
+            "fixture-artist-039",
+            "fixture-artist-038",
+            "fixture-artist-041",
+            "fixture-artist-003",
+            "fixture-artist-016",
+            "fixture-artist-012",
+            "fixture-artist-037",
+            "fixture-artist-031",
+            "fixture-artist-049"
+          ],
+          "unmatchedArtistNames": []
+        }
+      },
+      "notes": ""
+    },
+    {
+      "id": "f1a2b3c4-d5e6-4f78-9012-3a4b5c6d7e8f",
+      "referenceYear": 2026,
+      "rawText": "—  【🤍Live演出信息公布🫧】  —\n\n˚₊♡ 心的方向⟡𓈒˚₊糕糕生日sp⊹₊˚\n\n⏰演出时间：\n2026.05.23（土）｜Open 10:30 & Start 11:00\n\n📍演出地址：\nMao livehouse 上海市黄浦区重庆南路308号3层\n\n👤演出团体：\n@FixtureArtist011_Official\n@FixtureArtist030_Official\n@FixtureArtist040_Official\n@FixtureArtist023_Official\n@FixtureArtist043_Official \n@FixtureArtist044_Official \n@ReJumping_Official\n@FixtureArtist052_Official\n@FixtureArtist051_Official\n@FixtureArtist050_Official\n@FixtureArtist001_Official\n@FixtureArtist027_Official\n@FixtureArtist035_Official\n@FixtureArtist025_Official\n@FixtureArtist008_Official\n@FixtureArtist055_Official\n@FixtureArtist024_Official\n@FixtureArtist014_Official\n@FixtureArtist034_Official\n@FixtureArtist045_Official\n@FixtureArtist033_Official\n\n🎫票务信息：\n普通票🎫：💰138\n当日票🎫：💰178\nVIP🎫：💰298（演出&终特 优先入场+糕糕生日限定留言券*1）\nVIP开票时间：2026.05.18 21:00（VIP番号入场）\n票务稍后\n\n🧱➕关抽三位无料入场、一位偶活金💰100 抽奖详情",
+      "baseline": {
+        "title": "˚₊♡ 心的方向⟡𓈒˚₊糕糕生日sp⊹₊˚",
+        "event_date": "2026-05-23",
+        "event_time": "11:00",
+        "city": "上海",
+        "venue": "Mao Live House",
+        "ticket_price": 138,
+        "linkedArtistIds": [
+          "fixture-artist-011",
+          "fixture-artist-030",
+          "fixture-artist-018",
+          "fixture-artist-023",
+          "fixture-artist-043",
+          "fixture-artist-044",
+          "fixture-artist-052",
+          "fixture-artist-051",
+          "fixture-artist-050",
+          "fixture-artist-001",
+          "fixture-artist-027",
+          "fixture-artist-035",
+          "fixture-artist-025",
+          "fixture-artist-008",
+          "fixture-artist-055",
+          "fixture-artist-024",
+          "fixture-artist-014",
+          "fixture-artist-034",
+          "fixture-artist-045",
+          "fixture-artist-033"
+        ]
+      },
+      "expected": {
+        "parsed": {
+          "title": "˚₊♡ 心的方向⟡𓈒˚₊糕糕生日sp⊹₊˚",
+          "event_date": "2026-05-23",
+          "event_time": "11:00",
+          "city": "上海",
+          "venue": "Mao Live House",
+          "artist": null,
+          "ticket_price": 138,
+          "artist_mentions": [
+            {
+              "rawName": "FixtureArtist011_Official",
+              "source": "mention",
+              "order": 0
+            },
+            {
+              "rawName": "FixtureArtist030_Official",
+              "source": "mention",
+              "order": 1
+            },
+            {
+              "rawName": "FixtureArtist040_Official",
+              "source": "mention",
+              "order": 2
+            },
+            {
+              "rawName": "FixtureArtist023_Official",
+              "source": "mention",
+              "order": 3
+            },
+            {
+              "rawName": "FixtureArtist043_Official",
+              "source": "mention",
+              "order": 4
+            },
+            {
+              "rawName": "FixtureArtist044_Official",
+              "source": "mention",
+              "order": 5
+            },
+            {
+              "rawName": "ReJumping_Official",
+              "source": "mention",
+              "order": 6
+            },
+            {
+              "rawName": "FixtureArtist052_Official",
+              "source": "mention",
+              "order": 7
+            },
+            {
+              "rawName": "FixtureArtist051_Official",
+              "source": "mention",
+              "order": 8
+            },
+            {
+              "rawName": "FixtureArtist050_Official",
+              "source": "mention",
+              "order": 9
+            },
+            {
+              "rawName": "FixtureArtist001_Official",
+              "source": "mention",
+              "order": 10
+            },
+            {
+              "rawName": "FixtureArtist027_Official",
+              "source": "mention",
+              "order": 11
+            },
+            {
+              "rawName": "FixtureArtist035_Official",
+              "source": "mention",
+              "order": 12
+            },
+            {
+              "rawName": "FixtureArtist025_Official",
+              "source": "mention",
+              "order": 13
+            },
+            {
+              "rawName": "FixtureArtist008_Official",
+              "source": "mention",
+              "order": 14
+            },
+            {
+              "rawName": "FixtureArtist055_Official",
+              "source": "mention",
+              "order": 15
+            },
+            {
+              "rawName": "FixtureArtist024_Official",
+              "source": "mention",
+              "order": 16
+            },
+            {
+              "rawName": "FixtureArtist014_Official",
+              "source": "mention",
+              "order": 17
+            },
+            {
+              "rawName": "FixtureArtist034_Official",
+              "source": "mention",
+              "order": 18
+            },
+            {
+              "rawName": "FixtureArtist045_Official",
+              "source": "mention",
+              "order": 19
+            },
+            {
+              "rawName": "FixtureArtist033_Official",
+              "source": "mention",
+              "order": 20
+            }
+          ]
+        },
+        "match": {
+          "matchedArtistIds": [
+            "fixture-artist-011",
+            "fixture-artist-030",
+            "fixture-artist-040",
+            "fixture-artist-023",
+            "fixture-artist-043",
+            "fixture-artist-044",
+            "fixture-artist-052",
+            "fixture-artist-051",
+            "fixture-artist-050",
+            "fixture-artist-001",
+            "fixture-artist-027",
+            "fixture-artist-035",
+            "fixture-artist-025",
+            "fixture-artist-008",
+            "fixture-artist-055",
+            "fixture-artist-024",
+            "fixture-artist-014",
+            "fixture-artist-034",
+            "fixture-artist-045",
+            "fixture-artist-033"
+          ],
+          "unmatchedArtistNames": [
+            "ReJumping_Official"
+          ]
+        }
+      },
+      "notes": "emoji-decorated title; ticket price via 💰 emoji; FixtureArtist044_Official trailing-hyphen suffix fix; hasFreeAdmission raffle-line exclusion"
+    }
+  ]
+}

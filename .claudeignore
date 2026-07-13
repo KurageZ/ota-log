@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+.expo/
+
+# Native build artifacts
+android/build/
+android/.gradle/
+android/app/build/
+android/local.properties
+ios/build/
+ios/Pods/
+ios/DerivedData/
+
+# Generated assets
+src/db/artistAvatars.ts
+src/db/seedArtists.ts
+assets/avatars/
+
+# Lock files
+package-lock.json
+
+# Misc
+.DS_Store
