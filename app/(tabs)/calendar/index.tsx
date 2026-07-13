@@ -542,7 +542,7 @@ export default function CalendarScreen() {
         paddingBottom: contentBottomPadding,
       }}
       contentInsetAdjustmentBehavior="automatic"
-      scrollIndicatorInsets={{ bottom: contentBottomPadding }}
+      scrollIndicatorInsets={isIOS ? undefined : { bottom: contentBottomPadding }}
       {...monthViewScrollProps}
     >
       {!isIOS ? (
@@ -1024,7 +1024,7 @@ export default function CalendarScreen() {
             paddingBottom: contentBottomPadding,
           }}
           contentInsetAdjustmentBehavior="automatic"
-          scrollIndicatorInsets={{ bottom: contentBottomPadding }}
+          scrollIndicatorInsets={isIOS ? undefined : { bottom: contentBottomPadding }}
           showsVerticalScrollIndicator={false}
           {...timelineViewScrollProps}
           ListHeaderComponent={!isIOS ? (

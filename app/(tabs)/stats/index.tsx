@@ -950,7 +950,6 @@ export default function StatsScreen() {
           style={{ flex: 1, backgroundColor: colors.screen }}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
-          scrollIndicatorInsets={{ bottom: contentBottomPadding }}
           contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: contentBottomPadding }}
           {...tabBarScroll}
         >

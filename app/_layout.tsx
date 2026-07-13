@@ -8,6 +8,7 @@ import { DBProvider } from '../src/context/DBContext';
 import { OnboardingGuideProvider } from '../src/components/OnboardingGuide';
 import { useAppTheme } from '../src/theme/appTheme';
 import { AppThemeProvider } from '../src/theme/themePreferences';
+import { AppNavigationThemeProvider } from '../src/navigation/app-navigation-theme-provider';
 
 const LUCIDE_FONT = require('@react-native-vector-icons/lucide/fonts/Lucide.ttf');
 
@@ -22,7 +23,9 @@ export default function RootLayout() {
           <BottomSheetModalProvider>
             <DBProvider>
               <OnboardingGuideProvider>
-                <RootNavigator />
+                <AppNavigationThemeProvider>
+                  <RootNavigator />
+                </AppNavigationThemeProvider>
               </OnboardingGuideProvider>
             </DBProvider>
           </BottomSheetModalProvider>

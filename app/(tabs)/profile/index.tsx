@@ -337,7 +337,6 @@ export default function ProfileScreen() {
           style={{ flex: 1, backgroundColor: colors.screen }}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
-          scrollIndicatorInsets={{ bottom: contentBottomPadding }}
           contentContainerStyle={{
             paddingTop: 6,
             paddingBottom: contentBottomPadding + 24,

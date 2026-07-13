@@ -50,7 +50,7 @@ import { SearchFilterBar } from '../components/SearchFilterBar';
 import { BottomSheetDialog } from '../components/BottomSheetDialog';
 import { FilterSheet, FilterSection } from '../components/FilterSheet';
 import { FilteredEmptyState } from '../components/FilteredEmptyState';
-import { AppIcon } from '../components/AppIcon';
+import { AppIcon, getAppIconSFSymbol } from '../components/AppIcon';
 import { getArtistSearchText, sortArtistsWithOshi } from '../utils/filter';
 import { withAlpha } from '../utils/color';
 import {
@@ -1702,77 +1702,63 @@ export default function ChekiLibraryScreen() {
     toggleStack,
   ]);
 
-  return (
-    <View style={{ flex: 1, backgroundColor: bg }}>
-      <Stack.Screen
-        options={{
-          headerRight: renderHeaderActions,
-        }}
-      />
-
-      {isAndroid ? (
-        <AndroidCompactTabHeader
-          title="电子切册"
-          right={renderHeaderActions()}
-          compactHeaderStyle={androidHeader.compactHeaderStyle}
-          overlayHeight={androidHeader.overlayHeight}
-          overlayPaddingTop={androidHeader.overlayPaddingTop}
-        />
-      ) : null}
-
-      <FlatList
-        onLayout={handleGalleryLayout}
-        data={galleryItems}
-        keyExtractor={(item) => item.key}
-        renderItem={renderGalleryItem}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: isAndroid ? androidHeader.contentTopPadding : 12,
-          paddingBottom: contentBottomPadding,
-        }}
-        contentInsetAdjustmentBehavior="automatic"
-        scrollIndicatorInsets={{ bottom: contentBottomPadding }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        {...tabBarScroll}
-        ListHeaderComponent={
-          <>
-            {isAndroid ? (
-              <AndroidLargeTabTitle
-                title="电子切册"
-                right={renderHeaderActions()}
-                largeTitleStyle={androidHeader.largeTitleStyle}
-              />
-            ) : null}
-            <View onLayout={handleGalleryHeaderLayout} style={{ marginBottom: 8 }}>
-              <SearchFilterBar
-                keyword={keyword}
-                onKeywordChange={setKeyword}
-                placeholder="输入关键词搜索"
-                onOpenFilter={() => setFilterVisible(true)}
-                activeFilters={activeSearchFilters}
-                activeCount={activeFilterCount}
-                isDark={isDark}
-              />
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          hasAnyFilter ? (
-            <FilteredEmptyState
-              title="没有符合条件的记录"
-              onClear={clearFilter}
+  const galleryList = (
+    <FlatList
+      onLayout={handleGalleryLayout}
+      data={galleryItems}
+      keyExtractor={(item) => item.key}
+      renderItem={renderGalleryItem}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        paddingTop: isAndroid ? androidHeader.contentTopPadding : 12,
+        paddingBottom: contentBottomPadding,
+      }}
+      contentInsetAdjustmentBehavior="automatic"
+      scrollIndicatorInsets={isAndroid ? { bottom: contentBottomPadding } : undefined}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      {...tabBarScroll}
+      ListHeaderComponent={
+        <>
+          {isAndroid ? (
+            <AndroidLargeTabTitle
+              title="电子切册"
+              right={renderHeaderActions()}
+              largeTitleStyle={androidHeader.largeTitleStyle}
+            />
+          ) : null}
+          <View onLayout={handleGalleryHeaderLayout} style={{ marginBottom: 8 }}>
+            <SearchFilterBar
+              keyword={keyword}
+              onKeywordChange={setKeyword}
+              placeholder="输入关键词搜索"
+              onOpenFilter={() => setFilterVisible(true)}
+              activeFilters={activeSearchFilters}
+              activeCount={activeFilterCount}
               isDark={isDark}
             />
-          ) : renderEmptyState()
-        }
-        initialNumToRender={12}
-        maxToRenderPerBatch={9}
-        windowSize={7}
-        removeClippedSubviews
-      />
+          </View>
+        </>
+      }
+      ListEmptyComponent={
+        hasAnyFilter ? (
+          <FilteredEmptyState
+            title="没有符合条件的记录"
+            onClear={clearFilter}
+            isDark={isDark}
+          />
+        ) : renderEmptyState()
+      }
+      initialNumToRender={12}
+      maxToRenderPerBatch={9}
+      windowSize={7}
+      removeClippedSubviews
+    />
+  );
 
+  const screenOverlays = (
+    <>
       <ChekiViewerModal
         visible={viewerState !== null}
         items={viewerItems}
@@ -1791,63 +1777,163 @@ export default function ChekiLibraryScreen() {
         onClose={() => setFilterVisible(false)}
       />
 
-      <BottomSheetDialog
-        visible={viewSettingsVisible}
-        title="视图设置"
-        onClose={() => setViewSettingsVisible(false)}
-        maxHeightRatio={0.52}
-        scrollable
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
-      >
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-            展示模式
-          </Text>
-          <SegmentedOptions
-            colors={colors}
-            options={[
-              { value: 'artist', label: '艺人' },
-              { value: 'date', label: '时间' },
-              { value: 'album', label: '相册' },
-            ]}
-            value={viewPreferences.mode}
-            onChange={(value) => handleChangeMode(value as ChekiViewMode)}
-          />
-        </View>
-
-        {viewPreferences.mode !== 'artist' ? (
+      {isAndroid ? (
+        <BottomSheetDialog
+          visible={viewSettingsVisible}
+          title="视图设置"
+          onClose={() => setViewSettingsVisible(false)}
+          maxHeightRatio={0.52}
+          scrollable
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
+        >
           <View style={{ marginBottom: 16 }}>
             <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-              排序
+              展示模式
             </Text>
             <SegmentedOptions
               colors={colors}
               options={[
-                { value: 'desc', label: '最新在前' },
-                { value: 'asc', label: '最早在前' },
+                { value: 'artist', label: '艺人' },
+                { value: 'date', label: '时间' },
+                { value: 'album', label: '相册' },
               ]}
-              value={viewPreferences.sortOrder}
-              onChange={(value) => handleChangeSortOrder(value as ChekiSortOrder)}
+              value={viewPreferences.mode}
+              onChange={(value) => handleChangeMode(value as ChekiViewMode)}
             />
           </View>
-        ) : null}
 
-        <View>
-          <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-            图片大小
-          </Text>
-          <SegmentedOptions
-            colors={colors}
-            options={[
-              { value: 'large', label: '大' },
-              { value: 'medium', label: '中' },
-              { value: 'small', label: '小' },
-            ]}
-            value={viewPreferences.density}
-            onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
-          />
-        </View>
-      </BottomSheetDialog>
-    </View>
+          {viewPreferences.mode !== 'artist' ? (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                排序
+              </Text>
+              <SegmentedOptions
+                colors={colors}
+                options={[
+                  { value: 'desc', label: '最新在前' },
+                  { value: 'asc', label: '最早在前' },
+                ]}
+                value={viewPreferences.sortOrder}
+                onChange={(value) => handleChangeSortOrder(value as ChekiSortOrder)}
+              />
+            </View>
+          ) : null}
+
+          <View>
+            <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+              图片大小
+            </Text>
+            <SegmentedOptions
+              colors={colors}
+              options={[
+                { value: 'large', label: '大' },
+                { value: 'medium', label: '中' },
+                { value: 'small', label: '小' },
+              ]}
+              value={viewPreferences.density}
+              onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
+            />
+          </View>
+        </BottomSheetDialog>
+      ) : null}
+    </>
+  );
+
+  if (isAndroid) {
+    return (
+      <View style={{ flex: 1, backgroundColor: bg }}>
+        <Stack.Screen
+          options={{
+            headerRight: renderHeaderActions,
+          }}
+        />
+        <AndroidCompactTabHeader
+          title="电子切册"
+          right={renderHeaderActions()}
+          compactHeaderStyle={androidHeader.compactHeaderStyle}
+          overlayHeight={androidHeader.overlayHeight}
+          overlayPaddingTop={androidHeader.overlayPaddingTop}
+        />
+        {galleryList}
+        {screenOverlays}
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {galleryList}
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu
+          accessibilityLabel="切册视图设置"
+          icon={getAppIconSFSymbol('viewSettings')}
+        >
+          <Stack.Toolbar.Menu inline title="展示模式">
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.mode === 'artist'}
+              onPress={() => handleChangeMode('artist')}
+            >
+              艺人
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.mode === 'date'}
+              onPress={() => handleChangeMode('date')}
+            >
+              时间
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.mode === 'album'}
+              onPress={() => handleChangeMode('album')}
+            >
+              相册
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+          {viewPreferences.mode !== 'artist' ? (
+            <Stack.Toolbar.Menu inline title="排序">
+              <Stack.Toolbar.MenuAction
+                isOn={viewPreferences.sortOrder === 'desc'}
+                onPress={() => handleChangeSortOrder('desc')}
+              >
+                最新在前
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                isOn={viewPreferences.sortOrder === 'asc'}
+                onPress={() => handleChangeSortOrder('asc')}
+              >
+                最早在前
+              </Stack.Toolbar.MenuAction>
+            </Stack.Toolbar.Menu>
+          ) : null}
+          <Stack.Toolbar.Menu inline title="图片大小">
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.density === 'large'}
+              onPress={() => handleChangeDensity('large')}
+            >
+              大
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.density === 'medium'}
+              onPress={() => handleChangeDensity('medium')}
+            >
+              中
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              isOn={viewPreferences.density === 'small'}
+              onPress={() => handleChangeDensity('small')}
+            >
+              小
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar.Menu>
+        <Stack.Toolbar.Spacer width={8} />
+        <Stack.Toolbar.Button
+          accessibilityLabel="添加拍立得"
+          icon={getAppIconSFSymbol('add')}
+          onPress={openUnifiedCreate}
+          separateBackground
+        />
+      </Stack.Toolbar>
+      {screenOverlays}
+    </>
   );
 }

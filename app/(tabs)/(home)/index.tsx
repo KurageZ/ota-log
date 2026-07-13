@@ -1,24 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, NativeScrollEvent, NativeSyntheticEvent, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
-import { useDB } from '../../src/context/DBContext';
-import { Cheki, Event, UserConfig } from '../../src/types/models';
-import type { HeroBannerItem } from '../../src/components/HeroBanner';
-import { HomeUpcomingHero } from '../../src/components/HomeUpcomingHero';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, Platform } from 'react-native';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useDB } from '../../../src/context/DBContext';
+import { Cheki, Event, UserConfig } from '../../../src/types/models';
+import type { HeroBannerItem } from '../../../src/components/HeroBanner';
+import { HomeUpcomingHero } from '../../../src/components/HomeUpcomingHero';
 import {
   AndroidCompactTabHeader,
   AndroidLargeTabTitle,
   useAndroidCollapsibleTabHeader,
-} from '../../src/components/AndroidCollapsibleTabHeader';
-import { HomeTimelineEventCard } from '../../src/components/HomeTimelineEventCard';
-import { HomeCompletedEventCard } from '../../src/components/HomeCompletedEventCard';
+} from '../../../src/components/AndroidCollapsibleTabHeader';
+import { HomeTimelineEventCard } from '../../../src/components/HomeTimelineEventCard';
+import { HomeCompletedEventCard } from '../../../src/components/HomeCompletedEventCard';
 import {
   HomeChekiOverviewCard,
   HomeChekiPreview,
@@ -27,15 +20,14 @@ import {
   HomeImportantDatesCard,
   HomeMonthOverviewCard,
   HomeMonthOverviewData,
-} from '../../src/components/HomeDashboardCards';
-import type { HydratedDateItem } from '../../src/repositories/DateItemRepository';
-import { AppIcon } from '../../src/components/AppIcon';
-import { EventCardOshiBadge, getEventCardOshiBadge, getOshiMatchSource } from '../../src/utils/oshiMatch';
-import { buildHomeTimelineGroups } from '../../src/utils/homeTimeline';
-import { useAppTheme } from '../../src/theme/appTheme';
-import { useFloatingTabBarSpacing } from '../../src/navigation/floatingTabBar';
-import { useFloatingTabBarScroll } from '../../src/navigation/FloatingTabBarVisibility';
-import { withAlpha } from '../../src/utils/color';
+} from '../../../src/components/HomeDashboardCards';
+import type { HydratedDateItem } from '../../../src/repositories/DateItemRepository';
+import { AppIcon } from '../../../src/components/AppIcon';
+import { EventCardOshiBadge, getEventCardOshiBadge, getOshiMatchSource } from '../../../src/utils/oshiMatch';
+import { buildHomeTimelineGroups } from '../../../src/utils/homeTimeline';
+import { useAppTheme } from '../../../src/theme/appTheme';
+import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
+import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
 import {
   DEFAULT_RECENT_COMPLETED_DISPLAY_LIMIT,
   HomeCardConfig,
@@ -45,13 +37,13 @@ import {
   createDefaultHomePinnedInfo,
   getHomeCardKey,
   loadHomePreferences,
-} from '../../src/utils/homePreferences';
+} from '../../../src/utils/homePreferences';
 import {
   HomePinnedArtistHero,
   HomePinnedMonthSummaryHero,
   HomePinnedNextEventEmptyHero,
-} from '../../src/components/HomePinnedInfoHero';
-import { toISODate } from '../../src/utils/date';
+} from '../../../src/components/HomePinnedInfoHero';
+import { toISODate } from '../../../src/utils/date';
 
 type UpcomingItem = {
   event: Event;
@@ -255,12 +247,10 @@ function HomeCardsEmptyState({ onCustomizePress }: { onCustomizePress: () => voi
 
 export default function HomeScreen() {
   const db = useDB();
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const isAndroid = Platform.OS === 'android';
-  const RootView = isAndroid ? View : SafeAreaView;
   const androidHeader = useAndroidCollapsibleTabHeader();
-  const titleScrollY = useSharedValue(0);
   const [pinnedInfo, setPinnedInfo] = useState<HomePinnedInfoConfig>(() => createDefaultHomePinnedInfo());
   const [heroItem, setHeroItem] = useState<HeroBannerItem | null>(null);
   const [homeCards, setHomeCards] = useState<HomeCardConfig[]>(() => createDefaultHomeCards());
@@ -282,36 +272,8 @@ export default function HomeScreen() {
   }>({ totalCount: 0, monthCount: 0, previews: [] });
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleTitleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      titleScrollY.value = Math.max(event.nativeEvent.contentOffset.y, 0);
-    },
-    [titleScrollY],
-  );
-
-  const tabBarScroll = useFloatingTabBarScroll({
-    onScroll: handleTitleScroll,
-    topRevealOffset: 24,
-  });
+  const tabBarScroll = useFloatingTabBarScroll();
   const scrollProps = isAndroid ? androidHeader.scrollProps : tabBarScroll;
-
-  const largeTitleStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(titleScrollY.value, [0, 24, 72], [1, 0.72, 0], Extrapolation.CLAMP),
-    transform: [
-      {
-        translateY: interpolate(titleScrollY.value, [0, 72], [0, -18], Extrapolation.CLAMP),
-      },
-    ],
-  }));
-
-  const compactHeaderStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(titleScrollY.value, [0, 28, 88], [0, 0, 1], Extrapolation.CLAMP),
-    transform: [
-      {
-        translateY: interpolate(titleScrollY.value, [0, 88], [-10, 0], Extrapolation.CLAMP),
-      },
-    ],
-  }));
 
   const loadData = useCallback(async () => {
     const now = new Date();
@@ -653,90 +615,55 @@ export default function HomeScreen() {
   ]);
   const renderedHomeCards = homeCards.map(renderHomeCard);
   const hasRenderedHomeCards = renderedHomeCards.some(Boolean);
-
-  return (
-    <RootView style={{ flex: 1, backgroundColor: colors.screen }}>
+  const scrollContent = (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.screen }}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        paddingTop: isAndroid ? androidHeader.contentTopPadding : 6,
+        paddingBottom: contentBottomPadding,
+      }}
+      contentInsetAdjustmentBehavior="automatic"
+      scrollIndicatorInsets={isAndroid ? { bottom: contentBottomPadding } : undefined}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+      showsVerticalScrollIndicator={false}
+      {...scrollProps}
+    >
       {isAndroid ? (
-        <AndroidCompactTabHeader
+        <AndroidLargeTabTitle
           title="首页"
           right={renderCreateEventIcon()}
-          compactHeaderStyle={androidHeader.compactHeaderStyle}
-          overlayHeight={androidHeader.overlayHeight}
-          overlayPaddingTop={androidHeader.overlayPaddingTop}
+          largeTitleStyle={androidHeader.largeTitleStyle}
         />
-      ) : (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 50,
-              paddingHorizontal: 16,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: withAlpha(colors.screen, isDark ? 0.94 : 0.9),
-              borderBottomWidth: 1,
-              borderBottomColor: colors.divider,
-              zIndex: 10,
-            },
-            compactHeaderStyle,
-          ]}
-        >
-          <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: colors.heading }}>
-            首页
-          </Text>
-          {renderCreateEventIcon()}
-        </Animated.View>
+      ) : null}
+
+      {renderPinnedInfo()}
+
+      {hasRenderedHomeCards ? renderedHomeCards : (
+        <HomeCardsEmptyState onCustomizePress={() => router.push('/settings/home')} />
       )}
+    </ScrollView>
+  );
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: isAndroid ? androidHeader.contentTopPadding : 18,
-          paddingBottom: contentBottomPadding,
-        }}
-        contentInsetAdjustmentBehavior="automatic"
-        scrollIndicatorInsets={{ bottom: contentBottomPadding }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-        showsVerticalScrollIndicator={false}
-        {...scrollProps}
-      >
-        {isAndroid ? (
-          <AndroidLargeTabTitle
-            title="首页"
-            right={renderCreateEventIcon()}
-            largeTitleStyle={androidHeader.largeTitleStyle}
-          />
-        ) : (
-          <Animated.View
-            style={[
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 16,
-              },
-              largeTitleStyle,
-            ]}
-          >
-            <Text style={{ fontSize: 30, lineHeight: 34, fontWeight: '900', letterSpacing: -0.7, color: colors.heading }}>
-              首页
-            </Text>
-            {renderCreateEventIcon()}
-          </Animated.View>
-        )}
+  if (!isAndroid) {
+    return (
+      <>
+        <Stack.Screen options={{ headerRight: renderCreateEventIcon }} />
+        {scrollContent}
+      </>
+    );
+  }
 
-        {renderPinnedInfo()}
-
-        {hasRenderedHomeCards ? renderedHomeCards : (
-          <HomeCardsEmptyState onCustomizePress={() => router.push('/settings/home')} />
-        )}
-      </ScrollView>
-    </RootView>
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.screen }}>
+      <AndroidCompactTabHeader
+        title="首页"
+        right={renderCreateEventIcon()}
+        compactHeaderStyle={androidHeader.compactHeaderStyle}
+        overlayHeight={androidHeader.overlayHeight}
+        overlayPaddingTop={androidHeader.overlayPaddingTop}
+      />
+      {scrollContent}
+    </View>
   );
 }

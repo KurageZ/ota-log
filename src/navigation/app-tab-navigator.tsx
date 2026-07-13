@@ -17,7 +17,7 @@ export function AppTabNavigator() {
         }}
       >
         <Tabs.Screen
-          name="index"
+          name="(home)"
           options={{
             title: '首页',
             tabBarIcon: ({ color, focused, size }) => (

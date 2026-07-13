@@ -310,7 +310,7 @@ export function CustomFloatingTabBar({ state, descriptors, navigation }: BottomT
           };
 
           const iconMap: Record<string, AppIconName> = {
-            index: 'home',
+            '(home)': 'home',
             calendar: 'calendar',
             cheki: 'cheki',
             stats: 'stats',

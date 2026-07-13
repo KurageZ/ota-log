@@ -4,7 +4,7 @@ import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { Lucide } from '@react-native-vector-icons/lucide';
 import { Heart } from 'lucide-react-native';
 
-type LucideIconName = ComponentProps<typeof Lucide>['name'];
+export type LucideIconName = ComponentProps<typeof Lucide>['name'];
 
 export type AppIconVariant =
   | 'active'
@@ -81,16 +81,20 @@ export type AppIconName =
   | 'time'
   | 'tools'
   | 'trash'
+  | 'viewSettings'
   | 'weibo'
   | 'weiboImport';
 
+export type AppSFSymbolName = 'plus' | 'slider.horizontal.3';
+
 type IconDefinition = {
   icon: LucideIconName;
+  sfSymbol?: AppSFSymbolName;
   variants?: Partial<Record<AppIconVariant, LucideIconName>>;
 };
 
 const ICONS: Record<AppIconName, IconDefinition> = {
-  add: { icon: 'plus' },
+  add: { icon: 'plus', sfSymbol: 'plus' },
   addCircle: { icon: 'calendar-plus' },
   addPerson: { icon: 'user-plus' },
   album: { icon: 'images' },
@@ -182,9 +186,21 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   time: { icon: 'clock' },
   tools: { icon: 'wrench' },
   trash: { icon: 'trash-2' },
+  viewSettings: { icon: 'sliders-horizontal', sfSymbol: 'slider.horizontal.3' },
   weibo: { icon: 'globe' },
   weiboImport: { icon: 'users' },
 };
+
+export function getAppIconGlyph(name: AppIconName, variant?: AppIconVariant): LucideIconName {
+  const definition = ICONS[name];
+  return variant ? definition.variants?.[variant] ?? definition.icon : definition.icon;
+}
+
+export function getAppIconSFSymbol(name: AppIconName): AppSFSymbolName {
+  const symbol = ICONS[name].sfSymbol;
+  if (!symbol) throw new Error(`App icon "${name}" does not define an SF Symbol`);
+  return symbol;
+}
 
 function shouldFillHeart(name: AppIconName, variant: AppIconVariant | undefined) {
   if (name === 'oshi') return true;
@@ -246,8 +262,7 @@ export function AppIcon({
   secondaryColor?: string;
   style?: StyleProp<TextStyle>;
 }) {
-  const definition = ICONS[name];
-  const icon = variant ? definition.variants?.[variant] ?? definition.icon : definition.icon;
+  const icon = getAppIconGlyph(name, variant);
 
   if (name === 'radio' && variant === 'selected') {
     return <SelectedRadioIcon size={size} color={color} secondaryColor={secondaryColor} style={style} />;

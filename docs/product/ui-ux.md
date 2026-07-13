@@ -49,7 +49,7 @@ ota_log 是本地优先的演出记录 app，主要服务日系和国内偶像�
 
 当前底部导航按平台实现：iOS 使用 Expo Router `NativeTabs`，采用系统 Liquid Glass tab bar 和滚动最小化行为；Android 保留五个等宽悬浮胶囊 tab。两端入口和业务语义一致：
 
-- 首页：`app/(tabs)/index.tsx`
+- 首页：`app/(tabs)/(home)/index.tsx`
 - 日历：`app/(tabs)/calendar/index.tsx`
 - 切册：`app/(tabs)/cheki/index.tsx`，页面标题保留「电子切册」
 - 统计：`app/(tabs)/stats/index.tsx`
@@ -378,9 +378,9 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 
 ## 首页规范
 
-文件：`app/(tabs)/index.tsx`
+文件：`app/(tabs)/(home)/index.tsx`
 
-首页负责当天和近期行动，不显示大标题。
+首页负责当天和近期行动。iOS 使用原生 Stack large title 和 `headerRight` 新建活动入口；Android 保留自绘折叠标题。
 
 结构：
 
@@ -463,6 +463,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 
 - 作为底部 tab 主页时，底部入口名使用「切册」，页面标题使用「电子切册」。
 - iOS 使用原生大标题和 NativeTabs；普通 `ScrollView` 向下滚动时由系统最小化 tab bar，`FlatList` 页面受 Expo 当前集成限制，不强制模拟同一行为。Android 使用 `AndroidCompactTabHeader` / `AndroidLargeTabTitle`，滚动时标题收起并驱动底部 tab bar 收起。
+- iOS 右上角使用原生 `Stack.Toolbar`：视图设置使用 `slider.horizontal.3` 菜单，展示模式、排序和图片大小通过带勾选状态的原生菜单即时切换；新增拍立得使用独立的最右侧 `plus` 按钮。Android 保留自绘 Header 操作和视图设置 Bottom Sheet。
 - 有图拍立得和记录要一起呈现和统计。
 - 图片缩略图使用 54:86 比例。
 - 拍立得展示模式固定为三类：按艺人、时间分组、相册模式；不要再暴露网格 / 堆叠的自由组合。
@@ -582,9 +583,11 @@ Mini countdown：
 iOS：
 
 - 使用 Expo Router `NativeTabs`，不自行模拟系统 Liquid Glass 材质。
-- 图标使用现有 Lucide 业务语义映射，未选中态使用 `textSecondary`，选中态使用 `accent`。
+- 图标通过 `AppIcon` 的业务名映射生成 Lucide glyph，再交给 `NativeTabs.Trigger.VectorIcon`；导航配置不直接写具体 glyph 名。
+- 未选中态使用 `textSecondary`，选中态使用 `accent`。
 - 使用 `minimizeBehavior="onScrollDown"`；系统负责紧凑形态、恢复动画和安全区。
-- iOS 内容底部不叠加自定义 tab bar 高度，只保留页面视觉间距。
+- iOS 不复用 Android 悬浮 Tab 的显隐状态机；页面滚动只保留自身需要的标题动画，Tab 收起完全交给 NativeTabs。
+- NativeTabs 负责底部安全区；页面 `paddingBottom` 只保留内容末尾的视觉间距，不手工补偿原生 Tab 高度或滚动指示器 inset。
 
 Android：
 
@@ -632,6 +635,7 @@ Shell：
 
 - 页面和组件只使用 `AppIcon` 的业务名，不直接 import `@react-native-vector-icons/lucide`、`@expo/vector-icons` 或具体 icon 字体。
 - 图标命名遵循「业务名 -> 映射层 -> Lucide 实际名」。例如页面使用 `favorite`、`calendar`、`disclosure`，映射层再决定实际 glyph 是 `heart`、`calendar-days` 还是 `chevron-right`。
+- iOS 原生 Toolbar 优先使用 SF Symbols，但仍通过 `AppIcon` 的业务名映射获取，页面不直接硬编码 symbol 名；其他页面图标继续使用 Lucide glyph。
 - 新增图标先扩展 `AppIconName` 和 `ICONS`，不要在页面内写 Lucide 实际名。
 - `variant` 只用于真实业务状态或方向，例如 `selected/unselected`、`up/down/forward/back`。`active/inactive` 只有在 Lucide 实际提供有意义的状态 glyph 时才配置；否则用颜色、背景、缩放或文字表达状态。
 - Lucide 不提供实心 heart。单推或收藏如果需要实心心形，必须作为 `AppIcon` 映射层的明确例外实现，而不是在页面里绕过映射层。
@@ -654,6 +658,7 @@ Shell：
 | 所有活动 | `calendar` / `eventDate` |
 | 艺人管理 | `artists` |
 | 电子切册 | `cheki` |
+| 电子切册视图设置 | `viewSettings` |
 | 设置 | `settings` |
 | 工具箱 | `tools` |
 | 关于 | `info` |
