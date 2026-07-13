@@ -69,8 +69,8 @@ export default function EditDateItemScreen() {
         initial={item}
         hideSubmitButton
         onCanSaveChange={setCanSave}
-        onSaved={(savedId) => {
-          router.replace(`/date-items/${savedId}`);
+        onSaved={() => {
+          router.back();
         }}
       />
     </>

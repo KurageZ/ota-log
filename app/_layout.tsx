@@ -45,6 +45,7 @@ function RootNavigator() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.header },
         headerTitleAlign: 'center',
+        headerBackButtonDisplayMode: 'minimal',
         headerTintColor: colors.heading,
         headerTitleStyle: { color: colors.heading },
         contentStyle: { backgroundColor: colors.screen },
@@ -77,9 +78,9 @@ function RootNavigator() {
       <Stack.Screen name="cheki/manual/new" options={{ presentation: 'modal', title: '添加记录' }} />
       <Stack.Screen name="cheki/manual/[id]/edit" options={{ presentation: 'modal', title: '编辑记录' }} />
       <Stack.Screen name="date-items/index" options={{ title: '重要日期' }} />
-      <Stack.Screen name="date-items/new" options={{ title: '新建重要日期' }} />
+      <Stack.Screen name="date-items/new" options={{ presentation: 'modal', title: '新建重要日期' }} />
       <Stack.Screen name="date-items/[id]" options={{ title: '' }} />
-      <Stack.Screen name="date-items/[id]/edit" options={{ title: '编辑重要日期' }} />
+      <Stack.Screen name="date-items/[id]/edit" options={{ presentation: 'modal', title: '编辑重要日期' }} />
       <Stack.Screen name="settings/index" options={{ title: '设置' }} />
       <Stack.Screen name="settings/home" options={{ title: '首页自定义' }} />
       <Stack.Screen name="settings/profile" options={{ title: '个人资料' }} />

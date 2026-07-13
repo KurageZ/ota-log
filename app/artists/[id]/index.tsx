@@ -1298,10 +1298,12 @@ function CircleIconButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={variant === 'back' ? '返回' : undefined}
       style={({ pressed }) => ({
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: overlayMode
           ? (isDark ? 'rgba(15,10,30,0.42)' : 'rgba(255,255,255,0.78)')
           : colors.card,

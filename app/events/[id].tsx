@@ -497,7 +497,6 @@ export default function EventDetailScreen() {
       <Stack.Screen
         options={{
           title: '',
-          headerBackTitle: '返回',
           headerTitleAlign: 'center',
           headerStyle: { backgroundColor: bg },
           headerShadowVisible: false,
