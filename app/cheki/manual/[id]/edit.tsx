@@ -14,6 +14,7 @@ import { FormCard, FormFieldLabel, FormSectionLabel } from '../../../../src/comp
 import { showDeleteFailedAlert, showSaveFailedAlert } from '../../../../src/utils/failureAlert';
 import { calculateManualChekiTotalPrice } from '../../../../src/utils/cheki';
 import { useAppTheme } from '../../../../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 
 function formatDateInput(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 8);
@@ -216,7 +217,7 @@ export default function EditManualChekiEntryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
         <Stack.Screen options={{ title: '编辑记录', headerTitleAlign: 'center' }} />
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
@@ -255,9 +256,10 @@ export default function EditManualChekiEntryScreen() {
           ),
         }}
       />
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === 'android' ? 200 : 40 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

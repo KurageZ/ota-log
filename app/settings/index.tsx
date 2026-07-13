@@ -12,6 +12,7 @@ import { AppIcon } from '../../src/components/AppIcon';
 import { MenuBadge, MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { withAlpha } from '../../src/utils/color';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   AppAppearance,
   AppCalendarDefaultView,
@@ -280,8 +281,12 @@ export default function SettingsScreen() {
   const restoreTint = settingsTints.backupRestore;
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         <View style={{ marginBottom: 16 }}>
           <SectionLabel label="个人" />
           <MenuCard>

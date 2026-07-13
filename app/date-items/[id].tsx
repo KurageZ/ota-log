@@ -15,6 +15,7 @@ import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getDateItemPresetKind } from '../../src/utils/dateItemDisplay';
 import { showDeleteFailedAlert, showSaveFailedAlert } from '../../src/utils/failureAlert';
 import { withAlpha } from '../../src/utils/color';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 export default function DateItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -165,7 +166,7 @@ export default function DateItemDetailScreen() {
     : [item.item.date];
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
           title: '',
@@ -186,7 +187,11 @@ export default function DateItemDetailScreen() {
           ),
         }}
       />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         {isActivityCountdown ? (
           <TouchableOpacity
             activeOpacity={sourceEvent ? 0.88 : 1}

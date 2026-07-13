@@ -17,6 +17,7 @@ import { FilterSheet, FilterSection } from '../../src/components/FilterSheet';
 import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
@@ -196,7 +197,7 @@ export default function ArtistsScreen() {
           ),
         }}
       />
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <SearchFilterBar
             keyword={searchQuery}
@@ -292,6 +293,7 @@ export default function ArtistsScreen() {
         </View>
 
         <FlatList
+          contentInsetAdjustmentBehavior="automatic"
           data={filteredArtists}
           keyExtractor={(a) => a.id}
           showsVerticalScrollIndicator={false}

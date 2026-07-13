@@ -15,6 +15,7 @@ import { FormCard, FormFieldLabel, FormSectionLabel } from '../../../src/compone
 import { showDeleteFailedAlert, showSaveFailedAlert } from '../../../src/utils/failureAlert';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAppTheme } from '../../../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
 
 function formatDateInput(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 8);
@@ -132,7 +133,7 @@ export default function EditChekiScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
         <Stack.Screen options={{ title: '编辑拍立得', headerTitleAlign: 'center' }} />
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
@@ -168,9 +169,10 @@ export default function EditChekiScreen() {
           ),
         }}
       />
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === 'android' ? 200 : 40 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

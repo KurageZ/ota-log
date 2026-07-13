@@ -14,6 +14,7 @@ import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getDateItemPresetKind } from '../../src/utils/dateItemDisplay';
 import { toISODate } from '../../src/utils/date';
 import { withAlpha } from '../../src/utils/color';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 function DateItemCard({ item }: { item: HydratedDateItem }) {
   const { colors, isDark } = useAppTheme();
@@ -154,7 +155,7 @@ export default function DateItemsScreen() {
   }), [items, today]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -169,7 +170,11 @@ export default function DateItemsScreen() {
           ),
         }}
       />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         {items.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 80 }}>
             <View style={{ width: 54, height: 54, borderRadius: 18, backgroundColor: colors.accentSofter, alignItems: 'center', justifyContent: 'center' }}>

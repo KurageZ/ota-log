@@ -34,6 +34,7 @@ import {
 } from '../../src/utils/failureAlert';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { withAlpha } from '../../src/utils/color';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const MAX_MULTI_PHOTOS = 9;
 const CHEKI_IMPORT_MAX_DIMENSION = Platform.OS === 'android' ? 1600 : 2000;
@@ -730,7 +731,7 @@ export default function NewChekiScreen() {
   ) : null;
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
       <Stack.Screen
         options={{
           title: '添加拍立得',
@@ -767,6 +768,7 @@ export default function NewChekiScreen() {
 
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === 'android' ? 200 : 40 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

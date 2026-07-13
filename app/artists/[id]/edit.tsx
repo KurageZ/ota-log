@@ -22,6 +22,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
 import { withAlpha } from '../../../src/utils/color';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
 
 const MAX_ARTIST_BACKGROUND_BYTES = 5 * 1024 * 1024;
 const ARTIST_BACKGROUND_ASPECT_RATIO = 4 / 5;
@@ -268,7 +269,7 @@ export default function EditArtistScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
     );
@@ -298,9 +299,10 @@ export default function EditArtistScreen() {
           ),
         }}
       />
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

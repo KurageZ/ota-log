@@ -4,6 +4,7 @@ import { AppIcon } from '../src/components/AppIcon';
 import { MenuCard, MenuItem, SectionLabel } from '../src/components/SettingsMenu';
 import { useOnboardingGuide } from '../src/components/OnboardingGuide';
 import { useAppTheme } from '../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../src/utils/safeArea';
 
 const FEATURE_ITEMS = [
   '支持保存活动信息，包括时间、场地、出演者等，支持从微博解析',
@@ -196,8 +197,12 @@ export default function AboutScreen() {
   const { showHelp } = useOnboardingGuide();
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         <View
           style={{
             backgroundColor: colors.heroBg,

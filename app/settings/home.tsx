@@ -23,6 +23,7 @@ import type { HydratedDateItem } from '../../src/repositories/DateItemRepository
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { toISODate } from '../../src/utils/date';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   DEFAULT_RECENT_COMPLETED_DISPLAY_LIMIT,
   HOME_CARD_LABELS,
@@ -638,7 +639,7 @@ export default function HomeSettingsScreen() {
   ), [colors.accent, colors.accentSoft, handleReset]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen options={{ headerRight: renderResetAction }} />
       {isLoading ? (
         <View style={{ padding: 24, alignItems: 'center' }}>
@@ -647,6 +648,7 @@ export default function HomeSettingsScreen() {
       ) : (
         <ScrollView
           style={{ flex: 1, backgroundColor: colors.screen }}
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >

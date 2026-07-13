@@ -9,6 +9,7 @@ import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { ArtistSearchPicker } from '../../src/components/ArtistSearchPicker';
 import { showSaveFailedAlert } from '../../src/utils/failureAlert';
 import { useAppTheme } from '../../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 export default function OshiSettingsScreen() {
   const { colors, isDark } = useAppTheme();
@@ -49,7 +50,7 @@ export default function OshiSettingsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
           title: '单推设置',
@@ -61,7 +62,11 @@ export default function OshiSettingsScreen() {
         }}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         <View
           style={{
             backgroundColor: colors.card,

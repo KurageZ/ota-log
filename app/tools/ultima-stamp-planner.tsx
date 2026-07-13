@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../src/components/AppIcon';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme, type ThemeColors } from '../../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   ULTIMA_GROUPS,
   ULTIMA_POINT_CAP_PER_EVENT,
@@ -727,14 +728,14 @@ export default function UltimaStampPlannerScreen() {
 
   if (!isHydrated) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen options={{ title: '集章规划' }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"

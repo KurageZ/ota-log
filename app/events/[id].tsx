@@ -30,6 +30,7 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
 import { withAlpha } from '../../src/utils/color';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
@@ -478,7 +479,7 @@ export default function EventDetailScreen() {
 
   if (!event) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ color: isDark ? colors.textMuted : colors.chevron }}>活动不存在</Text>
       </SafeAreaView>
     );
@@ -492,7 +493,7 @@ export default function EventDetailScreen() {
   const currentStatusColors = colors.status[event.status];
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: bg }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
       <Stack.Screen
         options={{
           title: '',
@@ -510,6 +511,7 @@ export default function EventDetailScreen() {
       />
 
       <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >

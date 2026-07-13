@@ -454,6 +454,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 通用要求：
 
 - 顶部使用明确页面标题，例如「艺人管理」「电子切册」。
+- iOS 独立 Stack 的普通滚动页保持底部 edge-to-edge，不用外层 `SafeAreaView` 隔出固定空白；滚动容器使用 `contentInsetAdjustmentBehavior="automatic"`，内容末尾间距保留在可滚动区域内。Android 继续使用底部安全区保护。
 - 搜索和筛选统一走 `SearchFilterBar` + `FilterSheet`。
 - 已生效筛选应在搜索框内以 chip 展示，可点击移除。
 - 空态要说明下一步，例如新建活动、导入艺人、添加拍立得，而不是只写「暂无数据」。

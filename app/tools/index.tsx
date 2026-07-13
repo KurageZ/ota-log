@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const MIX_AND_CALL_URL = 'https://dzyxdd.github.io/MixAndCall/mix/mix/';
 
@@ -11,8 +12,12 @@ export default function ToolboxScreen() {
   const toolTints = colors.toolsMenu;
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      >
         <View style={{ marginBottom: 16 }}>
           <SectionLabel label="规划" />
           <MenuCard>

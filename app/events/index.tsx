@@ -26,6 +26,7 @@ import { AppIcon } from '../../src/components/AppIcon';
 import type { EventFilter } from '../../src/repositories/EventRepository';
 import { buildEventMonthSections } from '../../src/utils/eventSections';
 import { getArtistSearchText, sortArtistsWithOshi } from '../../src/utils/filter';
+import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const EVENT_FILTER_HISTORY_STORAGE_KEY = 'ota-log.events-filter-history.v1';
 
@@ -694,7 +695,7 @@ export default function EventsIndexScreen() {
           ),
         }}
       />
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
+      <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <SearchFilterBar
             keyword={keyword}
@@ -708,6 +709,7 @@ export default function EventsIndexScreen() {
         </View>
 
         <SectionList
+          contentInsetAdjustmentBehavior="automatic"
           sections={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
