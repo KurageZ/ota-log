@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.otalog"
+      "bundleIdentifier": "com.anonymous.otalog",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -34,6 +37,14 @@
         "expo-calendar",
         {
           "calendarPermission": "ota log 需要访问系统日历，用于将活动加入你的日程。"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.5"
+          }
         }
       ]
     ],
