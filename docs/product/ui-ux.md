@@ -47,7 +47,7 @@ ota_log 是本地优先的演出记录 app，主要服务日系和国内偶像�
 
 ### 底部导航
 
-当前底部是五个等宽悬浮胶囊 tab：
+当前底部导航按平台实现：iOS 使用 Expo Router `NativeTabs`，采用系统 Liquid Glass tab bar 和滚动最小化行为；Android 保留五个等宽悬浮胶囊 tab。两端入口和业务语义一致：
 
 - 首页：`app/(tabs)/index.tsx`
 - 日历：`app/(tabs)/calendar/index.tsx`
@@ -212,7 +212,7 @@ DEFAULT_CALENDAR_DEFAULT_VIEW = 'month';
 | 图片缩略图 | 10 |
 | 菜单图标容器 | 10 |
 | Chip / Badge / 状态 pill / OshiBadge | 999 |
-| Floating tab shell | 32 |
+| Android floating tab shell | 32 |
 | Header icon button | 18-24, 触控目标不低于 44x44 |
 
 ### 阴影
@@ -221,7 +221,7 @@ DEFAULT_CALENDAR_DEFAULT_VIEW = 'month';
 - 菜单卡：`shadowOffset: { width: 0, height: 2 }`，`shadowOpacity` 0.06，`shadowRadius` 8，`elevation` 2。
 - 首页卡片：边框用 `divider`，阴影更轻，避免整页像卡片墙。
 - 首页置顶信息 / HomeUpcomingHero：`shadowOffset: { width: 0, height: 8 }`，亮色 `opacity 0.12`，暗色 `0.26`。
-- Floating tab bar 使用 `boxShadow`，亮色 `0 12px 26px rgba(31,18,53,0.12)`，暗色 `0 14px 34px rgba(0,0,0,0.36)`。
+- Android floating tab bar 使用 `boxShadow`，亮色 `0 12px 26px rgba(31,18,53,0.12)`，暗色 `0 14px 34px rgba(0,0,0,0.36)`；iOS NativeTabs 的材质和阴影交给系统管理。
 
 ### 间距
 
@@ -462,7 +462,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 电子切册页特殊要求：
 
 - 作为底部 tab 主页时，底部入口名使用「切册」，页面标题使用「电子切册」。
-- iOS 使用原生大标题效果；Android 使用 `AndroidCompactTabHeader` / `AndroidLargeTabTitle`，滚动时标题收起并驱动底部 tab bar 收起。
+- iOS 使用原生大标题和 NativeTabs；普通 `ScrollView` 向下滚动时由系统最小化 tab bar，`FlatList` 页面受 Expo 当前集成限制，不强制模拟同一行为。Android 使用 `AndroidCompactTabHeader` / `AndroidLargeTabTitle`，滚动时标题收起并驱动底部 tab bar 收起。
 - 有图拍立得和记录要一起呈现和统计。
 - 图片缩略图使用 54:86 比例。
 - 拍立得展示模式固定为三类：按艺人、时间分组、相册模式；不要再暴露网格 / 堆叠的自由组合。
@@ -573,17 +573,29 @@ Mini countdown：
 
 ---
 
-## Floating Tab Bar
+## Platform Tab Bars
 
-文件：`src/navigation/CustomFloatingTabBar.tsx`
+入口：`app/(tabs)/_layout.tsx`。平台实现分别位于 `src/navigation/app-tab-navigator.ios.tsx` 和 `src/navigation/app-tab-navigator.tsx`。
 
-结构是 5 个等宽可见 tab。
+两端均保持 5 个可见 tab，顺序固定为首页、日历、切册、统计、我的。
+
+iOS：
+
+- 使用 Expo Router `NativeTabs`，不自行模拟系统 Liquid Glass 材质。
+- 图标使用现有 Lucide 业务语义映射，未选中态使用 `textSecondary`，选中态使用 `accent`。
+- 使用 `minimizeBehavior="onScrollDown"`；系统负责紧凑形态、恢复动画和安全区。
+- iOS 内容底部不叠加自定义 tab bar 高度，只保留页面视觉间距。
+
+Android：
+
+- 使用 `src/navigation/CustomFloatingTabBar.tsx`。
+- 结构是 5 个等宽悬浮胶囊 tab。
 
 Shell：
 
-- `borderRadius 32`，左右留 `FLOATING_TAB_BAR_HORIZONTAL_MARGIN`，当前为 12，尽量贴近 iOS 26 的宽浮层观感。
-- iOS / Android 可见基础高度为 66，选中胶囊高度 58，保留图标和文字 label 的上下呼吸感。
-- iOS 可用时使用 `expo-glass-effect` 的 `GlassView`，否则使用半透明纯色。
+- `borderRadius 32`，左右留 `FLOATING_TAB_BAR_HORIZONTAL_MARGIN`，当前为 12。
+- 可见基础高度为 66，选中胶囊高度 58，保留图标和文字 label 的上下呼吸感。
+- 使用主题半透明纯色、边框和阴影构成外壳。
 - 选中态是跟随 `selectedIndex` 的轻量圆角胶囊，使用 reanimated `withSpring`，不做高饱和实心块。
 - tab icon 19px，文字 label 使用约 10.5px / 13px，单行显示；当前五个入口均为 2 字 label。
 - 聚焦态主要通过 accent 色、胶囊背景和轻微 scale 表达。不要为了恢复 filled/outline 效果强行使用不符合语义的 Lucide 变体。
