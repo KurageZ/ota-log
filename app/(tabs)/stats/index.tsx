@@ -554,7 +554,7 @@ export default function StatsScreen() {
       ? `${year}.${String(month).padStart(2, '0')}`
       : `${year}`;
 
-  const renderPeriodButton = useCallback(() => (
+  const renderAndroidPeriodButton = useCallback(() => (
     <TouchableOpacity
       onPress={() => setPickerVisible(true)}
       activeOpacity={0.7}
@@ -945,7 +945,6 @@ export default function StatsScreen() {
   if (!isAndroid) {
     return (
       <>
-        <Stack.Screen options={{ headerRight: renderPeriodButton }} />
         <ScrollView
           style={{ flex: 1, backgroundColor: colors.screen }}
           showsVerticalScrollIndicator={false}
@@ -955,6 +954,15 @@ export default function StatsScreen() {
         >
           {statsContent}
         </ScrollView>
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityLabel={`选择统计周期，当前${periodButtonLabel}`}
+            tintColor={colors.accent}
+            onPress={() => setPickerVisible(true)}
+          >
+            {periodButtonLabel}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
         {periodPicker}
       </>
     );
@@ -964,7 +972,7 @@ export default function StatsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <AndroidCompactTabHeader
         title="统计"
-        right={renderPeriodButton()}
+        right={renderAndroidPeriodButton()}
         compactHeaderStyle={androidHeader.compactHeaderStyle}
         overlayHeight={androidHeader.overlayHeight}
         overlayPaddingTop={androidHeader.overlayPaddingTop}
@@ -979,7 +987,7 @@ export default function StatsScreen() {
       >
         <AndroidLargeTabTitle
           title="统计"
-          right={renderPeriodButton()}
+          right={renderAndroidPeriodButton()}
           largeTitleStyle={androidHeader.largeTitleStyle}
         />
 

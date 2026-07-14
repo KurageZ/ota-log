@@ -504,6 +504,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 统计页用于回顾和比较，不只是展示数字。
 
 - 年份切换应明显，支持当前年和所有时间等口径。
+- iOS 右上角周期入口使用原生 `Stack.Toolbar` 纯文字按钮，显示当前统计口径并打开周期选择器；不要在原生导航栏内嵌套自绘背景和圆角。Android 保留自绘 header 操作。
 - SectionHeader 使用 3x16 accent 竖线、17/700 标题、`lineHeight: 35`、可选 count badge 和右侧 action。
 - StatBox 数字使用 28/900，compact 可降到 24。
 - 统计页顶部摘要已移除，不再按所有时间、年度或月度展示摘要卡。
