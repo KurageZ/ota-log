@@ -13,6 +13,7 @@ import { ChekiManualEntryRepository } from '../repositories/ChekiManualEntryRepo
 import { UserConfigRepository } from '../repositories/UserConfigRepository';
 import { DateItemRepository } from '../repositories/DateItemRepository';
 import { useAppTheme } from '../theme/appTheme';
+import { rebaseLegacyLocalMediaUris } from '../utils/localMedia';
 
 export interface Repositories {
   artists: ArtistRepository;
@@ -56,6 +57,7 @@ async function initializeDatabase(): Promise<Repositories> {
     const db = await SQLite.openDatabaseAsync('ota.db');
     await db.runAsync('PRAGMA foreign_keys = ON');
     await runMigrations(db);
+    await rebaseLegacyLocalMediaUris(db);
     const repositories = buildRepositories(db);
     sharedRepositories = repositories;
     return repositories;
