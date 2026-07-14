@@ -16,7 +16,7 @@ import {
   AndroidLargeTabTitle,
   useAndroidCollapsibleTabHeader,
 } from '../../../src/components/AndroidCollapsibleTabHeader';
-import { AppIcon } from '../../../src/components/AppIcon';
+import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { EventCard } from '../../../src/components/EventCard';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
@@ -296,6 +296,10 @@ export default function CalendarScreen() {
     handleSelectDate(addMonths(selectedDate, delta));
   }, [handleSelectDate, selectedDate]);
 
+  const handleSelectViewMode = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+  }, []);
+
   const timelineSections = useMemo(() => buildTimeline(allEvents), [allEvents]);
   const eventsByDate = useMemo(() => {
     const byDate = new Map<string, Event[]>();
@@ -404,7 +408,7 @@ export default function CalendarScreen() {
       {VIEW_MODES.map((mode) => (
         <TouchableOpacity
           key={mode}
-          onPress={() => { setViewMode(mode); }}
+          onPress={() => { handleSelectViewMode(mode); }}
           style={{
             paddingHorizontal: 10,
             paddingVertical: 5,
@@ -424,7 +428,7 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       ))}
     </View>
-  ), [colors.card, colors.input, colors.inputBorder, colors.text, colors.textMuted, isDark, viewMode]);
+  ), [colors.card, colors.input, colors.inputBorder, colors.text, colors.textMuted, handleSelectViewMode, isDark, viewMode]);
 
   const renderChekiStack = useCallback((summary: ChekiCalendarDaySummary) => {
     const imageSource: ImageSourcePropType | null = summary.latestPhotoUri
@@ -1001,7 +1005,27 @@ export default function CalendarScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       {isIOS ? (
-        <Stack.Screen options={{ headerRight: renderSegmentedControl }} />
+        <>
+          <Stack.Screen options={{ headerRight: undefined }} />
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Menu
+              icon={getAppIconSFSymbol('viewSettings')}
+              accessibilityLabel={`切换日历视图，当前${APP_CALENDAR_DEFAULT_VIEW_LABELS[viewMode]}`}
+            >
+              <Stack.Toolbar.Menu inline>
+                {VIEW_MODES.map((mode) => (
+                  <Stack.Toolbar.MenuAction
+                    key={mode}
+                    isOn={viewMode === mode}
+                    onPress={() => { handleSelectViewMode(mode); }}
+                  >
+                    {APP_CALENDAR_DEFAULT_VIEW_LABELS[mode]}
+                  </Stack.Toolbar.MenuAction>
+                ))}
+              </Stack.Toolbar.Menu>
+            </Stack.Toolbar.Menu>
+          </Stack.Toolbar>
+        </>
       ) : (
         <AndroidCompactTabHeader
           title="日历"
