@@ -45,9 +45,9 @@ export function deriveArtistBackdropPalette(
   const tonedSource = tuneSourceColor(sourceRgb, paletteIsDark);
 
   if (paletteIsDark) {
-    const surface = mixRgb(baseScreen, tonedSource, 0.66);
-    const elevatedSurface = mixRgb(surface, tonedSource, 0.18);
-    const header = mixRgb(surface, { r: 0, g: 0, b: 0 }, 0.22);
+    const surface = mixRgb(baseScreen, tonedSource, 0.38);
+    const elevatedSurface = mixRgb(surface, tonedSource, 0.12);
+    const header = mixRgb(surface, { r: 0, g: 0, b: 0 }, 0.18);
     const topScrimBase = mixRgb(tonedSource, { r: 0, g: 0, b: 0 }, 0.82);
     const bottomScrimBase = mixRgb(surface, { r: 0, g: 0, b: 0 }, 0.48);
     return {
@@ -166,8 +166,8 @@ function tuneSourceColor(color: RGB, paletteIsDark: boolean): RGB {
   if (paletteIsDark) {
     return hslToRgb({
       h: hsl.h,
-      s: clampUnit(Math.min(0.74, hsl.s * 0.98)),
-      l: clampUnit(Math.max(0.26, hsl.l * 0.72)),
+      s: clampUnit(Math.min(0.56, hsl.s * 0.78)),
+      l: clampUnit(Math.max(0.2, hsl.l * 0.58)),
     });
   }
   return hslToRgb({

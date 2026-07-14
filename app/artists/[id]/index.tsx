@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
   ImageBackground,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,10 +17,17 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from 'expo-glass-effect';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Extrapolation,
   interpolate,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -41,13 +50,24 @@ import { sortArtistsWithOshi } from '../../../src/utils/filter';
 import { showDeleteFailedAlert } from '../../../src/utils/failureAlert';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 
-const ARTIST_HERO_ASPECT_RATIO = 4 / 5;
-const CONTENT_OVERLAP = 24;
+const ARTIST_HERO_SCREEN_RATIO = 0.7;
+const ARTIST_HERO_MAX_WIDTH_RATIO = 1.6;
+const BACKDROP_TRANSITION_HEIGHT = 96;
 const TAB_KEYS = ['events', 'cheki'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 type ArtistChekiListItem =
   | { type: 'row'; key: string; chekis: Cheki[]; isLastPhotoRow: boolean }
   | { type: 'manual'; key: 'manual'; entries: ChekiManualEntry[] };
+
+function canUseLiquidGlass(reduceTransparency: boolean) {
+  if (Platform.OS !== 'ios' || reduceTransparency) return false;
+
+  try {
+    return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+  } catch {
+    return false;
+  }
+}
 
 function buildArtistChekiItems(
   chekiList: Cheki[],
@@ -77,7 +97,7 @@ export default function ArtistDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const db = useDB();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { colors, isDark } = useAppTheme();
 
   const [loading, setLoading] = useState(true);
@@ -88,12 +108,40 @@ export default function ArtistDetailScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventMap, setEventMap] = useState<Map<string, Event>>(new Map());
   const [chekiList, setChekiList] = useState<Cheki[]>([]);
+  const [reduceTransparency, setReduceTransparency] = useState(false);
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('events');
+  const [showStickyTabs, setShowStickyTabs] = useState(false);
 
   const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler((event) => {
+  const eventsScrollY = useSharedValue(0);
+  const chekiScrollY = useSharedValue(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+
+    let isActive = true;
+    AccessibilityInfo.isReduceTransparencyEnabled().then((isEnabled) => {
+      if (isActive) setReduceTransparency(isEnabled);
+    });
+
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceTransparencyChanged',
+      setReduceTransparency,
+    );
+
+    return () => {
+      isActive = false;
+      subscription.remove();
+    };
+  }, []);
+  const eventsScrollHandler = useAnimatedScrollHandler((event) => {
+    eventsScrollY.value = event.contentOffset.y;
+    scrollY.value = event.contentOffset.y;
+  });
+  const chekiScrollHandler = useAnimatedScrollHandler((event) => {
+    chekiScrollY.value = event.contentOffset.y;
     scrollY.value = event.contentOffset.y;
   });
 
@@ -209,9 +257,17 @@ export default function ArtistDetailScreen() {
 
   const compactHeaderHeight = insets.top + 52;
   const hasBackground = Boolean(artist?.background_uri);
-  const heroHeight = hasBackground ? Math.round(screenWidth / ARTIST_HERO_ASPECT_RATIO) : 0;
-  const headerFadeStart = hasBackground ? Math.max(120, heroHeight - 168) : 40;
-  const headerFadeEnd = hasBackground ? Math.max(headerFadeStart + 68, heroHeight - 92) : 108;
+  const usesLiquidGlass = hasBackground && canUseLiquidGlass(reduceTransparency);
+  const heroHeight = hasBackground
+    ? Math.round(Math.min(
+      screenHeight * ARTIST_HERO_SCREEN_RATIO,
+      screenWidth * ARTIST_HERO_MAX_WIDTH_RATIO,
+    ))
+    : 0;
+  const heroDisplayHeight = hasBackground ? heroHeight + BACKDROP_TRANSITION_HEIGHT : 0;
+  const stickyTabsThreshold = heroDisplayHeight - compactHeaderHeight;
+  const headerFadeStart = hasBackground ? Math.max(120, heroDisplayHeight - compactHeaderHeight - 104) : 40;
+  const headerFadeEnd = hasBackground ? Math.max(headerFadeStart + 68, heroDisplayHeight - compactHeaderHeight - 28) : 108;
 
   const compactHeaderBackgroundStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [0, 1], Extrapolation.CLAMP),
@@ -220,6 +276,21 @@ export default function ArtistDetailScreen() {
     opacity: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [0, 1], Extrapolation.CLAMP),
     transform: [{ translateY: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [8, 0], Extrapolation.CLAMP) }],
   }));
+  useAnimatedReaction(
+    () => hasBackground && scrollY.value >= stickyTabsThreshold,
+    (shouldShow, wasShowing) => {
+      if (shouldShow !== wasShowing) {
+        runOnJS(setShowStickyTabs)(shouldShow);
+      }
+    },
+    [hasBackground, stickyTabsThreshold],
+  );
+  const handleSelectTab = useCallback((tab: TabKey) => {
+    const nextScrollY = tab === 'events' ? eventsScrollY.value : chekiScrollY.value;
+    scrollY.value = nextScrollY;
+    setShowStickyTabs(hasBackground && nextScrollY >= stickyTabsThreshold);
+    setActiveTab(tab);
+  }, [chekiScrollY, eventsScrollY, hasBackground, scrollY, stickyTabsThreshold]);
 
   const chekiCellW = Math.floor((screenWidth - 32 - 16) / 3);
   const chekiCellH = Math.round((chekiCellW * 86) / 54);
@@ -276,10 +347,10 @@ export default function ArtistDetailScreen() {
   const pDark = backdropPalette.paletteIsDark;
   const lowerCardBorderWidth = hasBackground && pDark ? 0 : 1;
   const cardBg = hasBackground
-    ? (pDark ? 'rgba(15,10,30,0.45)' : 'rgba(255,255,255,0.72)')
+    ? (pDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.58)')
     : colors.card;
   const cardAltBg = hasBackground
-    ? (pDark ? 'rgba(15,10,30,0.32)' : 'rgba(255,255,255,0.52)')
+    ? (pDark ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.46)')
     : colors.cardAlt;
   const eventCardSurfaceStyle = {
     backgroundColor: cardBg,
@@ -327,10 +398,12 @@ export default function ArtistDetailScreen() {
     ? (pDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')
     : colors.divider;
   const contentSurfaceColor = hasBackground ? backdropPalette.surfaceColor : 'transparent';
-  const tabActiveBg = pDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)';
+  const tabActiveBg = pDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
   const tabActiveText = pDark ? colors.white : 'rgba(0,0,0,0.85)';
   const tabInactiveText = pDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.42)';
   const heroNameShadowColor = pDark ? 'rgba(0,0,0,0.42)' : 'rgba(0,0,0,0.1)';
+  const heroActionText = pDark ? 'rgba(255,255,255,0.86)' : 'rgba(0,0,0,0.76)';
+  const heroActionIcon = pDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.6)';
   const backdropEmptyTextColor = pDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
   const chekiListIsDark = hasBackground ? pDark : isDark;
   const chekiManualTone = hasBackground && pDark ? 'glass' : 'default';
@@ -429,7 +502,7 @@ export default function ArtistDetailScreen() {
           top: 0,
           left: 0,
           right: 0,
-          height: compactHeaderHeight,
+          height: compactHeaderHeight + (showStickyTabs ? 60 : 0),
           zIndex: 20,
         }}
       >
@@ -451,7 +524,7 @@ export default function ArtistDetailScreen() {
         />
         <View
           style={{
-            flex: 1,
+            height: compactHeaderHeight,
             paddingTop: insets.top + 8,
             paddingHorizontal: 12,
             flexDirection: 'row',
@@ -459,7 +532,14 @@ export default function ArtistDetailScreen() {
             justifyContent: 'space-between',
           }}
         >
-          <CircleIconButton icon="disclosure" variant="back" onPress={handleBack} overlayMode={hasBackground} />
+          <CircleIconButton
+            icon="disclosure"
+            variant="back"
+            onPress={handleBack}
+            overlayMode={hasBackground}
+            overlayIsDark={pDark}
+            usesLiquidGlass={usesLiquidGlass}
+          />
           <Animated.View
             pointerEvents="none"
             style={[
@@ -487,16 +567,62 @@ export default function ArtistDetailScreen() {
               {compactTitle}
             </Text>
           </Animated.View>
-          <HeaderTextButton label="编辑" onPress={() => router.push(`/artists/${artist.id}/edit`)} overlayMode={hasBackground} />
+          <HeaderTextButton
+            label="编辑"
+            onPress={() => router.push(`/artists/${artist.id}/edit`)}
+            overlayMode={hasBackground}
+            overlayIsDark={pDark}
+            usesLiquidGlass={usesLiquidGlass}
+          />
         </View>
+        {showStickyTabs ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: compactHeaderHeight + 4,
+              left: 16,
+              right: 16,
+            }}
+          >
+            <TabSwitcherSurface
+              usesLiquidGlass={usesLiquidGlass}
+              overlayIsDark={pDark}
+              fallbackBackground={cardAltBg}
+              fallbackBorderWidth={lowerCardBorderWidth}
+              fallbackBorderColor={backdropDivider}
+            >
+              <TabButton
+                label={`活动 · ${events.length}`}
+                active={activeTab === 'events'}
+                onPress={() => handleSelectTab('events')}
+                activeBg={tabActiveBg}
+                activeTextColor={tabActiveText}
+                inactiveTextColor={tabInactiveText}
+              />
+              <TabButton
+                label={`拍立得 · ${totalChekiCount}`}
+                active={activeTab === 'cheki'}
+                onPress={() => handleSelectTab('cheki')}
+                activeBg={tabActiveBg}
+                activeTextColor={tabActiveText}
+                inactiveTextColor={tabInactiveText}
+              />
+            </TabSwitcherSurface>
+          </View>
+        ) : null}
       </View>
 
-      {activeTab === 'cheki' ? (
+      <View
+        pointerEvents={activeTab === 'cheki' ? 'auto' : 'none'}
+        accessibilityElementsHidden={activeTab !== 'cheki'}
+        importantForAccessibility={activeTab === 'cheki' ? 'auto' : 'no-hide-descendants'}
+        style={[StyleSheet.absoluteFill, { opacity: activeTab === 'cheki' ? 1 : 0 }]}
+      >
         <Animated.FlatList
           data={artistChekiItems}
           keyExtractor={(item) => item.key}
           renderItem={renderChekiListItem}
-          onScroll={scrollHandler}
+          onScroll={chekiScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
@@ -506,7 +632,7 @@ export default function ArtistDetailScreen() {
                 <ImageBackground
                   source={{ uri: artist.background_uri! }}
                   resizeMode="cover"
-                  style={{ width: '100%', aspectRatio: ARTIST_HERO_ASPECT_RATIO }}
+                  style={{ width: '100%', height: heroDisplayHeight }}
                 >
                   <LinearGradient
                     colors={backdropPalette.heroOverlayTopColors}
@@ -515,8 +641,14 @@ export default function ArtistDetailScreen() {
                   />
                   <LinearGradient
                     colors={backdropPalette.heroOverlayBottomColors}
-                    locations={[0, 0.42, 1]}
-                    style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '44%' }}
+                    locations={[0, 0.7, 1]}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: Math.round(heroHeight * 0.48) + BACKDROP_TRANSITION_HEIGHT,
+                    }}
                   />
                   <View
                     style={{
@@ -524,26 +656,23 @@ export default function ArtistDetailScreen() {
                       justifyContent: 'flex-end',
                       paddingTop: compactHeaderHeight + 22,
                       paddingHorizontal: 20,
-                      paddingBottom: 8,
-                      alignItems: 'center',
+                      paddingBottom: 84,
+                      alignItems: 'flex-start',
                     }}
                   >
-                    <View style={{ marginBottom: 14 }}>
-                      <OshiAvatar source={avatarSrc} size={48} isOshi={isOshi} />
-                    </View>
-                    <View style={{ minWidth: 0, alignItems: 'center' }}>
+                    <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
                       <Text
                         numberOfLines={2}
                         style={{
-                          fontSize: heroTitleIsLong ? 28 : 32,
-                          lineHeight: heroTitleIsLong ? 32 : 36,
-                          fontWeight: '900',
+                          fontSize: heroTitleIsLong ? 30 : 34,
+                          lineHeight: heroTitleIsLong ? 34 : 38,
+                          fontWeight: '800',
                           color: backdropText,
                           letterSpacing: heroTitleIsLong ? -0.5 : -0.7,
                           textShadowColor: heroNameShadowColor,
                           textShadowOffset: { width: 0, height: 1 },
                           textShadowRadius: 8,
-                          textAlign: 'center',
+                          textAlign: 'left',
                         }}
                       >
                         {artist.name}
@@ -551,60 +680,81 @@ export default function ArtistDetailScreen() {
                     </View>
                     <View
                       style={{
-                        marginTop: 18,
+                        marginTop: 10,
                         flexDirection: 'row',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         flexWrap: 'wrap',
-                        gap: 8,
+                        columnGap: 16,
                         minWidth: 0,
                         maxWidth: '100%',
                       }}
                     >
-                      <MetaPill
+                      <HeroMetaAction
                         icon={isOshi ? 'sparkles' : 'favorite'}
-                        label={isOshi ? '单推' : '收藏'}
-                        tone={isOshi ? 'oshi' : artist.is_favorite ? 'favorite' : 'neutral'}
-                        overlayMode={pDark ? true : 'light'}
+                        label={isOshi ? '单推' : artist.is_favorite ? '已收藏' : '收藏'}
+                        iconColor={isOshi ? '#c4b5fd' : artist.is_favorite ? '#fb7185' : heroActionIcon}
+                        textColor={heroActionText}
                         onPress={handleToggleFavorite}
                       />
                       {parentArtist ? (
-                        <MetaPill
+                        <HeroMetaAction
                           icon="artists"
                           label={parentArtist.name}
-                          tone="group"
                           isFlexible
-                          overlayMode={pDark ? true : 'light'}
+                          iconColor={heroActionIcon}
+                          textColor={heroActionText}
                           onPress={() => router.push(`/artists/${parentArtist.id}`)}
                         />
                       ) : null}
                       {artist.url ? (
-                        <MetaPill
+                        <HeroMetaAction
                           icon="link"
                           label="链接"
-                          tone="link"
-                          overlayMode={pDark ? true : 'light'}
+                          iconColor={heroActionIcon}
+                          textColor={heroActionText}
                           onPress={() => Linking.openURL(artist.url!)}
                         />
                       ) : null}
                     </View>
                   </View>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: 16,
+                      right: 16,
+                      bottom: 10,
+                    }}
+                  >
+                    <TabSwitcherSurface
+                      usesLiquidGlass={usesLiquidGlass}
+                      overlayIsDark={pDark}
+                      fallbackBackground={cardAltBg}
+                      fallbackBorderWidth={lowerCardBorderWidth}
+                      fallbackBorderColor={backdropDivider}
+                    >
+                      <TabButton
+                        label={`活动 · ${events.length}`}
+                        active={false}
+                        onPress={() => handleSelectTab('events')}
+                        activeBg={tabActiveBg}
+                        activeTextColor={tabActiveText}
+                        inactiveTextColor={tabInactiveText}
+                      />
+                      <TabButton
+                        label={`拍立得 · ${totalChekiCount}`}
+                        active
+                        onPress={() => handleSelectTab('cheki')}
+                        activeBg={tabActiveBg}
+                        activeTextColor={tabActiveText}
+                        inactiveTextColor={tabInactiveText}
+                      />
+                    </TabSwitcherSurface>
+                  </View>
                 </ImageBackground>
               </View>
-              <View
-                style={{
-                  marginTop: -CONTENT_OVERLAP,
-                  backgroundColor: 'transparent',
-                }}
-              >
-                <LinearGradient
-                  colors={backdropPalette.transitionColors}
-                  locations={[0, 0.68, 1]}
-                  style={{ height: CONTENT_OVERLAP + 34 }}
-                />
+              <View style={{ backgroundColor: 'transparent' }}>
                 <View
                   style={{
-                    marginTop: -22,
                     backgroundColor: 'transparent',
                     paddingTop: 0,
                     paddingBottom: 10,
@@ -668,36 +818,6 @@ export default function ArtistDetailScreen() {
                       </View>
                     </View>
                   ) : null}
-
-                  <View style={{ paddingHorizontal: 16 }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        backgroundColor: cardAltBg,
-                        borderRadius: 14,
-                        padding: 4,
-                        borderWidth: lowerCardBorderWidth,
-                        borderColor: backdropDivider,
-                      }}
-                    >
-                      <TabButton
-                        label={`活动 · ${events.length}`}
-                        active={false}
-                        onPress={() => setActiveTab('events')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                      <TabButton
-                        label={`拍立得 · ${totalChekiCount}`}
-                        active
-                        onPress={() => setActiveTab('cheki')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                    </View>
-                  </View>
 
                   {renderChekiSummary(actionPillText)}
                 </View>
@@ -843,12 +963,12 @@ export default function ArtistDetailScreen() {
                     <TabButton
                       label={`活动 · ${events.length}`}
                       active={false}
-                      onPress={() => setActiveTab('events')}
+                      onPress={() => handleSelectTab('events')}
                     />
                     <TabButton
                       label={`拍立得 · ${totalChekiCount}`}
                       active
-                      onPress={() => setActiveTab('cheki')}
+                      onPress={() => handleSelectTab('cheki')}
                     />
                   </View>
                 </View>
@@ -863,9 +983,15 @@ export default function ArtistDetailScreen() {
           windowSize={5}
           removeClippedSubviews
         />
-      ) : (
+      </View>
+      <View
+        pointerEvents={activeTab === 'events' ? 'auto' : 'none'}
+        accessibilityElementsHidden={activeTab !== 'events'}
+        importantForAccessibility={activeTab === 'events' ? 'auto' : 'no-hide-descendants'}
+        style={[StyleSheet.absoluteFill, { opacity: activeTab === 'events' ? 1 : 0 }]}
+      >
         <Animated.ScrollView
-          onScroll={scrollHandler}
+          onScroll={eventsScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
@@ -876,7 +1002,7 @@ export default function ArtistDetailScreen() {
                 <ImageBackground
                   source={{ uri: artist.background_uri! }}
                   resizeMode="cover"
-                  style={{ width: '100%', aspectRatio: ARTIST_HERO_ASPECT_RATIO }}
+                  style={{ width: '100%', height: heroDisplayHeight }}
                 >
                   <LinearGradient
                     colors={backdropPalette.heroOverlayTopColors}
@@ -885,8 +1011,14 @@ export default function ArtistDetailScreen() {
                   />
                   <LinearGradient
                     colors={backdropPalette.heroOverlayBottomColors}
-                    locations={[0, 0.42, 1]}
-                    style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '44%' }}
+                    locations={[0, 0.7, 1]}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: Math.round(heroHeight * 0.48) + BACKDROP_TRANSITION_HEIGHT,
+                    }}
                   />
                   <View
                     style={{
@@ -894,26 +1026,23 @@ export default function ArtistDetailScreen() {
                       justifyContent: 'flex-end',
                       paddingTop: compactHeaderHeight + 22,
                       paddingHorizontal: 20,
-                      paddingBottom: 8,
-                      alignItems: 'center',
+                      paddingBottom: 84,
+                      alignItems: 'flex-start',
                     }}
                   >
-                    <View style={{ marginBottom: 14 }}>
-                      <OshiAvatar source={avatarSrc} size={48} isOshi={isOshi} />
-                    </View>
-                    <View style={{ minWidth: 0, alignItems: 'center' }}>
+                    <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
                       <Text
                         numberOfLines={2}
                         style={{
-                          fontSize: heroTitleIsLong ? 28 : 32,
-                          lineHeight: heroTitleIsLong ? 32 : 36,
-                          fontWeight: '900',
+                          fontSize: heroTitleIsLong ? 30 : 34,
+                          lineHeight: heroTitleIsLong ? 34 : 38,
+                          fontWeight: '800',
                           color: backdropText,
                           letterSpacing: heroTitleIsLong ? -0.5 : -0.7,
                           textShadowColor: heroNameShadowColor,
                           textShadowOffset: { width: 0, height: 1 },
                           textShadowRadius: 8,
-                          textAlign: 'center',
+                          textAlign: 'left',
                         }}
                       >
                         {artist.name}
@@ -921,60 +1050,81 @@ export default function ArtistDetailScreen() {
                     </View>
                     <View
                       style={{
-                        marginTop: 18,
+                        marginTop: 10,
                         flexDirection: 'row',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         flexWrap: 'wrap',
-                        gap: 8,
+                        columnGap: 16,
                         minWidth: 0,
                         maxWidth: '100%',
                       }}
                     >
-                      <MetaPill
+                      <HeroMetaAction
                         icon={isOshi ? 'sparkles' : 'favorite'}
-                        label={isOshi ? '单推' : '收藏'}
-                        tone={isOshi ? 'oshi' : artist.is_favorite ? 'favorite' : 'neutral'}
-                        overlayMode={pDark ? true : 'light'}
+                        label={isOshi ? '单推' : artist.is_favorite ? '已收藏' : '收藏'}
+                        iconColor={isOshi ? '#c4b5fd' : artist.is_favorite ? '#fb7185' : heroActionIcon}
+                        textColor={heroActionText}
                         onPress={handleToggleFavorite}
                       />
                       {parentArtist ? (
-                        <MetaPill
+                        <HeroMetaAction
                           icon="artists"
                           label={parentArtist.name}
-                          tone="group"
                           isFlexible
-                          overlayMode={pDark ? true : 'light'}
+                          iconColor={heroActionIcon}
+                          textColor={heroActionText}
                           onPress={() => router.push(`/artists/${parentArtist.id}`)}
                         />
                       ) : null}
                       {artist.url ? (
-                        <MetaPill
+                        <HeroMetaAction
                           icon="link"
                           label="链接"
-                          tone="link"
-                          overlayMode={pDark ? true : 'light'}
+                          iconColor={heroActionIcon}
+                          textColor={heroActionText}
                           onPress={() => Linking.openURL(artist.url!)}
                         />
                       ) : null}
                     </View>
                   </View>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: 16,
+                      right: 16,
+                      bottom: 10,
+                    }}
+                  >
+                    <TabSwitcherSurface
+                      usesLiquidGlass={usesLiquidGlass}
+                      overlayIsDark={pDark}
+                      fallbackBackground={cardAltBg}
+                      fallbackBorderWidth={lowerCardBorderWidth}
+                      fallbackBorderColor={backdropDivider}
+                    >
+                      <TabButton
+                        label={`活动 · ${events.length}`}
+                        active
+                        onPress={() => handleSelectTab('events')}
+                        activeBg={tabActiveBg}
+                        activeTextColor={tabActiveText}
+                        inactiveTextColor={tabInactiveText}
+                      />
+                      <TabButton
+                        label={`拍立得 · ${totalChekiCount}`}
+                        active={false}
+                        onPress={() => handleSelectTab('cheki')}
+                        activeBg={tabActiveBg}
+                        activeTextColor={tabActiveText}
+                        inactiveTextColor={tabInactiveText}
+                      />
+                    </TabSwitcherSurface>
+                  </View>
                 </ImageBackground>
               </View>
-              <View
-                style={{
-                  marginTop: -CONTENT_OVERLAP,
-                  backgroundColor: 'transparent',
-                }}
-              >
-                <LinearGradient
-                  colors={backdropPalette.transitionColors}
-                  locations={[0, 0.68, 1]}
-                  style={{ height: CONTENT_OVERLAP + 34 }}
-                />
+              <View style={{ backgroundColor: 'transparent' }}>
                 <View
                   style={{
-                    marginTop: -22,
                     backgroundColor: 'transparent',
                     paddingTop: 0,
                     paddingBottom: 10,
@@ -1040,42 +1190,19 @@ export default function ArtistDetailScreen() {
                   ) : null}
 
                   <View style={{ paddingHorizontal: 16 }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        backgroundColor: cardAltBg,
-                        borderRadius: 14,
-                        padding: 4,
-                        borderWidth: lowerCardBorderWidth,
-                        borderColor: backdropDivider,
-                      }}
-                    >
-                      <TabButton
-                        label={`活动 · ${events.length}`}
-                        active
-                        onPress={() => setActiveTab('events')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                      <TabButton
-                        label={`拍立得 · ${totalChekiCount}`}
-                        active={false}
-                        onPress={() => setActiveTab('cheki')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
                     {events.length === 0 ? (
                       <EmptyState icon="music" message="还没有记录的活动" borderless bgColor={cardBg} textColor={backdropEmptyTextColor} />
                     ) : (
                       eventSections.map((section) => (
                         <View key={section.key}>
-                          <EventSectionHeader title={section.title} count={section.data.length} colors={colors} />
+                          <EventSectionHeader
+                            title={section.title}
+                            count={section.data.length}
+                            colors={colors}
+                            variant="media"
+                            titleColor={backdropText}
+                            countColor={sectionCountColor}
+                          />
                           {section.data.map((event) => (
                             <EventCard
                               key={event.id}
@@ -1233,12 +1360,12 @@ export default function ArtistDetailScreen() {
                     <TabButton
                       label={`活动 · ${events.length}`}
                       active
-                      onPress={() => setActiveTab('events')}
+                      onPress={() => handleSelectTab('events')}
                     />
                     <TabButton
                       label={`拍立得 · ${totalChekiCount}`}
                       active={false}
-                      onPress={() => setActiveTab('cheki')}
+                      onPress={() => handleSelectTab('cheki')}
                     />
                   </View>
                 </View>
@@ -1268,7 +1395,7 @@ export default function ArtistDetailScreen() {
             </>
           )}
         </Animated.ScrollView>
-      )}
+      </View>
 
       <ChekiViewerModal
         visible={viewerSelectedId !== null}
@@ -1287,15 +1414,21 @@ function CircleIconButton({
   variant,
   onPress,
   overlayMode,
+  overlayIsDark,
+  usesLiquidGlass,
 }: {
   icon: AppIconName;
   variant?: 'back' | 'forward' | 'up' | 'down';
   onPress: () => void;
   overlayMode: boolean;
+  overlayIsDark: boolean;
+  usesLiquidGlass: boolean;
 }) {
-  const { colors, isDark } = useAppTheme();
-
-  return (
+  const { colors } = useAppTheme();
+  const foregroundColor = overlayMode
+    ? (overlayIsDark ? colors.white : 'rgba(0,0,0,0.82)')
+    : colors.heading;
+  const control = (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
@@ -1303,49 +1436,115 @@ function CircleIconButton({
       style={({ pressed }) => ({
         width: 44,
         height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.66 : 1,
+      })}
+    >
+      <AppIcon name={icon} variant={variant} size={20} color={foregroundColor} />
+    </Pressable>
+  );
+
+  if (usesLiquidGlass) {
+    return (
+      <GlassView
+        glassEffectStyle="clear"
+        colorScheme={overlayIsDark ? 'dark' : 'light'}
+        isInteractive
+        style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden' }}
+      >
+        {control}
+      </GlassView>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        width: 44,
+        height: 44,
         borderRadius: 22,
+        overflow: 'hidden',
         backgroundColor: overlayMode
-          ? (isDark ? 'rgba(15,10,30,0.42)' : 'rgba(255,255,255,0.78)')
+          ? (overlayIsDark ? 'rgba(12,12,16,0.48)' : 'rgba(250,250,252,0.72)')
           : colors.card,
         borderWidth: 1,
         borderColor: overlayMode
-          ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(31,18,53,0.08)')
+          ? (overlayIsDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)')
           : colors.divider,
-        alignItems: 'center',
-        justifyContent: 'center',
-        opacity: pressed ? 0.7 : 1,
-      })}
+      }}
     >
-      <AppIcon name={icon} variant={variant} size={20} color={colors.heading} />
-    </Pressable>
+      {control}
+    </View>
   );
 }
 
-function HeaderTextButton({ label, onPress, overlayMode }: { label: string; onPress: () => void; overlayMode: boolean }) {
-  const { colors, isDark } = useAppTheme();
-
-  return (
+function HeaderTextButton({
+  label,
+  onPress,
+  overlayMode,
+  overlayIsDark,
+  usesLiquidGlass,
+}: {
+  label: string;
+  onPress: () => void;
+  overlayMode: boolean;
+  overlayIsDark: boolean;
+  usesLiquidGlass: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const foregroundColor = overlayMode
+    ? (overlayIsDark ? colors.white : 'rgba(0,0,0,0.82)')
+    : colors.accentText;
+  const control = (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => ({
-        minWidth: 52,
-        height: 38,
-        borderRadius: 19,
+        minWidth: 60,
+        height: 44,
         paddingHorizontal: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.66 : 1,
+      })}
+    >
+      <Text style={{ fontSize: 14, fontWeight: '700', color: foregroundColor }}>{label}</Text>
+    </Pressable>
+  );
+
+  if (usesLiquidGlass) {
+    return (
+      <GlassView
+        glassEffectStyle="clear"
+        colorScheme={overlayIsDark ? 'dark' : 'light'}
+        isInteractive
+        style={{ minWidth: 60, height: 44, borderRadius: 22, overflow: 'hidden' }}
+      >
+        {control}
+      </GlassView>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        minWidth: 52,
+        height: 44,
+        borderRadius: 22,
+        overflow: 'hidden',
         backgroundColor: overlayMode
-          ? (isDark ? 'rgba(15,10,30,0.42)' : 'rgba(255,255,255,0.78)')
+          ? (overlayIsDark ? 'rgba(12,12,16,0.48)' : 'rgba(250,250,252,0.72)')
           : colors.card,
         borderWidth: 1,
         borderColor: overlayMode
-          ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(31,18,53,0.08)')
+          ? (overlayIsDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)')
           : colors.divider,
-        alignItems: 'center',
-        justifyContent: 'center',
-        opacity: pressed ? 0.7 : 1,
-      })}
+      }}
     >
-      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.accentText }}>{label}</Text>
-    </Pressable>
+      {control}
+    </View>
   );
 }
 
@@ -1372,6 +1571,8 @@ function TabButton({
       onPress={onPress}
       style={{
         flex: 1,
+        minHeight: 44,
+        justifyContent: 'center',
         paddingVertical: 9,
         borderRadius: 9,
         alignItems: 'center',
@@ -1388,6 +1589,98 @@ function TabButton({
         {label}
       </Text>
     </TouchableOpacity>
+  );
+}
+
+function TabSwitcherSurface({
+  children,
+  usesLiquidGlass,
+  overlayIsDark,
+  fallbackBackground,
+  fallbackBorderWidth,
+  fallbackBorderColor,
+}: {
+  children: ReactNode;
+  usesLiquidGlass: boolean;
+  overlayIsDark: boolean;
+  fallbackBackground: string;
+  fallbackBorderWidth: number;
+  fallbackBorderColor: string;
+}) {
+  const contentStyle = {
+    flexDirection: 'row' as const,
+    borderRadius: 14,
+    padding: 4,
+    overflow: 'hidden' as const,
+  };
+
+  if (usesLiquidGlass) {
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme={overlayIsDark ? 'dark' : 'light'}
+        isInteractive
+        style={contentStyle}
+      >
+        {children}
+      </GlassView>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        contentStyle,
+        {
+          backgroundColor: fallbackBackground,
+          borderWidth: fallbackBorderWidth,
+          borderColor: fallbackBorderColor,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+function HeroMetaAction({
+  icon,
+  label,
+  iconColor,
+  textColor,
+  isFlexible = false,
+  onPress,
+}: {
+  icon: AppIconName;
+  label: string;
+  iconColor: string;
+  textColor: string;
+  isFlexible?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: 44,
+        maxWidth: isFlexible ? '58%' : undefined,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      <AppIcon name={icon} size={15} color={iconColor} />
+      <Text
+        numberOfLines={1}
+        style={{ flexShrink: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: textColor }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
