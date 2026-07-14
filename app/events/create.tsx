@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
 import { EventForm, defaultFormValues } from '../../src/components/EventForm';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import type { EventFormHandle, EventFormValues } from '../../src/components/EventForm';
 import { useDB } from '../../src/context/DBContext';
 import { consumeEventDraft } from '../../src/utils/eventDraftStore';
@@ -47,17 +48,21 @@ export default function CreateEventScreen() {
         options={{
           title: '新建活动',
           headerTitleAlign: 'center',
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingLeft: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => formRef.current?.submit()} style={{ paddingRight: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>保存</Text>
             </TouchableOpacity>
           ),
         }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: () => router.back() }}
+        right={{ label: '保存', onPress: () => formRef.current?.submit(), variant: 'done' }}
       />
       <EventForm
         ref={formRef}

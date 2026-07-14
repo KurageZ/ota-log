@@ -16,12 +16,14 @@ import { SearchFilterBar } from '../../src/components/SearchFilterBar';
 import { FilterSheet, FilterSection } from '../../src/components/FilterSheet';
 import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
 type ArtistGroupFilter = 'has_parent' | 'no_parent' | null;
+const IS_IOS = process.env.EXPO_OS === 'ios';
 
 export default function ArtistsScreen() {
   const db = useDB();
@@ -186,7 +188,7 @@ export default function ArtistsScreen() {
           headerShadowVisible: false,
           headerTintColor: colors.accent,
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerRight: () => (
+          headerRight: IS_IOS ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push('/artists/new')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -418,6 +420,12 @@ export default function ArtistsScreen() {
           onClose={() => setFilterVisible(false)}
         />
       </SafeAreaView>
+      {IS_IOS ? (
+        <NativeAddToolbar
+          accessibilityLabel="新建艺人"
+          onPress={() => router.push('/artists/new')}
+        />
+      ) : null}
     </>
   );
 }

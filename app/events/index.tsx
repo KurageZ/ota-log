@@ -23,12 +23,14 @@ import { SearchFilterBar } from '../../src/components/SearchFilterBar';
 import { FilterSheet, FilterSection } from '../../src/components/FilterSheet';
 import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
 import { AppIcon } from '../../src/components/AppIcon';
+import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import type { EventFilter } from '../../src/repositories/EventRepository';
 import { buildEventMonthSections } from '../../src/utils/eventSections';
 import { getArtistSearchText, sortArtistsWithOshi } from '../../src/utils/filter';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const EVENT_FILTER_HISTORY_STORAGE_KEY = 'ota-log.events-filter-history.v1';
+const IS_IOS = process.env.EXPO_OS === 'ios';
 
 type PeriodHistoryPill = {
   id: string;
@@ -682,7 +684,7 @@ export default function EventsIndexScreen() {
           headerShadowVisible: false,
           headerTintColor: colors.accent,
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerRight: () => (
+          headerRight: IS_IOS ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push('/events/compose')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -757,6 +759,12 @@ export default function EventsIndexScreen() {
           onClose={() => setFilterVisible(false)}
         />
       </SafeAreaView>
+      {IS_IOS ? (
+        <NativeAddToolbar
+          accessibilityLabel="新建活动"
+          onPress={() => router.push('/events/compose')}
+        />
+      ) : null}
     </>
   );
 }

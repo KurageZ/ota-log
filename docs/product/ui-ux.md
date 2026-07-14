@@ -630,7 +630,7 @@ Shell：
 
 - `Modal transparent`，`presentationStyle="overFullScreen"`，`animationType="fade"`。
 - 背景 `rgba(0,0,0,0.92)`。
-- 顶部按钮为圆形半透明底，关闭、编辑、删除保持位置稳定。
+- 顶部左侧保留圆形半透明关闭按钮；右侧只显示「更多」按钮，编辑和删除收进系统操作菜单，删除项使用 destructive 语义。没有编辑或删除能力时保留等宽占位，确保图片计数居中稳定。
 - 资料图支持 1-5 倍缩放。
 - 拍立得查看底部显示日期、价格、备注、艺人等元信息。
 
@@ -647,6 +647,9 @@ Shell：
 - 页面和组件只使用 `AppIcon` 的业务名，不直接 import `@react-native-vector-icons/lucide`、`@expo/vector-icons` 或具体 icon 字体。
 - 图标命名遵循「业务名 -> 映射层 -> Lucide 实际名」。例如页面使用 `favorite`、`calendar`、`disclosure`，映射层再决定实际 glyph 是 `heart`、`calendar-days` 还是 `chevron-right`。
 - iOS 原生 Toolbar 优先使用 SF Symbols，但仍通过 `AppIcon` 的业务名映射获取，页面不直接硬编码 symbol 名；其他页面图标继续使用 Lucide glyph。
+- 首页、所有活动、艺人管理和重要日期的 iOS 右上角「新建」统一复用 `NativeAddToolbar`，由原生 `Stack.Toolbar` 渲染 `plus`；Android 保留现有 Lucide Header 操作。底部 Tab Bar 不随本轮 Toolbar 调整变更。
+- iOS 导航栏中的「取消 / 编辑 / 保存 / 重置」等文字操作统一使用原生 `Stack.Toolbar.Button`，避免两字自定义按钮在 Liquid Glass 下收成圆形；Android 保留现有 Header 操作。
+- 只有会丢失持久数据或用户配置的操作使用 danger 红色，例如删除记录、覆盖备份和恢复默认配置；取消、清除筛选等非破坏性操作继续使用普通强调色。破坏性操作需要二次确认，确认按钮使用 destructive 语义。
 - 新增图标先扩展 `AppIconName` 和 `ICONS`，不要在页面内写 Lucide 实际名。
 - `variant` 只用于真实业务状态或方向，例如 `selected/unselected`、`up/down/forward/back`。`active/inactive` 只有在 Lucide 实际提供有意义的状态 glyph 时才配置；否则用颜色、背景、缩放或文字表达状态。
 - Lucide 不提供实心 heart。单推或收藏如果需要实心心形，必须作为 `AppIcon` 映射层的明确例外实现，而不是在页面里绕过映射层。

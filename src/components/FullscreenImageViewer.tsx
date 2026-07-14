@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
+  Alert,
   Animated,
   Dimensions,
   Easing,
@@ -75,12 +77,14 @@ type IndexComponentProps = {
 
 function HeaderButton({
   icon,
+  accessibilityLabel,
   color,
   onPress,
   restBackgroundColor,
   pressedBackgroundColor,
 }: {
   icon: AppIconName;
+  accessibilityLabel: string;
   color: string;
   onPress: () => void;
   restBackgroundColor: string;
@@ -90,6 +94,8 @@ function HeaderButton({
     <Pressable
       onPress={onPress}
       hitSlop={12}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
       style={({ pressed }) => ({
         width: 40,
         height: 40,
@@ -131,6 +137,49 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const [transitionCoverLoaded, setTransitionCoverLoaded] = useState(false);
   const controlsAnimation = useRef(new Animated.Value(1)).current;
   const transitionAnimation = useRef(new Animated.Value(0)).current;
+
+  const showMoreActions = useCallback((item: T) => {
+    const actions = [
+      ...(onEdit ? [{ id: 'edit' as const, label: '编辑' }] : []),
+      ...(onDelete ? [{ id: 'delete' as const, label: '删除' }] : []),
+    ];
+    if (actions.length === 0) return;
+
+    const runAction = (id: 'edit' | 'delete') => {
+      if (id === 'edit') onEdit?.(item);
+      if (id === 'delete') onDelete?.(item);
+    };
+
+    if (Platform.OS === 'ios') {
+      const cancelButtonIndex = actions.length;
+      const destructiveButtonIndex = actions.findIndex((action) => action.id === 'delete');
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...actions.map((action) => action.label), '取消'],
+          cancelButtonIndex,
+          destructiveButtonIndex: destructiveButtonIndex >= 0 ? destructiveButtonIndex : undefined,
+        },
+        (buttonIndex) => {
+          const action = actions[buttonIndex];
+          if (action) runAction(action.id);
+        },
+      );
+      return;
+    }
+
+    Alert.alert(
+      '更多操作',
+      undefined,
+      [
+        ...actions.map((action) => ({
+          text: action.label,
+          style: action.id === 'delete' ? 'destructive' as const : 'default' as const,
+          onPress: () => runAction(action.id),
+        })),
+        { text: '取消', style: 'cancel' as const },
+      ],
+    );
+  }, [onDelete, onEdit]);
 
   const selectedIndex = useMemo(() => {
     if (!selectedId) return 0;
@@ -450,6 +499,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
         >
           <HeaderButton
             icon="close"
+            accessibilityLabel="关闭图片查看"
             color={colors.white}
             onPress={onClose}
             restBackgroundColor={colors.heroDecorWeak}
@@ -460,35 +510,22 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
               {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
             </Text>
           </View>
-          {onEdit && item ? (
+          {(onEdit || onDelete) && item ? (
             <HeaderButton
-              icon="edit"
+              icon="more"
+              accessibilityLabel="更多操作"
               color={colors.white}
-              onPress={() => onEdit(item)}
+              onPress={() => showMoreActions(item)}
               restBackgroundColor={colors.heroDecorWeak}
               pressedBackgroundColor={colors.heroDecor}
             />
-          ) : null}
-          {onDelete && item ? (
-            <View style={{ marginLeft: onEdit ? 8 : 0 }}>
-              <HeaderButton
-                icon="trash"
-                color={colors.danger}
-                onPress={() => onDelete(item)}
-                restBackgroundColor={colors.dangerSoft}
-                pressedBackgroundColor={colors.dangerBorder}
-              />
-            </View>
-          ) : null}
+          ) : <View style={{ width: 40, height: 40 }} />}
         </Animated.View>
       </>
     );
   }, [
     clampIndex,
     controlsVisible,
-    colors.danger,
-    colors.dangerBorder,
-    colors.dangerSoft,
     colors.heroDecor,
     colors.heroDecorWeak,
     colors.heroEyebrow,
@@ -504,6 +541,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     screenHeight,
     screenWidth,
     showOpeningTransition,
+    showMoreActions,
     transitionAnimatedStyle,
     transitionBackdropStyle,
     transitionCoverLoaded,

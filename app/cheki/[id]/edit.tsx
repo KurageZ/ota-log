@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '../../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useDB } from '../../../src/context/DBContext';
 import { Artist, Cheki, Event } from '../../../src/types/models';
 import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
@@ -154,12 +155,12 @@ export default function EditChekiScreen() {
           headerShadowVisible: false,
           headerTitleAlign: 'center',
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingLeft: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={handleSave} disabled={!canSave} style={{ paddingRight: 4, opacity: canSave ? 1 : 0.4 }}>
               {saving
                 ? <ActivityIndicator size="small" color={colors.accent} />
@@ -167,6 +168,15 @@ export default function EditChekiScreen() {
               }
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: () => router.back(), disabled: saving }}
+        right={{
+          label: saving ? '保存中' : '保存',
+          onPress: handleSave,
+          disabled: !canSave,
+          variant: 'done',
         }}
       />
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>

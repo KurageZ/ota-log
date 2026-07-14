@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useDB } from '../../../src/context/DBContext';
 import { Event, Artist, Photo } from '../../../src/types/models';
 import { EventForm, EventFormHandle, EventFormValues } from '../../../src/components/EventForm';
+import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useAppTheme } from '../../../src/theme/appTheme';
 
 export default function EditEventScreen() {
@@ -97,17 +98,21 @@ export default function EditEventScreen() {
         options={{
           title: '编辑活动',
           headerTitleAlign: 'center',
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingLeft: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => formRef.current?.submit()} style={{ paddingRight: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>保存</Text>
             </TouchableOpacity>
           ),
         }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: () => router.back() }}
+        right={{ label: '保存', onPress: () => formRef.current?.submit(), variant: 'done' }}
       />
       <EventForm
         ref={formRef}

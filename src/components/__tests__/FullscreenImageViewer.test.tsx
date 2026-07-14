@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { Image, Modal, StyleSheet } from 'react-native';
+import { ActionSheetIOS, Image, Modal, StyleSheet } from 'react-native';
 import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
 jest.mock('react-native-image-viewing', () => ({
@@ -54,6 +54,7 @@ describe('FullscreenImageViewer opening transition', () => {
 
   afterEach(() => {
     act(() => renderer.unmount());
+    jest.restoreAllMocks();
   });
 
   test('renders the opening animation inside the viewer instead of presenting a second Modal', () => {
@@ -73,5 +74,42 @@ describe('FullscreenImageViewer opening transition', () => {
     expect(renderer.root.findByProps({ testID: 'image-opening-transition' })).toBeTruthy();
     const headerControls = renderer.root.findByProps({ testID: 'image-viewer-header-controls' });
     expect(StyleSheet.flatten(headerControls.props.style).opacity).toBe(0);
+  });
+
+  test('groups edit and delete actions under the native more-actions menu', () => {
+    const onEdit = jest.fn();
+    const onDelete = jest.fn();
+    let selectAction: ((buttonIndex: number) => void) | undefined;
+    const actionSheetSpy = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((options, callback) => {
+        expect(options.options).toEqual(['编辑', '删除', '取消']);
+        expect(options.cancelButtonIndex).toBe(2);
+        expect(options.destructiveButtonIndex).toBe(1);
+        selectAction = callback;
+      });
+
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+          selectedId="cheki-1"
+          onClose={jest.fn()}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />,
+      );
+    });
+
+    const moreButton = renderer.root.findByProps({ accessibilityLabel: '更多操作' });
+    act(() => moreButton.props.onPress());
+    expect(actionSheetSpy).toHaveBeenCalledTimes(1);
+
+    act(() => selectAction?.(0));
+    expect(onEdit).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
+
+    act(() => selectAction?.(1));
+    expect(onDelete).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
   });
 });

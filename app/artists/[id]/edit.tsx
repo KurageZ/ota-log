@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { AppIcon } from '../../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useDB } from '../../../src/context/DBContext';
 import { Artist } from '../../../src/types/models';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
@@ -284,12 +285,12 @@ export default function EditArtistScreen() {
           headerStyle: { backgroundColor: colors.header },
           headerShadowVisible: false,
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingLeft: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={handleSave} disabled={saving} style={{ paddingRight: 4, opacity: saving ? 0.4 : 1 }}>
               {saving
                 ? <ActivityIndicator size="small" color={colors.accent} />
@@ -297,6 +298,15 @@ export default function EditArtistScreen() {
               }
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: () => router.back(), disabled: saving }}
+        right={{
+          label: saving ? '保存中' : '保存',
+          onPress: handleSave,
+          disabled: saving,
+          variant: 'done',
         }}
       />
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../src/components/AppIcon';
+import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import { OshiAvatar } from '../../src/components/Oshi';
 import { PresetDateItemTitle } from '../../src/components/PresetDateItemTitle';
 import { SectionLabel } from '../../src/components/SettingsMenu';
@@ -15,6 +16,8 @@ import { getDateItemPresetKind } from '../../src/utils/dateItemDisplay';
 import { toISODate } from '../../src/utils/date';
 import { withAlpha } from '../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+
+const IS_IOS = process.env.EXPO_OS === 'ios';
 
 function DateItemCard({ item }: { item: HydratedDateItem }) {
   const { colors, isDark } = useAppTheme();
@@ -158,7 +161,7 @@ export default function DateItemsScreen() {
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
-          headerRight: () => (
+          headerRight: IS_IOS ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push('/date-items/new')}
               activeOpacity={0.72}
@@ -213,6 +216,12 @@ export default function DateItemsScreen() {
           </>
         )}
       </ScrollView>
+      {IS_IOS ? (
+        <NativeAddToolbar
+          accessibilityLabel="新建重要日期"
+          onPress={() => router.push('/date-items/new')}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

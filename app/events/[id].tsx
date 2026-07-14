@@ -30,6 +30,7 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
 import { withAlpha } from '../../src/utils/color';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const INFO_PH = 160;
@@ -501,11 +502,17 @@ export default function EventDetailScreen() {
           headerStyle: { backgroundColor: bg },
           headerShadowVisible: false,
           headerTintColor: colors.accent,
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.push(`/events/${id}/edit`)} style={{ paddingRight: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>编辑</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        right={{
+          label: '编辑',
+          onPress: () => router.push(`/events/${id}/edit`),
         }}
       />
 

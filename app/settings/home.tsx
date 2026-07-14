@@ -3,6 +3,7 @@ import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -17,6 +18,7 @@ import { Artist, UserConfig } from '../../src/types/models';
 import { ThemeColors, useAppTheme } from '../../src/theme/appTheme';
 import { ArtistSearchPicker } from '../../src/components/ArtistSearchPicker';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import type { HydratedDateItem } from '../../src/repositories/DateItemRepository';
@@ -369,6 +371,7 @@ export default function HomeSettingsScreen() {
       { text: '取消', style: 'cancel' },
       {
         text: '恢复',
+        style: 'destructive',
         onPress: () => {
           void persistPreferences(createDefaultHomePinnedInfo(), createDefaultHomeCards(userConfig?.oshi_artist_id));
         },
@@ -640,7 +643,15 @@ export default function HomeSettingsScreen() {
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
-      <Stack.Screen options={{ headerRight: renderResetAction }} />
+      <Stack.Screen options={{ headerRight: Platform.OS === 'ios' ? undefined : renderResetAction }} />
+      <NativeTextToolbar
+        right={{
+          label: '重置',
+          accessibilityLabel: '恢复默认首页设置',
+          onPress: handleReset,
+          tintColor: colors.danger,
+        }}
+      />
       {isLoading ? (
         <View style={{ padding: 24, alignItems: 'center' }}>
           <ActivityIndicator color={colors.accent} />

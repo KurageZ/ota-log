@@ -1,10 +1,11 @@
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../src/components/AppIcon';
 import { OshiAvatar } from '../../src/components/Oshi';
 import { PresetDateItemTitle } from '../../src/components/PresetDateItemTitle';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
 import { HydratedDateItem } from '../../src/repositories/DateItemRepository';
@@ -170,7 +171,7 @@ export default function DateItemDetailScreen() {
       <Stack.Screen
         options={{
           title: '',
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push(`/date-items/${item.item.id}/edit`)}
               activeOpacity={0.72}
@@ -185,6 +186,12 @@ export default function DateItemDetailScreen() {
               <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>编辑</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        right={{
+          label: '编辑',
+          onPress: () => router.push(`/date-items/${item.item.id}/edit`),
         }}
       />
       <ScrollView

@@ -59,6 +59,7 @@ export type AppIconName =
   | 'mapPin'
   | 'menuDrag'
   | 'music'
+  | 'more'
   | 'navigate'
   | 'oshi'
   | 'person'
@@ -158,6 +159,7 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   mapPin: { icon: 'map-pin' },
   menuDrag: { icon: 'grip-vertical' },
   music: { icon: 'music' },
+  more: { icon: 'ellipsis' },
   navigate: { icon: 'navigation' },
   oshi: { icon: 'heart' },
   person: { icon: 'user' },

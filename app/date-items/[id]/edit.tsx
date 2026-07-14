@@ -1,7 +1,8 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { DateItemForm, DateItemFormHandle } from '../../../src/components/DateItemForm';
+import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useDB } from '../../../src/context/DBContext';
 import { HydratedDateItem } from '../../../src/repositories/DateItemRepository';
 import { useAppTheme } from '../../../src/theme/appTheme';
@@ -48,12 +49,12 @@ export default function EditDateItemScreen() {
         options={{
           title: '编辑重要日期',
           headerTitleAlign: 'center',
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingLeft: 4 }}>
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity
               onPress={() => formRef.current?.submit()}
               disabled={!canSave}
@@ -62,6 +63,15 @@ export default function EditDateItemScreen() {
               <Text style={{ color: canSave ? colors.accent : colors.textMuted, fontSize: 16, fontWeight: '700' }}>保存</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: () => router.back() }}
+        right={{
+          label: '保存',
+          onPress: () => formRef.current?.submit(),
+          disabled: !canSave,
+          variant: 'done',
         }}
       />
       <DateItemForm

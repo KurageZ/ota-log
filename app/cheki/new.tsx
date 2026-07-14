@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { FormCard, FormFieldLabel, FormSectionLabel } from '../../src/components/FormPrimitives';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -738,7 +739,7 @@ export default function NewChekiScreen() {
           headerStyle: { backgroundColor: isDark ? colors.screen : colors.card },
           headerTitleAlign: 'center',
           headerShadowVisible: false,
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity
               onPress={() => {
                 if (!saving && !isHandlingPhotoSelection) {
@@ -752,7 +753,7 @@ export default function NewChekiScreen() {
               <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={handleSave} disabled={!canSave} style={{ paddingRight: 4 }}>
               {saving || isHandlingPhotoSelection ? (
                 <ActivityIndicator size="small" color={colors.accent} />
@@ -763,6 +764,24 @@ export default function NewChekiScreen() {
               )}
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        left={{
+          label: '取消',
+          onPress: () => {
+            if (!saving && !isHandlingPhotoSelection) {
+              void cleanupPendingImportedPhotos([...photoUris]);
+              router.back();
+            }
+          },
+          disabled: saving || isHandlingPhotoSelection,
+        }}
+        right={{
+          label: saving || isHandlingPhotoSelection ? '处理中' : saveLabel,
+          onPress: handleSave,
+          disabled: !canSave,
+          variant: 'done',
         }}
       />
 

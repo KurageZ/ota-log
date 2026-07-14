@@ -23,6 +23,7 @@ import {
 } from '../../../src/components/HomeDashboardCards';
 import type { HydratedDateItem } from '../../../src/repositories/DateItemRepository';
 import { AppIcon } from '../../../src/components/AppIcon';
+import { NativeAddToolbar } from '../../../src/components/native-add-toolbar';
 import { EventCardOshiBadge, getEventCardOshiBadge, getOshiMatchSource } from '../../../src/utils/oshiMatch';
 import { buildHomeTimelineGroups } from '../../../src/utils/homeTimeline';
 import { useAppTheme } from '../../../src/theme/appTheme';
@@ -648,8 +649,12 @@ export default function HomeScreen() {
   if (!isAndroid) {
     return (
       <>
-        <Stack.Screen options={{ headerRight: renderCreateEventIcon }} />
+        <Stack.Screen />
         {scrollContent}
+        <NativeAddToolbar
+          accessibilityLabel="新建活动"
+          onPress={() => router.push('/events/compose')}
+        />
       </>
     );
   }

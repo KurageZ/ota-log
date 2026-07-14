@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
+import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { useDB } from '../../src/context/DBContext';
 import { Artist } from '../../src/types/models';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
@@ -54,11 +55,19 @@ export default function OshiSettingsScreen() {
       <Stack.Screen
         options={{
           title: '单推设置',
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={handleSave} disabled={saving} style={{ paddingRight: 4, opacity: saving ? 0.5 : 1 }}>
               <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>保存</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        right={{
+          label: saving ? '保存中' : '保存',
+          onPress: handleSave,
+          disabled: saving,
+          variant: 'done',
         }}
       />
 
