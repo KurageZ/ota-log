@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { Alert } from 'react-native';
 import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
-import { buildBackupData, importBackup, restoreBackupData } from '../../utils/backup';
+import { buildBackupData, exportFullBackup, importBackup, restoreBackupData } from '../../utils/backup';
 import { ArtistRepository } from '../../repositories/ArtistRepository';
 import { EventRepository } from '../../repositories/EventRepository';
 import { TripRepository } from '../../repositories/TripRepository';
@@ -115,6 +115,28 @@ describe('backup artist background metadata support', () => {
         background_color: '#605074',
       }),
     ]);
+  });
+
+  test('export refuses to create an incomplete backup when a preset avatar is unavailable', async () => {
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'artist-preset-missing',
+      'Preset Missing',
+      null,
+      null,
+      'preset://missing',
+      null,
+      null,
+      null,
+      0,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    await expect(exportFullBackup(repositories)).rejects.toThrow(
+      '有 1 个旧版内置艺人头像无法读取，未生成备份',
+    );
   });
 
   test('restoreBackupData persists artist background metadata', async () => {

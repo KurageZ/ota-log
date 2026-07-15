@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import { unzip } from 'react-native-zip-archive';
 import { Repositories } from '../context/DBContext';
 import { copyToDocuments } from './copyToDocuments';
+import { materializePresetArtistAvatars } from './presetArtistMedia';
 
 const BACKUP_VERSION = 4;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
@@ -785,6 +786,11 @@ export async function exportFullBackup(
   };
   reportProgress(2);
   cleanupHistoricCacheBackups();
+
+  const presetMedia = await materializePresetArtistAvatars(db.rawDb);
+  if (presetMedia.unresolved > 0) {
+    throw new Error(`有 ${presetMedia.unresolved} 个旧版内置艺人头像无法读取，未生成备份`);
+  }
 
   const payload = await buildBackupPayload(db);
   reportProgress(8);

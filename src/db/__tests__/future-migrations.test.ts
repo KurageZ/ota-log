@@ -79,17 +79,15 @@ function createV12DbWithManualEntries(): Database.Database {
 }
 
 describe('Forward migrations from v11', () => {
-  test('fresh database seeds only the build-time bundled artist catalog', async () => {
+  test('fresh database does not seed the legacy bundled artist catalog', async () => {
     const db = new Database(':memory:');
-    const expectedArtistCount = Number(process.env.OTA_LOG_EXPECT_BUNDLED_ARTISTS ?? 0);
-    const expectedAvatarCount = Number(process.env.OTA_LOG_EXPECT_BUNDLED_ARTIST_AVATARS ?? 0);
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
     expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(16);
-    expect(getScalar<number>(db, 'SELECT COUNT(*) FROM artists')).toBe(expectedArtistCount);
+    expect(getScalar<number>(db, 'SELECT COUNT(*) FROM artists')).toBe(0);
     expect(getScalar<number>(db, "SELECT COUNT(*) FROM artists WHERE avatar_uri LIKE 'preset://%'"))
-      .toBe(expectedAvatarCount);
+      .toBe(0);
 
     db.close();
   });

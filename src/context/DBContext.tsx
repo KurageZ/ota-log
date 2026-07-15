@@ -14,6 +14,7 @@ import { UserConfigRepository } from '../repositories/UserConfigRepository';
 import { DateItemRepository } from '../repositories/DateItemRepository';
 import { useAppTheme } from '../theme/appTheme';
 import { rebaseLegacyLocalMediaUris } from '../utils/localMedia';
+import { materializePresetArtistAvatars } from '../utils/presetArtistMedia';
 
 export interface Repositories {
   artists: ArtistRepository;
@@ -58,6 +59,7 @@ async function initializeDatabase(): Promise<Repositories> {
     await db.runAsync('PRAGMA foreign_keys = ON');
     await runMigrations(db);
     await rebaseLegacyLocalMediaUris(db);
+    await materializePresetArtistAvatars(db);
     const repositories = buildRepositories(db);
     sharedRepositories = repositories;
     return repositories;

@@ -75,15 +75,7 @@ async function loadAndValidateSource(sourceDirectory) {
   return { artists: parsed.artists, avatarDirectory, avatarFiles: actualAvatarFiles };
 }
 
-function generateAdapterSource(artists, avatarFiles) {
-  const artistRows = artists.map((artist) => ({
-    id: artist.id,
-    name: artist.name,
-    short_name: artist.short_name,
-    parent_id: artist.parent_id,
-    url: artist.url,
-    avatar_uri: artist.avatar_id === null ? null : `preset://${artist.avatar_id}`,
-  }));
+function generateAdapterSource(avatarFiles) {
   const avatarEntries = avatarFiles.map((filename) => {
     const id = filename.slice('avatar_'.length, -'.jpg'.length);
     return `  ${JSON.stringify(id)}: require('../../assets/bundled-artists/${filename}'),`;
@@ -91,28 +83,9 @@ function generateAdapterSource(artists, avatarFiles) {
 
   return `// Generated in a disposable private-build staging directory. Do not commit this file.\n`
     + `import type { SQLiteDatabase } from 'expo-sqlite';\n`
-    + `import { toISODateTime } from '../utils/date';\n\n`
-    + `interface BundledArtist {\n`
-    + `  id: string;\n  name: string;\n  short_name: string | null;\n  parent_id: string | null;\n`
-    + `  url: string | null;\n  avatar_uri: string | null;\n}\n\n`
-    + `const BUNDLED_ARTISTS: BundledArtist[] = ${JSON.stringify(artistRows, null, 2)};\n\n`
+    + `\n`
     + `const BUNDLED_ARTIST_AVATARS: Record<string, number> = {\n${avatarEntries.join('\n')}\n};\n\n`
-    + `export async function insertBundledArtists(db: SQLiteDatabase): Promise<void> {\n`
-    + `  const now = toISODateTime();\n`
-    + `  await db.withTransactionAsync(async () => {\n`
-    + `    for (const artist of BUNDLED_ARTISTS) {\n`
-    + `      await db.runAsync(\n`
-    + `        'INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, created_at) VALUES (?, ?, ?, NULL, ?, ?, ?)',\n`
-    + `        [artist.id, artist.name, artist.short_name, artist.avatar_uri, artist.url, now],\n`
-    + `      );\n`
-    + `    }\n`
-    + `    for (const artist of BUNDLED_ARTISTS) {\n`
-    + `      if (artist.parent_id !== null) {\n`
-    + `        await db.runAsync('UPDATE artists SET parent_id = ? WHERE id = ?', [artist.parent_id, artist.id]);\n`
-    + `      }\n`
-    + `    }\n`
-    + `  });\n`
-    + `}\n\n`
+    + `export async function insertBundledArtists(_db: SQLiteDatabase): Promise<void> {}\n\n`
     + `export function resolveBundledArtistAvatar(id: string): number | undefined {\n`
     + `  return BUNDLED_ARTIST_AVATARS[id];\n`
     + `}\n`;
@@ -136,8 +109,8 @@ for (const filename of avatarFiles) {
 }
 await writeFile(
   path.join(resolvedProjectRoot, 'src', 'db', 'bundledArtistCatalog.ts'),
-  generateAdapterSource(artists, avatarFiles),
+  generateAdapterSource(avatarFiles),
   'utf8',
 );
 
-process.stdout.write(`Injected ${artists.length} artists and ${avatarFiles.length} avatars into ${resolvedProjectRoot}\n`);
+process.stdout.write(`Loaded ${artists.length} legacy artist mappings and injected ${avatarFiles.length} migration avatars into ${resolvedProjectRoot}\n`);

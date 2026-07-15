@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { SQLiteDatabase } from 'expo-sqlite';
 
-const LOCAL_MEDIA_PREFIXES = ['photo_', 'weibo_avatar_', 'artist_bg_', 'showcase_bg_'];
+const LOCAL_MEDIA_PREFIXES = ['photo_', 'weibo_avatar_', 'artist_avatar_', 'artist_bg_', 'showcase_bg_'];
 
 export interface LocalMediaCleanupResult {
   scanned: number;

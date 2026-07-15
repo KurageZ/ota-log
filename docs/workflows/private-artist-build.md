@@ -1,6 +1,6 @@
 # 私有艺人构建工作流
 
-公开源码不跟踪第三方艺人数据或头像。需要内置这些数据的本地构建，在仓库外维护私有素材源，并只在一次性的 staging 目录中生成静态 Metro 资源。
+公开源码不跟踪第三方艺人数据或头像。过渡版本在仓库外维护旧版头像源，并只在一次性的 staging 目录中生成静态 Metro 资源，用于把升级用户数据库中的 `preset://` 头像永久化。
 
 ## 私有素材源
 
@@ -23,7 +23,7 @@
 
 公开源码中的 `src/db/bundledArtistCatalog.ts` 是空 Adapter。`scripts/inject-bundled-artists.mjs` 只允许修改不含 `.git` 的 staging 目录，并生成：
 
-- 带静态 `require()` 的私有 Adapter。
+- 带静态 `require()` 的迁移 Adapter；不再向新数据库写入艺人。
 - `assets/bundled-artists/` 下的临时头像副本。
 
 `scripts/run-with-private-artists.mjs` 负责复制当前项目、排除 Git 和旧敏感路径、链接 `node_modules`、注入私有素材、执行指定命令，并在结束后删除 staging。
@@ -44,6 +44,14 @@ node scripts/run-with-private-artists.mjs \
   -- ./node_modules/.bin/tsc --noEmit
 ```
 
+需要保留已安装 `.dev` 应用的数据进行 Android 调试时，通过同一 staging 包装器运行 Expo；`app.json` 中的 `android.versionCode` 必须与已安装版本一致，避免系统拒绝降级安装：
+
+```sh
+node scripts/run-with-private-artists.mjs \
+  --source /absolute/path/to/ota-log-private-artists \
+  -- npx expo run:android
+```
+
 构建脚本设置 `OTA_LOG_PRIVATE_BUILD_STAGING=1` 防止 staging 中递归创建 staging。
 
 ## 公开构建
@@ -54,12 +62,12 @@ node scripts/run-with-private-artists.mjs \
 OTA_LOG_PUBLIC_BUILD=1 ./build_apk.sh
 ```
 
-已有数据库中的艺人不会被删除。若记录仍使用 `preset://`，公开构建会保留记录并显示无头像占位；同一数据库回到包含对应私有素材的构建后可再次解析头像。
+已有数据库中的艺人不会被删除。若记录仍使用 `preset://`，不含迁移资源的公开构建会保留记录并显示无头像占位；包含迁移资源的过渡构建会在启动时将头像复制到 Documents，并把数据库引用改为可备份的 `file://` URI。
 
 ## 验收
 
 - 私有素材校验结果为 356 条艺人、354 张头像、2 条无头像记录。
 - 公开工作树不存在 `assets/artists/`、`assets/bundled-artists/`、旧 seed 或旧头像映射。
 - 公开与私有 staging 均通过 `npx tsc --noEmit`。
-- 私有 APK 中能显示预置艺人及头像；公开 APK 新装后不出现第三方艺人。
+- 过渡 APK 全新安装后不出现第三方艺人；旧库中的 `preset://` 头像会转成 Documents 文件并可随完整备份恢复。
 - Git 历史清理完成前，不创建公开 remote 或上传源码归档。
