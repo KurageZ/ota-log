@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
-  Alert,
   Animated,
   Dimensions,
   Easing,
@@ -21,6 +19,8 @@ import { useAppTheme } from '../theme/appTheme';
 
 const HEADER_HEIGHT = 64;
 const COLLAPSED_PILL_HEIGHT = 44;
+const FOOTER_ACTION_GAP = 12;
+const FOOTER_ACTION_HEIGHT = 40;
 const CONTROLS_ANIMATION_DURATION_MS = 180;
 const OPEN_TRANSITION_DURATION_MS = 220;
 
@@ -138,49 +138,6 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const controlsAnimation = useRef(new Animated.Value(1)).current;
   const transitionAnimation = useRef(new Animated.Value(0)).current;
 
-  const showMoreActions = useCallback((item: T) => {
-    const actions = [
-      ...(onEdit ? [{ id: 'edit' as const, label: '编辑' }] : []),
-      ...(onDelete ? [{ id: 'delete' as const, label: '删除' }] : []),
-    ];
-    if (actions.length === 0) return;
-
-    const runAction = (id: 'edit' | 'delete') => {
-      if (id === 'edit') onEdit?.(item);
-      if (id === 'delete') onDelete?.(item);
-    };
-
-    if (Platform.OS === 'ios') {
-      const cancelButtonIndex = actions.length;
-      const destructiveButtonIndex = actions.findIndex((action) => action.id === 'delete');
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [...actions.map((action) => action.label), '取消'],
-          cancelButtonIndex,
-          destructiveButtonIndex: destructiveButtonIndex >= 0 ? destructiveButtonIndex : undefined,
-        },
-        (buttonIndex) => {
-          const action = actions[buttonIndex];
-          if (action) runAction(action.id);
-        },
-      );
-      return;
-    }
-
-    Alert.alert(
-      '更多操作',
-      undefined,
-      [
-        ...actions.map((action) => ({
-          text: action.label,
-          style: action.id === 'delete' ? 'destructive' as const : 'default' as const,
-          onPress: () => runAction(action.id),
-        })),
-        { text: '取消', style: 'cancel' as const },
-      ],
-    );
-  }, [onDelete, onEdit]);
-
   const selectedIndex = useMemo(() => {
     if (!selectedId) return 0;
     const index = items.findIndex((item) => item.id === selectedId);
@@ -244,11 +201,20 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const hasDetails = Boolean(getDetailSummary && renderDetails);
   const expandedSheetHeight = Math.min(
     Math.max(300, screenHeight * 0.46),
-    screenHeight - insets.top - insets.bottom - HEADER_HEIGHT - 40,
+    screenHeight
+      - insets.top
+      - insets.bottom
+      - HEADER_HEIGHT
+      - FOOTER_ACTION_GAP
+      - FOOTER_ACTION_HEIGHT
+      - 40,
   );
   const sheetBackgroundColor = 'rgba(17,24,39,0.88)';
   const sheetBorderColor = 'rgba(255,255,255,0.10)';
   const detailLabelColor = 'rgba(255,255,255,0.66)';
+  const footerBottomPadding = Platform.OS === 'ios'
+    ? Math.max(insets.bottom - 8, 8)
+    : insets.bottom + 12;
   const initialTransitionOriginForModal = useMemo(() => (
     visible && initialTransitionOrigin
       ? normalizeSourceOriginForModal(initialTransitionOrigin)
@@ -510,12 +476,12 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
               {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
             </Text>
           </View>
-          {(onEdit || onDelete) && item ? (
+          {onEdit && item ? (
             <HeaderButton
-              icon="more"
-              accessibilityLabel="更多操作"
+              icon="edit"
+              accessibilityLabel="编辑图片"
               color={colors.white}
-              onPress={() => showMoreActions(item)}
+              onPress={() => onEdit(item)}
               restBackgroundColor={colors.heroDecorWeak}
               pressedBackgroundColor={colors.heroDecor}
             />
@@ -541,7 +507,6 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     screenHeight,
     screenWidth,
     showOpeningTransition,
-    showMoreActions,
     transitionAnimatedStyle,
     transitionBackdropStyle,
     transitionCoverLoaded,
@@ -549,102 +514,142 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   ]);
 
   const FooterComponent = useCallback(({ imageIndex }: IndexComponentProps) => {
-    if (!hasDetails || !getDetailSummary || !renderDetails) return null;
-
     const item = items[clampIndex(imageIndex)] ?? null;
     if (!item) return null;
 
     return (
       <View
+        testID="image-viewer-footer-controls"
         pointerEvents={controlsVisible ? 'box-none' : 'none'}
         style={{
           paddingHorizontal: 16,
-          paddingBottom: insets.bottom + 12,
+          paddingBottom: footerBottomPadding,
+          minHeight: COLLAPSED_PILL_HEIGHT + footerBottomPadding,
           alignItems: 'center',
         }}
       >
-        <Animated.View
-          style={{
-            width: detailsExpanded ? '100%' : undefined,
-            minWidth: detailsExpanded ? undefined : 160,
-            maxWidth: detailsExpanded ? undefined : '88%',
-            height: detailsExpanded ? expandedSheetHeight : undefined,
-            maxHeight: detailsExpanded ? expandedSheetHeight : COLLAPSED_PILL_HEIGHT,
-            borderRadius: detailsExpanded ? 24 : 999,
-            overflow: 'hidden',
-            backgroundColor: sheetBackgroundColor,
-            borderWidth: 1,
-            borderColor: sheetBorderColor,
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.24,
-            shadowRadius: 22,
-            elevation: 10,
-            ...footerAnimatedStyle,
-            opacity: showOpeningTransition ? 0 : footerAnimatedStyle.opacity,
-          }}
-        >
-          <Pressable
-            onPress={() => setDetailsExpanded((expanded) => !expanded)}
-            style={({ pressed }) => ({
-              minHeight: COLLAPSED_PILL_HEIGHT,
-              paddingHorizontal: 18,
-              paddingVertical: 11,
-              opacity: pressed ? 0.82 : 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-            })}
+        {hasDetails && getDetailSummary && renderDetails ? (
+          <Animated.View
+            style={{
+              width: detailsExpanded ? '100%' : undefined,
+              minWidth: detailsExpanded ? undefined : 160,
+              maxWidth: detailsExpanded ? undefined : '88%',
+              height: detailsExpanded ? expandedSheetHeight : undefined,
+              maxHeight: detailsExpanded ? expandedSheetHeight : COLLAPSED_PILL_HEIGHT,
+              borderRadius: detailsExpanded ? 24 : 999,
+              overflow: 'hidden',
+              backgroundColor: sheetBackgroundColor,
+              borderWidth: 1,
+              borderColor: sheetBorderColor,
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.24,
+              shadowRadius: 22,
+              elevation: 10,
+              ...footerAnimatedStyle,
+              opacity: showOpeningTransition ? 0 : footerAnimatedStyle.opacity,
+            }}
           >
-            <Text
-              numberOfLines={1}
-              style={{
-                flexShrink: 1,
-                fontSize: 13,
-                lineHeight: 18,
-                fontWeight: '700',
-                color: colors.white,
-              }}
+            <Pressable
+              onPress={() => setDetailsExpanded((expanded) => !expanded)}
+              accessibilityLabel={detailsExpanded ? '收起图片信息' : '展开图片信息'}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                minHeight: COLLAPSED_PILL_HEIGHT,
+                paddingHorizontal: 18,
+                paddingVertical: 11,
+                opacity: pressed ? 0.82 : 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              })}
             >
-              {getDetailSummary(item)}
-            </Text>
-            <AppIcon
-              name="disclosure"
-              variant={detailsExpanded ? 'down' : 'up'}
-              size={14}
-              color={detailLabelColor}
-            />
-          </Pressable>
+              <Text
+                numberOfLines={1}
+                style={{
+                  flexShrink: 1,
+                  fontSize: 13,
+                  lineHeight: 18,
+                  fontWeight: '700',
+                  color: colors.white,
+                }}
+              >
+                {getDetailSummary(item)}
+              </Text>
+              <AppIcon
+                name="disclosure"
+                variant={detailsExpanded ? 'down' : 'up'}
+                size={14}
+                color={detailLabelColor}
+              />
+            </Pressable>
 
-          {detailsExpanded ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              contentContainerStyle={{
-                paddingHorizontal: 16,
-                paddingBottom: insets.bottom + 18,
-              }}
-            >
-              {renderDetails(item)}
-            </ScrollView>
-          ) : null}
-        </Animated.View>
+            {detailsExpanded ? (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={{
+                  paddingHorizontal: 16,
+                  paddingBottom: insets.bottom + 18,
+                }}
+              >
+                {renderDetails(item)}
+              </ScrollView>
+            ) : null}
+          </Animated.View>
+        ) : null}
+
+        {onDelete ? (
+          <Animated.View
+            testID="image-viewer-delete-action"
+            style={{
+              ...(detailsExpanded && hasDetails
+                ? {
+                  width: '100%',
+                  height: FOOTER_ACTION_HEIGHT,
+                  marginTop: FOOTER_ACTION_GAP,
+                  alignItems: 'flex-end' as const,
+                }
+                : {
+                  position: 'absolute' as const,
+                  right: 16,
+                  bottom: footerBottomPadding,
+                }),
+              ...footerAnimatedStyle,
+              opacity: showOpeningTransition ? 0 : footerAnimatedStyle.opacity,
+            }}
+          >
+            <HeaderButton
+              icon="trash"
+              accessibilityLabel="删除图片"
+              color={colors.danger}
+              onPress={() => onDelete(item)}
+              restBackgroundColor={colors.dangerSoft}
+              pressedBackgroundColor={colors.dangerBorder}
+            />
+          </Animated.View>
+        ) : null}
       </View>
     );
   }, [
     clampIndex,
     controlsVisible,
+    colors.danger,
+    colors.dangerBorder,
+    colors.dangerSoft,
     colors.shadow,
     colors.white,
     detailLabelColor,
     detailsExpanded,
     expandedSheetHeight,
     footerAnimatedStyle,
+    footerBottomPadding,
     getDetailSummary,
     hasDetails,
     insets.bottom,
     items,
+    onDelete,
     renderDetails,
     sheetBackgroundColor,
     sheetBorderColor,
@@ -666,7 +671,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
       imageHidden={showOpeningTransition}
       keyExtractor={(_, index) => items[index]?.id ?? String(index)}
       HeaderComponent={HeaderComponent}
-      FooterComponent={hasDetails ? FooterComponent : undefined}
+      FooterComponent={hasDetails || onDelete ? FooterComponent : undefined}
       presentationStyle="overFullScreen"
       animationType={initialTransitionOrigin ? 'none' : 'fade'}
       backgroundColor={showOpeningTransition ? 'transparent' : '#000000'}

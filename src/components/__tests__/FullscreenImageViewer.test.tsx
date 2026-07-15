@@ -1,12 +1,13 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { ActionSheetIOS, Image, Modal, StyleSheet } from 'react-native';
+import { Image, Modal, StyleSheet } from 'react-native';
 import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
 jest.mock('react-native-image-viewing', () => ({
   __esModule: true,
-  default: ({ HeaderComponent, imageIndex }: {
+  default: ({ HeaderComponent, FooterComponent, imageIndex }: {
     HeaderComponent?: React.ComponentType<{ imageIndex: number }>;
+    FooterComponent?: React.ComponentType<{ imageIndex: number }>;
     imageIndex: number;
   }) => {
     const React = require('react');
@@ -15,6 +16,7 @@ jest.mock('react-native-image-viewing', () => ({
       View,
       { testID: 'image-viewing' },
       HeaderComponent ? React.createElement(HeaderComponent, { imageIndex }) : null,
+      FooterComponent ? React.createElement(FooterComponent, { imageIndex }) : null,
     );
   },
 }));
@@ -76,18 +78,9 @@ describe('FullscreenImageViewer opening transition', () => {
     expect(StyleSheet.flatten(headerControls.props.style).opacity).toBe(0);
   });
 
-  test('groups edit and delete actions under the native more-actions menu', () => {
+  test('places edit in the top-right and delete in the bottom-right', () => {
     const onEdit = jest.fn();
     const onDelete = jest.fn();
-    let selectAction: ((buttonIndex: number) => void) | undefined;
-    const actionSheetSpy = jest
-      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
-      .mockImplementation((options, callback) => {
-        expect(options.options).toEqual(['编辑', '删除', '取消']);
-        expect(options.cancelButtonIndex).toBe(2);
-        expect(options.destructiveButtonIndex).toBe(1);
-        selectAction = callback;
-      });
 
     act(() => {
       renderer = create(
@@ -102,14 +95,63 @@ describe('FullscreenImageViewer opening transition', () => {
       );
     });
 
-    const moreButton = renderer.root.findByProps({ accessibilityLabel: '更多操作' });
-    act(() => moreButton.props.onPress());
-    expect(actionSheetSpy).toHaveBeenCalledTimes(1);
-
-    act(() => selectAction?.(0));
+    const editButton = renderer.root.findByProps({ accessibilityLabel: '编辑图片' });
+    act(() => editButton.props.onPress());
     expect(onEdit).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
 
-    act(() => selectAction?.(1));
+    const deleteAction = renderer.root.findByProps({ testID: 'image-viewer-delete-action' });
+    expect(StyleSheet.flatten(deleteAction.props.style)).toEqual(expect.objectContaining({
+      position: 'absolute',
+      right: 16,
+    }));
+    const deleteButton = renderer.root.findByProps({ accessibilityLabel: '删除图片' });
+    act(() => deleteButton.props.onPress());
     expect(onDelete).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
+  });
+
+  test('keeps the collapsed details pill closer to the iOS bottom safe area', () => {
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+          selectedId="cheki-1"
+          onClose={jest.fn()}
+          getDetailSummary={() => '2026年7月15日'}
+          renderDetails={() => null}
+        />,
+      );
+    });
+
+    const footerControls = renderer.root.findByProps({ testID: 'image-viewer-footer-controls' });
+    expect(StyleSheet.flatten(footerControls.props.style).paddingBottom).toBe(8);
+  });
+
+  test('moves delete into a separate bottom action row when details expand', () => {
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+          selectedId="cheki-1"
+          onClose={jest.fn()}
+          onDelete={jest.fn()}
+          getDetailSummary={() => '2026年7月15日'}
+          renderDetails={() => null}
+        />,
+      );
+    });
+
+    const expandButton = renderer.root.findByProps({ accessibilityLabel: '展开图片信息' });
+    act(() => expandButton.props.onPress());
+
+    const deleteAction = renderer.root.findByProps({ testID: 'image-viewer-delete-action' });
+    expect(StyleSheet.flatten(deleteAction.props.style)).toEqual(expect.objectContaining({
+      width: '100%',
+      height: 40,
+      marginTop: 12,
+      alignItems: 'flex-end',
+    }));
+    expect(StyleSheet.flatten(deleteAction.props.style).position).toBeUndefined();
   });
 });
