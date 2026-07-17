@@ -59,7 +59,20 @@ function chekiPeriodClause(year?: number, month?: number, expression = "COALESCE
 }
 
 export class ChekiRepository {
+  private readonly changeListeners = new Set<() => void>();
+
   constructor(private db: SQLiteDatabase) {}
+
+  subscribeToChanges(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+
+  private notifyChanges(): void {
+    for (const listener of this.changeListeners) listener();
+  }
 
   async findAll(): Promise<Cheki[]> {
     return this.db.getAllAsync<Cheki>(
@@ -468,6 +481,7 @@ export class ChekiRepository {
       'INSERT INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [cheki.id, cheki.event_id, cheki.artist_id, cheki.photo_uri, cheki.date, cheki.price, cheki.notes, cheki.created_at]
     );
+    this.notifyChanges();
     return cheki;
   }
 
@@ -482,6 +496,7 @@ export class ChekiRepository {
     if (fields.length === 0) return;
     values.push(id);
     await this.db.runAsync(`UPDATE cheki SET ${fields.join(', ')} WHERE id = ?`, values);
+    this.notifyChanges();
   }
 
   async delete(id: string): Promise<void> {
@@ -491,5 +506,6 @@ export class ChekiRepository {
     );
     await this.db.runAsync('DELETE FROM cheki WHERE id = ?', [id]);
     await deleteLocalFileIfUnreferenced(this.db, cheki?.photo_uri);
+    this.notifyChanges();
   }
 }

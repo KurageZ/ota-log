@@ -9,11 +9,13 @@ import { OnboardingGuideProvider } from '../src/components/OnboardingGuide';
 import { useAppTheme } from '../src/theme/appTheme';
 import { AppThemeProvider } from '../src/theme/themePreferences';
 import { AppNavigationThemeProvider } from '../src/navigation/app-navigation-theme-provider';
+import { ChekiPhotoWidgetSync } from '../src/widgets/ChekiPhotoWidgetSync';
 
 const LUCIDE_FONT = require('@react-native-vector-icons/lucide/fonts/Lucide.ttf');
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Lucide: LUCIDE_FONT });
+
   if (!fontsLoaded) return null;
 
   return (
@@ -22,6 +24,7 @@ export default function RootLayout() {
         <AppThemeProvider>
           <BottomSheetModalProvider>
             <DBProvider>
+              <ChekiPhotoWidgetSync />
               <OnboardingGuideProvider>
                 <AppNavigationThemeProvider>
                   <RootNavigator />

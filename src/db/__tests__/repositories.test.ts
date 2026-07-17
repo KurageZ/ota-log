@@ -177,6 +177,21 @@ describe('Cheki repositories', () => {
     ]);
   });
 
+  test('notifies subscribers after cheki mutations', async () => {
+    const listener = jest.fn();
+    const unsubscribe = chekiRepository.subscribeToChanges(listener);
+    const created = await chekiRepository.create({ photo_uri: 'file:///widget-sync.jpg' });
+
+    await chekiRepository.update(created.id, { notes: 'updated' });
+    await chekiRepository.delete(created.id);
+
+    expect(listener).toHaveBeenCalledTimes(3);
+
+    unsubscribe();
+    await chekiRepository.create({ photo_uri: 'file:///widget-sync-unsubscribed.jpg' });
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
   test('artist ranking includes avatars and is not capped by default', async () => {
     for (let index = 3; index <= 9; index += 1) {
       rawDb.prepare(

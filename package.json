@@ -12,6 +12,7 @@
     "postinstall": "node scripts/patch-react-native-image-viewing.js && node scripts/patch-react-native-cookies.js"
   },
   "dependencies": {
+    "@expo/ui": "~56.0.22",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
@@ -33,6 +34,7 @@
     "expo-sharing": "~56.0.21",
     "expo-splash-screen": "~56.0.12",
     "expo-sqlite": "~56.0.5",
+    "expo-widgets": "~56.0.23",
     "jszip": "^3.10.1",
     "lucide-react-native": "^1.22.0",
     "react": "19.2.3",

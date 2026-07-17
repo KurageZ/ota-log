@@ -51,6 +51,27 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      "./plugins/with-expo-widgets-no-push",
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": false,
+          "widgets": [
+            {
+              "name": "ChekiPhotoWidget",
+              "displayName": "拍立得回忆",
+              "description": "展示电子切册中的拍立得照片",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ],
+                "contentMarginsDisabled": true
+              }
+            }
+          ]
+        }
       ]
     ],
     "extra": {
