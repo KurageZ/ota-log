@@ -88,6 +88,7 @@ function RootNavigator() {
       <Stack.Screen name="settings/home" options={{ title: '首页自定义' }} />
       <Stack.Screen name="settings/profile" options={{ title: '个人资料' }} />
       <Stack.Screen name="settings/oshi" options={{ title: '单推设置' }} />
+      <Stack.Screen name="settings/widget" options={{ title: '小组件设置' }} />
       <Stack.Screen name="weibo" options={{ title: '微博抓取' }} />
       <Stack.Screen name="tools/index" options={{ title: '工具箱' }} />
       <Stack.Screen name="tools/ultima-stamp-planner" options={{ title: '集章规划' }} />

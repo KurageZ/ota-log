@@ -193,6 +193,16 @@ export class ChekiRepository {
     return rows.map((row) => row.artist_id);
   }
 
+  async findDistinctPhotoArtistIds(): Promise<string[]> {
+    const rows = await this.db.getAllAsync<{ artist_id: string }>(
+      `SELECT DISTINCT artist_id
+       FROM cheki
+       WHERE artist_id IS NOT NULL
+       ORDER BY artist_id`
+    );
+    return rows.map((row) => row.artist_id);
+  }
+
   async countAll(): Promise<number> {
     const row = await this.db.getFirstAsync<{ count: number }>(
       `SELECT

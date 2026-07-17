@@ -5,6 +5,10 @@ import type { Cheki } from '../types/models';
 import type { ChekiRepository } from '../repositories/ChekiRepository';
 import { ChekiPhotoWidget } from './ChekiPhotoWidget';
 import { createChekiPhotoWidgetTimeline } from './chekiPhotoWidgetTimeline';
+import {
+  filterChekiForPhotoWidget,
+  loadChekiPhotoWidgetPreferences,
+} from './chekiPhotoWidgetPreferences';
 
 const THUMBNAIL_DIRECTORY_NAME = 'cheki-thumbnails';
 const THUMBNAIL_FILENAME_PREFIX = 'v1-';
@@ -79,7 +83,11 @@ export async function initializeChekiPhotoWidget(chekiRepository: ChekiReader): 
   const thumbnailDirectory = new Directory(sharedDirectory, THUMBNAIL_DIRECTORY_NAME);
   thumbnailDirectory.create({ idempotent: true, intermediates: true });
 
-  const chekiRecords = await chekiRepository.findAll();
+  const [allChekiRecords, preferences] = await Promise.all([
+    chekiRepository.findAll(),
+    loadChekiPhotoWidgetPreferences(),
+  ]);
+  const chekiRecords = filterChekiForPhotoWidget(allChekiRecords, preferences);
   const imageUris = await cacheThumbnails(chekiRecords, thumbnailDirectory);
 
   const timeline = createChekiPhotoWidgetTimeline(imageUris);

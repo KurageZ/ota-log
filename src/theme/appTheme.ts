@@ -85,6 +85,7 @@ export interface ThemeColors {
     appearance: string;
     theme: string;
     calendar: string;
+    widget: string;
     backupExport: string;
     backupSave: string;
     backupRestore: string;
@@ -187,6 +188,7 @@ const classicViolet: ThemeDefinition = {
       appearance: '#2563eb',
       theme: '#7c3aed',
       calendar: '#7c3aed',
+      widget: '#db2777',
       backupExport: '#2563eb',
       backupSave: '#16a34a',
       backupRestore: '#d97706',
@@ -285,6 +287,7 @@ const classicViolet: ThemeDefinition = {
       appearance: '#2563eb',
       theme: '#7c3aed',
       calendar: '#7c3aed',
+      widget: '#db2777',
       backupExport: '#2563eb',
       backupSave: '#16a34a',
       backupRestore: '#d97706',
@@ -384,6 +387,7 @@ const monoChrome: ThemeDefinition = {
       appearance: '#2563eb',
       theme: '#0b63f6',
       calendar: '#7c3aed',
+      widget: '#db2777',
       backupExport: '#2563eb',
       backupSave: '#16a34a',
       backupRestore: '#d97706',
@@ -480,6 +484,7 @@ const monoChrome: ThemeDefinition = {
       appearance: '#60a5fa',
       theme: '#58a4ff',
       calendar: '#a78bfa',
+      widget: '#f472b6',
       backupExport: '#60a5fa',
       backupSave: '#5fd28b',
       backupRestore: '#f4bd63',
@@ -560,6 +565,7 @@ const nightNeon: ThemeDefinition = {
       appearance: '#5da9ff',
       theme: '#ff5c8a',
       calendar: '#8d79ff',
+      widget: '#ff5c8a',
       backupExport: '#5da9ff',
       backupSave: '#28b67a',
       backupRestore: '#d97706',
@@ -637,6 +643,7 @@ const nightNeon: ThemeDefinition = {
       appearance: '#5da9ff',
       theme: '#ff5c8a',
       calendar: '#a993ff',
+      widget: '#ff5c8a',
       backupExport: '#5da9ff',
       backupSave: '#3fc28b',
       backupRestore: '#f3b95f',

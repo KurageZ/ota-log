@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useDB } from '../../src/context/DBContext';
@@ -21,6 +21,7 @@ import {
   APP_CALENDAR_DEFAULT_VIEW_LABELS,
   APP_THEME_LABELS,
 } from '../../src/theme/config';
+import { loadChekiPhotoWidgetPreferences } from '../../src/widgets/chekiPhotoWidgetPreferences';
 
 type BackupExportState =
   | { status: 'idle' }
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
 
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
+  const [widgetArtistIds, setWidgetArtistIds] = useState<string[]>([]);
   const [backupExportState, setBackupExportState] = useState<BackupExportState>({ status: 'idle' });
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
@@ -71,9 +73,16 @@ export default function SettingsScreen() {
   const [pendingCalendarDefaultView, setPendingCalendarDefaultView] = useState<AppCalendarDefaultView | null>(null);
 
   const reloadSettingsContext = useCallback(async () => {
-    const [config, artists] = await Promise.all([db.userConfig.getConfig(), db.artists.findAll()]);
+    const [config, artists, photoArtistIds, widgetPreferences] = await Promise.all([
+      db.userConfig.getConfig(),
+      db.artists.findAll(),
+      db.cheki.findDistinctPhotoArtistIds(),
+      loadChekiPhotoWidgetPreferences(),
+    ]);
+    const availableArtistIds = new Set(photoArtistIds);
     setUserConfig(config);
     setAllArtists(artists);
+    setWidgetArtistIds(widgetPreferences.artistIds.filter((artistId) => availableArtistIds.has(artistId)));
   }, [db]);
 
   useFocusEffect(
@@ -91,6 +100,7 @@ export default function SettingsScreen() {
     artist: oshiArtist,
     parentName: oshiArtist.parent_id ? artistNameMap[oshiArtist.parent_id] : null,
   }) : null;
+  const widgetArtists = allArtists.filter((artist) => widgetArtistIds.includes(artist.id));
 
   const handleCleanupUnusedMedia = async () => {
     try {
@@ -664,6 +674,26 @@ export default function SettingsScreen() {
             </View>
           </MenuCard>
         </View>
+
+        {Platform.OS === 'ios' ? (
+          <View style={{ marginBottom: 16 }}>
+            <SectionLabel label="小组件" />
+            <MenuCard>
+              <MenuItem
+                icon="widget"
+                label="拍立得回忆"
+                subtitle={widgetArtists.length === 0
+                  ? '展示全部艺人的拍立得'
+                  : widgetArtists.length === 1
+                    ? `只展示 ${getArtistPrimaryName(widgetArtists[0])} 的拍立得`
+                    : `展示 ${getArtistPrimaryName(widgetArtists[0])} 等 ${widgetArtists.length} 位艺人的拍立得`}
+                tint={settingsTints.widget}
+                isLast
+                onPress={() => router.push('/settings/widget')}
+              />
+            </MenuCard>
+          </View>
+        ) : null}
 
         <View style={{ marginBottom: 16 }}>
           <SectionLabel label="数据与备份" />

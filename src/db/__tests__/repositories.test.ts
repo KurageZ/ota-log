@@ -276,6 +276,10 @@ describe('Cheki repositories', () => {
       'artist-2',
       'artist-3',
     ]);
+    await expect(chekiRepository.findDistinctPhotoArtistIds()).resolves.toEqual([
+      'artist-1',
+      'artist-2',
+    ]);
   });
 
   test('findRecent returns latest photo cheki rows only', async () => {

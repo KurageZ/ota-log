@@ -84,7 +84,8 @@ export type AppIconName =
   | 'trash'
   | 'viewSettings'
   | 'weibo'
-  | 'weiboImport';
+  | 'weiboImport'
+  | 'widget';
 
 export type AppSFSymbolName = 'plus' | 'slider.horizontal.3';
 
@@ -191,6 +192,7 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   viewSettings: { icon: 'sliders-horizontal', sfSymbol: 'slider.horizontal.3' },
   weibo: { icon: 'globe' },
   weiboImport: { icon: 'users' },
+  widget: { icon: 'panels-top-left' },
 };
 
 export function getAppIconGlyph(name: AppIconName, variant?: AppIconVariant): LucideIconName {

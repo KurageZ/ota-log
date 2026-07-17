@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useDB } from '../context/DBContext';
 import { initializeChekiPhotoWidget } from './initializeChekiPhotoWidget';
+import { subscribeToChekiPhotoWidgetPreferenceChanges } from './chekiPhotoWidgetPreferences';
 
 export function ChekiPhotoWidgetSync() {
   const { cheki } = useDB();
@@ -33,6 +34,7 @@ export function ChekiPhotoWidgetSync() {
 
     requestSync();
     const unsubscribeFromChekiChanges = cheki.subscribeToChanges(requestSync);
+    const unsubscribeFromPreferenceChanges = subscribeToChekiPhotoWidgetPreferenceChanges(requestSync);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') requestSync();
     });
@@ -40,6 +42,7 @@ export function ChekiPhotoWidgetSync() {
     return () => {
       disposed = true;
       unsubscribeFromChekiChanges();
+      unsubscribeFromPreferenceChanges();
       appStateSubscription.remove();
     };
   }, [cheki]);
