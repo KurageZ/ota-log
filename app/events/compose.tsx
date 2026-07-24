@@ -16,7 +16,10 @@ import { router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
 import { EventFormValues } from '../../src/components/EventForm';
 import { useDB } from '../../src/context/DBContext';
-import { parseAnnouncement } from '../../src/utils/parseAnnouncement';
+import {
+  parseAnnouncement,
+  type ParsedAnnouncement,
+} from '../../src/utils/parseAnnouncement';
 import { splitArtistHandle } from '../../src/utils/artistName';
 import { Artist } from '../../src/types/models';
 import { fetchWeiboPost, WEIBO_URL_RE } from '../../src/utils/weibo/fetchPost';
@@ -28,6 +31,12 @@ import { showFailureAlert } from '../../src/utils/failureAlert';
 import { buildParsedEventDraft } from '../../src/utils/parsedEventDraft';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { withAlpha } from '../../src/utils/color';
+import {
+  fetchImportedEvent,
+  IEVENT_URL_RE,
+} from '../../src/utils/ievent/importEvent';
+import { prepareImportedEventDraft } from '../../src/utils/importedEventDraft';
+import type { ParsedEventDraftResult } from '../../src/utils/parsedEventDraft';
 
 // ── ParseModal ────────────────────────────────────────────────────────────────
 // Owns its own text state so typing never re-renders the parent screen
@@ -91,11 +100,11 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
   const handlePasteAndSubmit = async () => {
     const clipboardText = (await Clipboard.getString()).trim();
     if (!clipboardText) {
-      Alert.alert('剪贴板为空', '请先复制微博链接或公告文本。');
+      Alert.alert('剪贴板为空', '请先复制公告链接或公告文本。');
       return;
     }
 
-    if (WEIBO_URL_RE.test(clipboardText)) {
+    if (WEIBO_URL_RE.test(clipboardText) || IEVENT_URL_RE.test(clipboardText)) {
       setUrlValue(clipboardText);
       setTextValue('');
     } else {
@@ -177,7 +186,7 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
           >
             <View style={{ padding: 16, paddingBottom: 8 }}>
               <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 16 }}>
-                <Text style={labelStyle}>微博链接</Text>
+                <Text style={labelStyle}>公告链接</Text>
                 <TextInput
                   value={urlValue}
                   style={{
@@ -186,7 +195,7 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
                     backgroundColor: isDark ? colors.screen : colors.cardAlt,
                     paddingHorizontal: 12,
                   }}
-                  placeholder="https://m.weibo.cn/..."
+                  placeholder="https://..."
                   placeholderTextColor={colors.placeholder}
                   onChangeText={setUrlValue}
                   keyboardType="url"
@@ -224,7 +233,7 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
               }}>
                 <AppIcon name="sparkles" size={18} color={colors.accent} />
                 <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, color: isDark ? colors.accentBorder : colors.accentText }}>
-                  解析使用本地解析器进行解析，失败或识别不准时，可以手动修改标题、日期、场地等信息。
+                  解析失败或识别不准时，可以手动修改标题、日期、场地等信息。
                 </Text>
               </View>
             </View>
@@ -530,19 +539,19 @@ export default function NewEventScreen() {
     router.back();
   };
 
-  const applyParsedText = (
+  const applyParsedResult = (
     announcementText: string,
+    parsed: ParsedAnnouncement,
     extraFields: Partial<EventFormValues> = {},
     photoUris: string[] = pendingPhotoUris,
   ) => {
-    const parsed = parseAnnouncement(announcementText);
     const hasUsefulFields = Boolean(
       parsed.title ||
       parsed.event_date ||
       parsed.event_time ||
       parsed.city ||
       parsed.venue ||
-      parsed.ticket_price ||
+      parsed.ticket_price != null ||
       parsed.artist_mentions.length > 0
     );
 
@@ -559,13 +568,17 @@ export default function NewEventScreen() {
       return;
     }
 
-    const { matchedIds, candidates, fields, shouldConfirmArtists } = buildParsedEventDraft(
-      announcementText,
-      parsed,
-      allArtists,
-      extraFields,
+    applyDraftResult(
+      buildParsedEventDraft(announcementText, parsed, allArtists, extraFields),
+      photoUris,
     );
+  };
 
+  const applyDraftResult = (
+    draft: ParsedEventDraftResult,
+    photoUris: string[] = pendingPhotoUris,
+  ) => {
+    const { matchedIds, candidates, fields, shouldConfirmArtists } = draft;
     if (shouldConfirmArtists) {
       setPendingMatchedIds(matchedIds);
       setPendingFields(fields);
@@ -593,13 +606,61 @@ export default function NewEventScreen() {
     }
   };
 
+  const applyParsedText = (
+    announcementText: string,
+    extraFields: Partial<EventFormValues> = {},
+    photoUris: string[] = pendingPhotoUris,
+  ) => {
+    applyParsedResult(
+      announcementText,
+      parseAnnouncement(announcementText),
+      extraFields,
+      photoUris,
+    );
+  };
+
   const handleParse = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) {
-      Alert.alert('请粘贴公告文本', '可以粘贴微博链接或公告全文，也可以直接手动创建。', [
+      Alert.alert('请粘贴公告内容', '可以粘贴公告链接或公告全文，也可以直接手动创建。', [
         { text: '重新输入', style: 'cancel' },
         { text: '手动创建', onPress: enterManualForm },
       ]);
+      return;
+    }
+
+    if (IEVENT_URL_RE.test(trimmed)) {
+      setParseLoading(true);
+      try {
+        const result = await fetchImportedEvent(trimmed);
+        if (!result.ok) {
+          showFailureAlert({
+            title: '抓取失败',
+            reason: '活动内容提取失败。',
+            nextStep: '请检查网络或链接是否有效；也可以粘贴公告正文继续解析，或直接手动创建。',
+            details: result.message,
+            buttons: [
+              { text: '重新输入', style: 'cancel' },
+              { text: '手动创建', onPress: enterManualForm },
+            ],
+          });
+          return;
+        }
+
+        const handoff = await prepareImportedEventDraft(
+          result.event,
+          allArtists,
+          pendingPhotoUris,
+        );
+        const nextPhotoUris = handoff.photoUris;
+        if (nextPhotoUris.length > pendingPhotoUris.length) {
+          setPendingPhotoUris(nextPhotoUris);
+        }
+
+        applyDraftResult(handoff.draft, nextPhotoUris);
+      } finally {
+        setParseLoading(false);
+      }
       return;
     }
 

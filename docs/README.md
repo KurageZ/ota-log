@@ -22,6 +22,7 @@
 
 - UI/UX 设计：`product/ui-ux.md`
 - 首页置顶信息功能设计：`product/home-pinned-info.md`
+- iEvent 轻量活动导入规格：`product/ievent-import.md`
 - 数据结构设计：`data/activity-data-model-design.md`
 - 重要日期数据结构设计：`data/important-date-data-model.md`
 - 技术选型：`tech/stack.md`
