@@ -5,7 +5,18 @@ import { toISODateTime } from '../utils/date';
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 
 export class PhotoRepository {
+  private readonly changeListeners = new Set<() => void>();
+
   constructor(private db: SQLiteDatabase) {}
+
+  subscribeToChanges(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  }
+
+  private notifyChanges(): void {
+    for (const listener of this.changeListeners) listener();
+  }
 
   async findAll(): Promise<Photo[]> {
     return this.db.getAllAsync<Photo>(
@@ -31,6 +42,7 @@ export class PhotoRepository {
       'INSERT INTO photos (id, event_id, local_uri, created_at) VALUES (?, ?, ?, ?)',
       [photo.id, photo.event_id, photo.local_uri, photo.created_at]
     );
+    this.notifyChanges();
     return photo;
   }
 
@@ -41,5 +53,6 @@ export class PhotoRepository {
     );
     await this.db.runAsync('DELETE FROM photos WHERE id = ?', [id]);
     await deleteLocalFileIfUnreferenced(this.db, photo?.local_uri);
+    this.notifyChanges();
   }
 }

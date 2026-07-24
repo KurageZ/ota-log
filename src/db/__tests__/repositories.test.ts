@@ -6,6 +6,7 @@ import { ChekiManualEntryRepository } from '../../repositories/ChekiManualEntryR
 import { EventRepository } from '../../repositories/EventRepository';
 import { ArtistRepository } from '../../repositories/ArtistRepository';
 import { UserConfigRepository } from '../../repositories/UserConfigRepository';
+import { PhotoRepository } from '../../repositories/PhotoRepository';
 import { DEFAULT_PROFILE_EMOJI } from '../../utils/profile';
 
 jest.mock('../../utils/uuid', () => ({
@@ -18,6 +19,7 @@ describe('Cheki repositories', () => {
   let chekiManualEntryRepository: ChekiManualEntryRepository;
   let eventRepository: EventRepository;
   let artistRepository: ArtistRepository;
+  let photoRepository: PhotoRepository;
 
   beforeEach(() => {
     rawDb = new Database(':memory:');
@@ -148,6 +150,7 @@ describe('Cheki repositories', () => {
     chekiManualEntryRepository = new ChekiManualEntryRepository(asyncDb);
     eventRepository = new EventRepository(asyncDb);
     artistRepository = new ArtistRepository(asyncDb);
+    photoRepository = new PhotoRepository(asyncDb);
   });
 
   afterEach(() => {
@@ -190,6 +193,53 @@ describe('Cheki repositories', () => {
     unsubscribe();
     await chekiRepository.create({ photo_uri: 'file:///widget-sync-unsubscribed.jpg' });
     expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  test('reconciles only expired planned events and preserves review data', async () => {
+    rawDb.prepare('UPDATE events SET event_date = ? WHERE id = ?').run('2026-07-25', 'event-2');
+    rawDb.prepare('UPDATE events SET review_score = 5, notes = ? WHERE id = ?').run('keep this', 'event-2');
+    rawDb.prepare(
+      `INSERT INTO events
+         (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('expired-planned', 'Expired', 'livehouse', '2026-05-01', null, null, null, null, 'planned', 4, 'note', null, null, null, null, '2026-04-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO events
+         (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('wishlist-old', 'Wishlist', 'livehouse', '2026-05-01', null, null, null, null, 'wishlist', null, null, null, null, null, null, '2026-04-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z');
+
+    await expect(eventRepository.reconcileExpiredPlanned('2026-07-24')).resolves.toBe(1);
+    await expect(eventRepository.findById('expired-planned')).resolves.toEqual(expect.objectContaining({ status: 'completed', review_score: 4, notes: 'note' }));
+    await expect(eventRepository.findById('event-2')).resolves.toEqual(expect.objectContaining({ status: 'planned', review_score: 5, notes: 'keep this' }));
+    await expect(eventRepository.findById('wishlist-old')).resolves.toEqual(expect.objectContaining({ status: 'wishlist' }));
+  });
+
+  test('notifies subscribers when rollover completes expired planned events', async () => {
+    const listener = jest.fn();
+    const unsubscribe = eventRepository.subscribeToChanges(listener);
+    await eventRepository.reconcileExpiredPlanned('2026-07-24');
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  test('notifies subscribers after event mutations', async () => {
+    const listener = jest.fn();
+    const unsubscribe = eventRepository.subscribeToChanges(listener);
+    const created = await eventRepository.create({ title: 'New', event_type: 'livehouse', event_date: '2026-07-25', status: 'planned' });
+    await eventRepository.update(created.id, { title: 'Updated' });
+    await eventRepository.delete(created.id);
+    expect(listener).toHaveBeenCalledTimes(3);
+    unsubscribe();
+  });
+
+  test('notifies subscribers after photo mutations', async () => {
+    const listener = jest.fn();
+    const unsubscribe = photoRepository.subscribeToChanges(listener);
+    const created = await photoRepository.create('file:///widget-photo.jpg', 'event-1');
+    await photoRepository.delete(created.id);
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
   });
 
   test('artist ranking includes avatars and is not capped by default', async () => {

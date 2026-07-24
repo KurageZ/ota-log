@@ -15,6 +15,7 @@ import { DateItemRepository } from '../repositories/DateItemRepository';
 import { useAppTheme } from '../theme/appTheme';
 import { rebaseLegacyLocalMediaUris } from '../utils/localMedia';
 import { materializePresetArtistAvatars } from '../utils/presetArtistMedia';
+import { toISODate } from '../utils/date';
 
 export interface Repositories {
   artists: ArtistRepository;
@@ -61,6 +62,7 @@ async function initializeDatabase(): Promise<Repositories> {
     await rebaseLegacyLocalMediaUris(db);
     await materializePresetArtistAvatars(db);
     const repositories = buildRepositories(db);
+    await repositories.events.reconcileExpiredPlanned(toISODate(new Date()));
     sharedRepositories = repositories;
     return repositories;
   })();

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, Platform } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useDB } from '../../../src/context/DBContext';
@@ -45,6 +45,7 @@ import {
   HomePinnedNextEventEmptyHero,
 } from '../../../src/components/HomePinnedInfoHero';
 import { toISODate } from '../../../src/utils/date';
+import { synchronizeCurrentEvent } from '../../../src/utils/currentEvent';
 
 type UpcomingItem = {
   event: Event;
@@ -300,8 +301,8 @@ export default function HomeScreen() {
       : DEFAULT_RECENT_COMPLETED_DISPLAY_LIMIT;
     const recentQueryLimit = recentDisplayLimit === RECENT_COMPLETED_DISPLAY_ALL ? null : recentDisplayLimit;
 
+    const nextEvent = await synchronizeCurrentEvent(db.events, now);
     const [
-      nextEvent,
       upcomingList,
       recentList,
       monthStatusCounts,
@@ -310,7 +311,6 @@ export default function HomeScreen() {
       chekiTotalCount,
       recentCheki,
     ] = await Promise.all([
-      db.events.findNextPlanned(),
       db.events.findUpcoming(),
       db.events.findRecent(recentQueryLimit),
       db.events.getYearStatusCounts(currentYear, currentMonth),
@@ -393,6 +393,13 @@ export default function HomeScreen() {
   }, [db]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  useEffect(() => {
+    const unsubscribe = db.events.subscribeToChanges(() => {
+      void loadData();
+    });
+    return unsubscribe;
+  }, [db.events, loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

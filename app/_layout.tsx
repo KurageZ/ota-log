@@ -10,6 +10,7 @@ import { useAppTheme } from '../src/theme/appTheme';
 import { AppThemeProvider } from '../src/theme/themePreferences';
 import { AppNavigationThemeProvider } from '../src/navigation/app-navigation-theme-provider';
 import { ChekiPhotoWidgetSync } from '../src/widgets/ChekiPhotoWidgetSync';
+import { NextEventWidgetSync } from '../src/widgets/NextEventWidgetSync';
 
 const LUCIDE_FONT = require('@react-native-vector-icons/lucide/fonts/Lucide.ttf');
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
           <BottomSheetModalProvider>
             <DBProvider>
               <ChekiPhotoWidgetSync />
+              <NextEventWidgetSync />
               <OnboardingGuideProvider>
                 <AppNavigationThemeProvider>
                   <RootNavigator />

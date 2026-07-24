@@ -2,6 +2,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import { Artist, CreateEventInput, Event, EventStatus } from '../types/models';
 import { generateId } from '../utils/uuid';
 import { eventDateLikeParam, toISODateTime } from '../utils/date';
+import { selectCurrentPlannedEvent } from '../utils/currentEvent';
 
 export interface EventFilter {
   keyword?: string;
@@ -81,7 +82,18 @@ function eventPeriodClause(year?: number, month?: number, column = 'event_date')
 }
 
 export class EventRepository {
+  private readonly changeListeners = new Set<() => void>();
+
   constructor(private db: SQLiteDatabase) {}
+
+  subscribeToChanges(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  }
+
+  private notifyChanges(): void {
+    for (const listener of this.changeListeners) listener();
+  }
 
   async findAll(status?: EventStatus): Promise<Event[]> {
     if (status) {
@@ -103,12 +115,18 @@ export class EventRepository {
   }
 
   async findNextPlanned(): Promise<Event | null> {
-    return this.db.getFirstAsync<Event>(
-      `SELECT * FROM events
-       WHERE status = 'planned'
-       ORDER BY event_date ASC, event_time ASC
-       LIMIT 1`
+    const events = await this.findAll('planned');
+    return selectCurrentPlannedEvent(events, new Date());
+  }
+
+  async reconcileExpiredPlanned(today: string): Promise<number> {
+    const result = await this.db.runAsync(
+      `UPDATE events SET status = 'completed', updated_at = ?
+       WHERE status = 'planned' AND event_date < ?`,
+      [new Date().toISOString(), today],
     );
+    if (result.changes > 0) this.notifyChanges();
+    return result.changes;
   }
 
   async findUpcoming(limit?: number): Promise<Event[]> {
@@ -660,6 +678,7 @@ export class EventRepository {
         event.setlist_text, event.trip_id, event.created_at, event.updated_at,
       ]
     );
+    this.notifyChanges();
     return event;
   }
 
@@ -688,6 +707,7 @@ export class EventRepository {
       `UPDATE events SET ${fields.join(', ')} WHERE id = ?`,
       values as string[]
     );
+    this.notifyChanges();
   }
 
   async delete(id: string): Promise<void> {
@@ -699,6 +719,7 @@ export class EventRepository {
     for (const photo of photos) {
       await deleteLocalFileIfUnreferenced(this.db, photo.local_uri);
     }
+    this.notifyChanges();
   }
 
   async findByArtistId(artistId: string): Promise<Event[]> {

@@ -69,6 +69,18 @@
                 ],
                 "contentMarginsDisabled": true
               }
+            },
+            {
+              "name": "NextEventWidget",
+              "displayName": "下一场活动",
+              "description": "查看下一场计划中的活动",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ],
+                "contentMarginsDisabled": true
+              }
             }
           ]
         }
