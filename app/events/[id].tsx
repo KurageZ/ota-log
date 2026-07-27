@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 import Clipboard from '@react-native-clipboard/clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useDB } from '../../src/context/DBContext';
@@ -32,6 +32,7 @@ import { withAlpha } from '../../src/utils/color';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+import { addEventToSystemCalendar } from '../../src/utils/systemCalendar';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
@@ -348,7 +349,7 @@ export default function EventDetailScreen() {
 
     try {
       setAddingToCalendar(true);
-      await Calendar.createEventInCalendarAsync(buildCalendarEventPayload(event));
+      await addEventToSystemCalendar(buildCalendarEventPayload(event), Calendar);
     } catch (error) {
       showOperationFailedAlert(
         '无法打开系统日历。',
