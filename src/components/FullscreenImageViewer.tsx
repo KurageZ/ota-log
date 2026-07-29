@@ -23,6 +23,7 @@ const FOOTER_ACTION_GAP = 12;
 const FOOTER_ACTION_HEIGHT = 40;
 const CONTROLS_ANIMATION_DURATION_MS = 180;
 const OPEN_TRANSITION_DURATION_MS = 220;
+const OPEN_TRANSITION_FALLBACK_MS = 1000;
 
 export interface FullscreenImageItem {
   id: string;
@@ -404,6 +405,18 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     setTransitionActive(false);
     setControlsVisible(true);
   }, [transitionActive, transitionReady, viewerContentLoaded, visible]);
+
+  useEffect(() => {
+    if (!visible || !initialTransitionOrigin || !transitionActive) return;
+
+    const timeout = setTimeout(() => {
+      setTransitionActive(false);
+      setTransitionReady(true);
+      setControlsVisible(true);
+    }, OPEN_TRANSITION_FALLBACK_MS);
+
+    return () => clearTimeout(timeout);
+  }, [initialTransitionOrigin, transitionActive, visible]);
 
   const HeaderComponent = useCallback(({ imageIndex }: IndexComponentProps) => {
     const item = items[clampIndex(imageIndex)] ?? null;

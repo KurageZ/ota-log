@@ -5,16 +5,17 @@ import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
 jest.mock('react-native-image-viewing', () => ({
   __esModule: true,
-  default: ({ HeaderComponent, FooterComponent, imageIndex }: {
+  default: ({ HeaderComponent, FooterComponent, imageIndex, imageHidden }: {
     HeaderComponent?: React.ComponentType<{ imageIndex: number }>;
     FooterComponent?: React.ComponentType<{ imageIndex: number }>;
     imageIndex: number;
+    imageHidden?: boolean;
   }) => {
     const React = require('react');
     const { View } = require('react-native');
     return React.createElement(
       View,
-      { testID: 'image-viewing' },
+      { testID: 'image-viewing', imageHidden },
       HeaderComponent ? React.createElement(HeaderComponent, { imageIndex }) : null,
       FooterComponent ? React.createElement(FooterComponent, { imageIndex }) : null,
     );
@@ -57,6 +58,7 @@ describe('FullscreenImageViewer opening transition', () => {
   afterEach(() => {
     act(() => renderer.unmount());
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   test('renders the opening animation inside the viewer instead of presenting a second Modal', () => {
@@ -76,6 +78,32 @@ describe('FullscreenImageViewer opening transition', () => {
     expect(renderer.root.findByProps({ testID: 'image-opening-transition' })).toBeTruthy();
     const headerControls = renderer.root.findByProps({ testID: 'image-viewer-header-controls' });
     expect(StyleSheet.flatten(headerControls.props.style).opacity).toBe(0);
+  });
+
+  test('reveals the viewer when opening transition image callbacks never arrive', () => {
+    jest.useFakeTimers();
+
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+          selectedId="cheki-1"
+          initialTransitionOrigin={{ x: 16, y: 120, width: 108, height: 172, borderRadius: 10 }}
+          onClose={jest.fn()}
+        />,
+      );
+    });
+
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.imageHidden).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.imageHidden).toBe(false);
+    expect(renderer.root.findByProps({ testID: 'image-viewer-header-controls' }).props.pointerEvents)
+      .toBe('auto');
   });
 
   test('places edit in the top-right and delete in the bottom-right', () => {

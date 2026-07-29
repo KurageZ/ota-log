@@ -53,6 +53,7 @@ import { FilteredEmptyState } from '../components/FilteredEmptyState';
 import { AppIcon, getAppIconSFSymbol } from '../components/AppIcon';
 import { getArtistSearchText, sortArtistsWithOshi } from '../utils/filter';
 import { withAlpha } from '../utils/color';
+import { measureImageTransitionOrigin } from '../utils/imageTransition';
 import {
   ChekiSortOrder,
   ChekiViewMode,
@@ -203,27 +204,31 @@ function ChekiThumbnailButton({
 }) {
   const thumbnailRef = useRef<View>(null);
   const thumbnailImageRef = useRef<Image>(null);
+  const cancelPendingMeasurementRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => {
+    cancelPendingMeasurementRef.current?.();
+  }, []);
 
   const handlePress = useCallback(() => {
+    cancelPendingMeasurementRef.current?.();
     const node = thumbnailImageRef.current ?? thumbnailRef.current;
     if (!node) {
       onOpen(cheki, viewerChekis, null);
       return;
     }
 
-    node.measureInWindow((x, y, measuredWidth, measuredHeight) => {
-      onOpen(cheki, viewerChekis, measuredWidth > 0 && measuredHeight > 0
-        ? {
-          x,
-          y,
-          width: measuredWidth,
-          height: measuredHeight,
-          borderRadius: chrome === 'bare'
-            ? CHEKI_BARE_THUMBNAIL_RADIUS
-            : Math.max(6, CHEKI_FRAME_RADIUS - getChekiFrameInsets(width).side),
-        }
-        : null);
-    });
+    const borderRadius = chrome === 'bare'
+      ? CHEKI_BARE_THUMBNAIL_RADIUS
+      : Math.max(6, CHEKI_FRAME_RADIUS - getChekiFrameInsets(width).side);
+    cancelPendingMeasurementRef.current = measureImageTransitionOrigin(
+      node,
+      borderRadius,
+      (origin) => {
+        cancelPendingMeasurementRef.current = null;
+        onOpen(cheki, viewerChekis, origin);
+      },
+    );
   }, [cheki, chrome, onOpen, viewerChekis, width]);
 
   return (
