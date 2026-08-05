@@ -6,7 +6,7 @@
 
 - 产品：本地优先的 Otaku 演出记录 App，面向日系 / 国内偶像、团体活动爱好者。
 - 平台：iOS + Android，Expo SDK 56 + Expo Router v6。
-- 数据：本地 SQLite，当前 migration 版本 v16；`trip` 表仍保留为历史遗留，前台功能已下线。
+- 数据：本地 SQLite，当前 migration 版本 v17；`trip` 表仍保留为历史遗留，前台功能已下线。
 - 主要模块：活动、艺人、切册、统计、个人资料、设置、小工具。
 
 ## Documentation Map
@@ -14,7 +14,8 @@
 - 文档索引：`docs/README.md`
 - UI/UX 设计：`docs/product/ui-ux.md`
   - 根目录 `design.md` 是指向该文件的软链接，保留旧入口。
-- 数据结构设计：`docs/data/activity-data-model-design.md`
+- 活动数据结构设计：`docs/data/activity-data-model-design.md`
+- 拍立得数据结构设计：`docs/data/cheki-data-model-design.md`
 - 技术选型：`docs/tech/stack.md`
 - 决策记录模板：`docs/decisions/0000-template.md`
 - 当前进度：`docs/progress/now.md`

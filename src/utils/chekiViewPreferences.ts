@@ -3,23 +3,25 @@ import { ChekiGridDensity } from './cheki';
 
 export const CHEKI_VIEW_PREFERENCES_STORAGE_KEY = 'ota-log.cheki-view-preferences.v1';
 
-export type ChekiViewMode = 'artist' | 'date' | 'album';
+export type ChekiViewMode = 'artist' | 'record' | 'album';
 export type ChekiSortOrder = 'desc' | 'asc';
 
 export interface ChekiViewPreferences {
   mode: ChekiViewMode;
   sortOrder: ChekiSortOrder;
   density: ChekiGridDensity;
+  showRecordThumbnails: boolean;
 }
 
 export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
   mode: 'artist',
   sortOrder: 'desc',
   density: 'medium',
+  showRecordThumbnails: true,
 };
 
 function isMode(value: unknown): value is ChekiViewMode {
-  return value === 'artist' || value === 'date' || value === 'album';
+  return value === 'artist' || value === 'record' || value === 'album';
 }
 
 function isSortOrder(value: unknown): value is ChekiSortOrder {
@@ -39,7 +41,8 @@ function densityFromLegacyColumns(value: unknown): ChekiGridDensity | null {
 
 function modeFromLegacyPreferences(value: Record<string, unknown>): ChekiViewMode {
   if ('mode' in value && isMode(value.mode)) return value.mode;
-  if (value.organization === 'time' && value.display === 'stack') return 'date';
+  if (value.mode === 'date') return 'record';
+  if (value.organization === 'time' && value.display === 'stack') return 'record';
   if (value.organization === 'time') return 'album';
   return DEFAULT_CHEKI_VIEW_PREFERENCES.mode;
 }
@@ -56,8 +59,11 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
   const density = 'density' in value && isDensity(value.density)
     ? value.density
     : legacyDensity ?? DEFAULT_CHEKI_VIEW_PREFERENCES.density;
+  const showRecordThumbnails = typeof raw.showRecordThumbnails === 'boolean'
+    ? raw.showRecordThumbnails
+    : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails;
 
-  return { mode, sortOrder, density };
+  return { mode, sortOrder, density, showRecordThumbnails };
 }
 
 export async function loadChekiViewPreferences(): Promise<ChekiViewPreferences> {

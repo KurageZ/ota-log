@@ -1,6 +1,11 @@
 export interface ChekiViewerItem {
   id: string;
+  itemId?: string;
   photoUri: string;
+  frontPhotoUri?: string | null;
+  backPhotoUri?: string | null;
+  side?: 'front' | 'back';
+  isFavorite?: boolean;
   date: string | null;
   price: number | null;
   notes: string | null;

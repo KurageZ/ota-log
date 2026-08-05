@@ -297,15 +297,25 @@ export function buildChekiViewerItems(
   artistMap: Map<string, Artist>,
   eventMap: Map<string, Event>,
 ): ChekiViewerItem[] {
-  return sortChekisDesc(chekis).map((cheki) => ({
-    id: cheki.id,
-    photoUri: cheki.photo_uri,
-    date: cheki.date,
-    price: cheki.price,
-    notes: cheki.notes,
-    artistId: cheki.artist_id,
-    artistName: cheki.artist_id ? (artistMap.get(cheki.artist_id) ? getArtistPrimaryName(artistMap.get(cheki.artist_id)!) : '未知艺人') : null,
-    eventId: cheki.event_id,
-    eventTitle: cheki.event_id ? (eventMap.get(cheki.event_id)?.title ?? '未命名活动') : null,
-  }));
+  return sortChekisDesc(chekis).map((cheki) => {
+    const shared = {
+      itemId: cheki.id,
+      date: cheki.date,
+      price: cheki.price,
+      notes: cheki.notes,
+      isFavorite: cheki.is_favorite === 1,
+      artistId: cheki.artist_id,
+      artistName: cheki.artist_id ? (artistMap.get(cheki.artist_id) ? getArtistPrimaryName(artistMap.get(cheki.artist_id)!) : '未知艺人') : null,
+      eventId: cheki.event_id,
+      eventTitle: cheki.event_id ? (eventMap.get(cheki.event_id)?.title ?? '未命名活动') : null,
+    };
+    return {
+      ...shared,
+      id: cheki.id,
+      photoUri: cheki.front_photo_uri ?? cheki.back_photo_uri ?? cheki.photo_uri,
+      frontPhotoUri: cheki.front_photo_uri,
+      backPhotoUri: cheki.back_photo_uri,
+      side: cheki.front_photo_uri ? 'front' as const : cheki.back_photo_uri ? 'back' as const : undefined,
+    };
+  });
 }

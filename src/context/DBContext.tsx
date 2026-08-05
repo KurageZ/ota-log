@@ -10,6 +10,7 @@ import { ExpenseRepository } from '../repositories/ExpenseRepository';
 import { PhotoRepository } from '../repositories/PhotoRepository';
 import { ChekiRepository } from '../repositories/ChekiRepository';
 import { ChekiManualEntryRepository } from '../repositories/ChekiManualEntryRepository';
+import { ChekiRecordRepository } from '../repositories/ChekiRecordRepository';
 import { UserConfigRepository } from '../repositories/UserConfigRepository';
 import { DateItemRepository } from '../repositories/DateItemRepository';
 import { useAppTheme } from '../theme/appTheme';
@@ -25,6 +26,7 @@ export interface Repositories {
   photos: PhotoRepository;
   cheki: ChekiRepository;
   chekiManualEntries: ChekiManualEntryRepository;
+  chekiRecords: ChekiRecordRepository;
   userConfig: UserConfigRepository;
   dateItems: DateItemRepository;
   rawDb: SQLiteDatabase;
@@ -46,6 +48,7 @@ function buildRepositories(db: SQLiteDatabase): Repositories {
     photos: new PhotoRepository(db),
     cheki: new ChekiRepository(db),
     chekiManualEntries: new ChekiManualEntryRepository(db),
+    chekiRecords: new ChekiRecordRepository(db),
     userConfig: new UserConfigRepository(db),
     dateItems: new DateItemRepository(db),
   };

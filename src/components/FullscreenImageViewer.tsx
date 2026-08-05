@@ -67,6 +67,10 @@ interface FullscreenImageViewerProps<T extends FullscreenImageItem> {
   onClose: () => void;
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  isFavorite?: (item: T) => boolean;
+  onToggleFavorite?: (item: T) => void;
+  getAlternateItem?: (item: T) => T | null;
+  getAlternateActionLabel?: (item: T) => string;
   getDetailSummary?: (item: T) => string;
   renderDetails?: (item: T) => React.ReactNode;
   initialTransitionOrigin?: FullscreenImageTransitionOrigin | null;
@@ -83,6 +87,7 @@ function HeaderButton({
   onPress,
   restBackgroundColor,
   pressedBackgroundColor,
+  variant,
 }: {
   icon: AppIconName;
   accessibilityLabel: string;
@@ -90,6 +95,7 @@ function HeaderButton({
   onPress: () => void;
   restBackgroundColor: string;
   pressedBackgroundColor: string;
+  variant?: 'active' | 'inactive';
 }) {
   return (
     <Pressable
@@ -106,7 +112,7 @@ function HeaderButton({
         backgroundColor: pressed ? pressedBackgroundColor : restBackgroundColor,
       })}
     >
-      <AppIcon name={icon} size={20} color={color} />
+      <AppIcon name={icon} variant={variant} size={20} color={color} />
     </Pressable>
   );
 }
@@ -118,6 +124,10 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   onClose,
   onEdit,
   onDelete,
+  isFavorite,
+  onToggleFavorite,
+  getAlternateItem,
+  getAlternateActionLabel,
   getDetailSummary,
   renderDetails,
   initialTransitionOrigin,
@@ -128,6 +138,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const [currentIndex, setCurrentIndex] = useState(0);
   // react-native-image-viewing remounts when imageIndex changes; treat it as open-time initial state.
   const [initialImageIndex, setInitialImageIndex] = useState(0);
+  const [showingAlternate, setShowingAlternate] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [transitionOrigin, setTransitionOrigin] = useState<FullscreenImageTransitionOrigin | null>(null);
@@ -145,9 +156,18 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     return index >= 0 ? index : 0;
   }, [items, selectedId]);
 
+  const displayItems = useMemo(
+    () => items.map((item, index) => (
+      showingAlternate && index === currentIndex
+        ? getAlternateItem?.(item) ?? item
+        : item
+    )),
+    [currentIndex, getAlternateItem, items, showingAlternate],
+  );
+
   const images = useMemo(
-    () => items.map((item) => ({ uri: item.photoUri })),
-    [items],
+    () => displayItems.map((item) => ({ uri: item.photoUri })),
+    [displayItems],
   );
 
   const clampIndex = useCallback((index: number) => {
@@ -165,6 +185,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     const opensWithTransition = Boolean(initialTransitionOrigin);
     setInitialImageIndex(nextIndex);
     setCurrentIndex(nextIndex);
+    setShowingAlternate(false);
     setTransitionReady(!opensWithTransition);
     setViewerContentLoaded(!opensWithTransition);
     setControlsVisible(!opensWithTransition);
@@ -179,6 +200,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   }, [clampIndex, items.length, visible]);
 
   const handleImageIndexChange = useCallback((imageIndex: number) => {
+    setShowingAlternate(false);
     setCurrentIndex(imageIndex);
     setDetailsExpanded(false);
   }, []);
@@ -198,7 +220,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     }).start();
   }, [controlsAnimation, controlsVisible]);
 
-  const currentItem = items[clampIndex(currentIndex)] ?? null;
+  const currentItem = displayItems[clampIndex(currentIndex)] ?? null;
   const hasDetails = Boolean(getDetailSummary && renderDetails);
   const expandedSheetHeight = Math.min(
     Math.max(300, screenHeight * 0.46),
@@ -419,7 +441,8 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   }, [initialTransitionOrigin, transitionActive, visible]);
 
   const HeaderComponent = useCallback(({ imageIndex }: IndexComponentProps) => {
-    const item = items[clampIndex(imageIndex)] ?? null;
+    const item = displayItems[clampIndex(imageIndex)] ?? null;
+    const nextAlternateItem = item ? getAlternateItem?.(item) ?? null : null;
 
     return (
       <>
@@ -489,15 +512,43 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
               {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
             </Text>
           </View>
-          {onEdit && item ? (
-            <HeaderButton
-              icon="edit"
-              accessibilityLabel="编辑图片"
-              color={colors.white}
-              onPress={() => onEdit(item)}
-              restBackgroundColor={colors.heroDecorWeak}
-              pressedBackgroundColor={colors.heroDecor}
-            />
+          {item && (nextAlternateItem || onToggleFavorite || onEdit) ? (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {nextAlternateItem ? (
+                <HeaderButton
+                  icon="swap"
+                  accessibilityLabel={getAlternateActionLabel?.(item) ?? '查看关联图片'}
+                  color={colors.white}
+                  onPress={() => {
+                    setShowingAlternate((current) => !current);
+                    setDetailsExpanded(false);
+                  }}
+                  restBackgroundColor={colors.heroDecorWeak}
+                  pressedBackgroundColor={colors.heroDecor}
+                />
+              ) : null}
+              {onToggleFavorite ? (
+                <HeaderButton
+                  icon="favorite"
+                  variant={isFavorite?.(item) ? 'active' : 'inactive'}
+                  accessibilityLabel={isFavorite?.(item) ? '取消收藏这张拍立得' : '收藏这张拍立得'}
+                  color={isFavorite?.(item) ? colors.danger : colors.white}
+                  onPress={() => onToggleFavorite(item)}
+                  restBackgroundColor={colors.heroDecorWeak}
+                  pressedBackgroundColor={colors.heroDecor}
+                />
+              ) : null}
+              {onEdit ? (
+                <HeaderButton
+                  icon="edit"
+                  accessibilityLabel="编辑图片"
+                  color={colors.white}
+                  onPress={() => onEdit(item)}
+                  restBackgroundColor={colors.heroDecorWeak}
+                  pressedBackgroundColor={colors.heroDecor}
+                />
+              ) : null}
+            </View>
           ) : <View style={{ width: 40, height: 40 }} />}
         </Animated.View>
       </>
@@ -508,15 +559,20 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     colors.heroDecor,
     colors.heroDecorWeak,
     colors.heroEyebrow,
+    colors.danger,
     colors.white,
+    getAlternateActionLabel,
+    getAlternateItem,
     headerAnimatedStyle,
     handleTransitionCoverError,
     handleTransitionCoverLoad,
     insets.top,
-    items,
+    displayItems,
+    isFavorite,
     onClose,
     onDelete,
     onEdit,
+    onToggleFavorite,
     screenHeight,
     screenWidth,
     showOpeningTransition,
@@ -527,7 +583,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   ]);
 
   const FooterComponent = useCallback(({ imageIndex }: IndexComponentProps) => {
-    const item = items[clampIndex(imageIndex)] ?? null;
+    const item = displayItems[clampIndex(imageIndex)] ?? null;
     if (!item) return null;
 
     return (
@@ -661,7 +717,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     getDetailSummary,
     hasDetails,
     insets.bottom,
-    items,
+    displayItems,
     onDelete,
     renderDetails,
     sheetBackgroundColor,
@@ -682,7 +738,10 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
       onImageIndexChange={handleImageIndexChange}
       onImageLoad={handleViewerImageLoad}
       imageHidden={showOpeningTransition}
-      keyExtractor={(_, index) => items[index]?.id ?? String(index)}
+      keyExtractor={(_, index) => {
+        const item = displayItems[index];
+        return item ? `${item.id}:${item.photoUri}` : String(index);
+      }}
       HeaderComponent={HeaderComponent}
       FooterComponent={hasDetails || onDelete ? FooterComponent : undefined}
       presentationStyle="overFullScreen"

@@ -411,17 +411,11 @@ export class EventRepository {
          COALESCE(e.ticket_price, 0) + COALESCE(c.cheki_total, 0) AS total_spend
        FROM events e
        LEFT JOIN (
-         SELECT event_id, COALESCE(SUM(total), 0) AS cheki_total
-         FROM (
-           SELECT event_id, price AS total
-           FROM cheki
-           WHERE event_id IS NOT NULL
-           UNION ALL
-           SELECT event_id, total_price AS total
-           FROM cheki_manual_entries
-           WHERE event_id IS NOT NULL
-         ) combined
-         GROUP BY event_id
+         SELECT r.event_id, COALESCE(SUM(i.unit_price), 0) AS cheki_total
+         FROM cheki_records r
+         JOIN cheki_items i ON i.record_id = r.id
+         WHERE r.event_id IS NOT NULL
+         GROUP BY r.event_id
        ) c ON c.event_id = e.id
        WHERE e.status = 'completed'
          ${period.sql}
@@ -469,17 +463,11 @@ export class EventRepository {
            COALESCE(c.cheki_total, 0) AS cheki_total
          FROM events e
          LEFT JOIN (
-           SELECT event_id, COALESCE(SUM(total), 0) AS cheki_total
-           FROM (
-             SELECT event_id, price AS total
-             FROM cheki
-             WHERE event_id IS NOT NULL
-             UNION ALL
-             SELECT event_id, total_price AS total
-             FROM cheki_manual_entries
-             WHERE event_id IS NOT NULL
-           ) combined
-           GROUP BY event_id
+           SELECT r.event_id, COALESCE(SUM(i.unit_price), 0) AS cheki_total
+           FROM cheki_records r
+           JOIN cheki_items i ON i.record_id = r.id
+           WHERE r.event_id IS NOT NULL
+           GROUP BY r.event_id
          ) c ON c.event_id = e.id
          WHERE e.status = 'completed'
            ${period.sql}

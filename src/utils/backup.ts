@@ -7,8 +7,10 @@ import { unzip } from 'react-native-zip-archive';
 import { Repositories } from '../context/DBContext';
 import { copyToDocuments } from './copyToDocuments';
 import { materializePresetArtistAvatars } from './presetArtistMedia';
+import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
+import { generateId } from './uuid';
 
-const BACKUP_VERSION = 4;
+const BACKUP_VERSION = 5;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -27,8 +29,9 @@ interface BackupData {
   events: Awaited<ReturnType<Repositories['events']['findAll']>>;
   event_artists: EventArtistRow[];
   expenses: Awaited<ReturnType<Repositories['expenses']['findAll']>>;
-  cheki: Awaited<ReturnType<Repositories['cheki']['findAll']>>;
-  cheki_manual_entries: Awaited<ReturnType<Repositories['chekiManualEntries']['findAll']>>;
+  cheki_records: Row[];
+  cheki_items: Row[];
+  cheki_item_images: Row[];
   photos: Awaited<ReturnType<Repositories['photos']['findAll']>>;
   user_config: Awaited<ReturnType<Repositories['userConfig']['getConfig']>>;
   important_dates: Row[];
@@ -69,6 +72,9 @@ interface ImportDataShape {
   expenses?: Row[];
   cheki?: Row[];
   cheki_manual_entries?: Row[];
+  cheki_records?: Row[];
+  cheki_items?: Row[];
+  cheki_item_images?: Row[];
   photos?: Row[];
   user_config?: Row;
   important_dates?: Row[];
@@ -92,8 +98,9 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     trips,
     events,
     expenses,
-    cheki,
-    chekiManualEntries,
+    chekiRecords,
+    chekiItems,
+    chekiItemImages,
     photos,
     eventArtists,
     importantDates,
@@ -105,8 +112,9 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     db.trips.findAll(),
     db.events.findAll(),
     db.expenses.findAll(),
-    db.cheki.findAll(),
-    db.chekiManualEntries.findAll(),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_records'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_items'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_item_images'),
     db.photos.findAll(),
     db.rawDb.getAllAsync<EventArtistRow>('SELECT * FROM event_artists'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM important_dates'),
@@ -122,8 +130,9 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     events,
     event_artists: eventArtists,
     expenses,
-    cheki,
-    cheki_manual_entries: chekiManualEntries,
+    cheki_records: chekiRecords,
+    cheki_items: chekiItems,
+    cheki_item_images: chekiItemImages,
     photos,
     user_config: userConfig,
     important_dates: importantDates,
@@ -151,8 +160,10 @@ function collectReferencedMediaUris(payload: BackupPayload): string[] {
   for (const photo of payload.data.photos) {
     if (isBackupLocalFileUri(photo.local_uri)) uris.add(photo.local_uri);
   }
-  for (const cheki of payload.data.cheki) {
-    if (isBackupLocalFileUri(cheki.photo_uri)) uris.add(cheki.photo_uri);
+  for (const image of payload.data.cheki_item_images) {
+    if (isBackupLocalFileUri(image.photo_uri as string | null)) {
+      uris.add(image.photo_uri as string);
+    }
   }
   for (const artist of payload.data.artists) {
     if (isBackupLocalFileUri(artist.avatar_uri)) uris.add(artist.avatar_uri);
@@ -172,6 +183,10 @@ function collectBackupMediaUrisFromData(data: ImportDataShape): string[] {
   }
   for (const cheki of data.cheki ?? []) {
     const photoUri = typeof cheki.photo_uri === 'string' ? cheki.photo_uri : null;
+    if (isBackupLocalFileUri(photoUri)) uris.add(photoUri);
+  }
+  for (const image of data.cheki_item_images ?? []) {
+    const photoUri = typeof image.photo_uri === 'string' ? image.photo_uri : null;
     if (isBackupLocalFileUri(photoUri)) uris.add(photoUri);
   }
   for (const artist of data.artists ?? []) {
@@ -330,6 +345,9 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
     expenses = [],
     cheki = [],
     cheki_manual_entries = [],
+    cheki_records = [],
+    cheki_items = [],
+    cheki_item_images = [],
     photos = [],
     user_config,
     important_dates = [],
@@ -337,6 +355,39 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
     important_date_anniversary_rules = [],
     scheduled_reminder_state = [],
   } = data;
+  const migratedLegacy = cheki_records.length === 0 && (cheki.length > 0 || cheki_manual_entries.length > 0)
+    ? migrateLegacyChekiData(
+        {
+          cheki: cheki.map((row) => ({
+            id: String(row.id),
+            event_id: typeof row.event_id === 'string' ? row.event_id : null,
+            artist_id: typeof row.artist_id === 'string' ? row.artist_id : null,
+            photo_uri: String(row.photo_uri),
+            date: typeof row.date === 'string' ? row.date : null,
+            price: row.price == null ? null : Number(row.price),
+            notes: typeof row.notes === 'string' ? row.notes : null,
+            created_at: String(row.created_at),
+          })),
+          manualEntries: cheki_manual_entries.map((row) => ({
+            id: String(row.id),
+            artist_id: typeof row.artist_id === 'string' ? row.artist_id : null,
+            event_id: typeof row.event_id === 'string' ? row.event_id : null,
+            date: typeof row.date === 'string' ? row.date : null,
+            count: Number(row.count),
+            total_price: row.total_price == null ? null : Number(row.total_price),
+            created_at: String(row.created_at),
+            updated_at: String(row.updated_at ?? row.created_at),
+          })),
+          eventDatesById: new Map(
+            events.map((event) => [String(event.id), String(event.event_date)]),
+          ),
+        },
+        { generateId },
+      )
+    : null;
+  const recordsToRestore = migratedLegacy?.records ?? cheki_records;
+  const itemsToRestore = migratedLegacy?.items ?? cheki_items;
+  const imagesToRestore = migratedLegacy?.images ?? cheki_item_images;
 
   await db.rawDb.execAsync('PRAGMA foreign_keys = OFF');
   try {
@@ -349,8 +400,9 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
         DELETE FROM event_artists;
         DELETE FROM photos;
         DELETE FROM expenses;
-        DELETE FROM cheki;
-        DELETE FROM cheki_manual_entries;
+        DELETE FROM cheki_item_images;
+        DELETE FROM cheki_items;
+        DELETE FROM cheki_records;
         DELETE FROM events;
         DELETE FROM trips;
         DELETE FROM user_config;
@@ -445,47 +497,56 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
         );
       }
 
-      for (const ck of cheki) {
+      for (const record of recordsToRestore) {
         await db.rawDb.runAsync(
-          `INSERT OR REPLACE INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at)
+          `INSERT INTO cheki_records
+             (id, event_id, artist_id, date, quantity, notes, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            String(ck.id),
-            ck.event_id ?? null,
-            ck.artist_id ?? null,
-            String(ck.photo_uri),
-            ck.date ?? null,
-            ck.price ?? null,
-            ck.notes ?? null,
-            String(ck.created_at),
+            String(record.id),
+            record.event_id ?? null,
+            record.artist_id ?? null,
+            record.date ?? null,
+            Number(record.quantity),
+            record.notes ?? null,
+            String(record.created_at),
+            String(record.updated_at),
           ]
         );
       }
 
-      for (const manual of cheki_manual_entries) {
-        const parsedCount = Number(manual.count);
-        const normalizedCount = Number.isFinite(parsedCount)
-          ? Math.max(1, Math.trunc(parsedCount))
-          : 1;
-        const parsedTotalPrice = manual.total_price == null ? null : Number(manual.total_price);
-        const normalizedTotalPrice = parsedTotalPrice == null || Number.isNaN(parsedTotalPrice)
-          ? null
-          : Math.max(0, parsedTotalPrice);
-
+      for (const item of itemsToRestore) {
         await db.rawDb.runAsync(
-          `INSERT OR REPLACE INTO cheki_manual_entries
-             (id, artist_id, event_id, date, count, total_price, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO cheki_items
+             (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            String(manual.id),
-            String(manual.artist_id),
-            manual.event_id ?? null,
-            manual.date ?? null,
-            normalizedCount,
-            normalizedTotalPrice,
-            String(manual.created_at),
-            String(manual.updated_at ?? manual.created_at ?? new Date().toISOString()),
+            String(item.id),
+            String(item.record_id),
+            Number(item.sort_order),
+            Number(item.unit_price ?? 0),
+            Number(item.display_aspect_ratio),
+            Number(item.is_favorite ?? 0),
+            item.notes ?? null,
+            String(item.created_at),
+            String(item.updated_at),
           ]
+        );
+      }
+
+      for (const image of imagesToRestore) {
+        await db.rawDb.runAsync(
+          `INSERT INTO cheki_item_images
+             (id, item_id, side, photo_uri, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            String(image.id),
+            String(image.item_id),
+            String(image.side),
+            String(image.photo_uri),
+            String(image.created_at),
+            String(image.updated_at),
+          ],
         );
       }
 
@@ -645,6 +706,11 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       };
     case 4:
       return {
+        version: BACKUP_VERSION,
+        data: candidate.data as ImportDataShape,
+      };
+    case 5:
+      return {
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       };
@@ -738,6 +804,13 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
       expenses: (payload.data.expenses as unknown as Row[] | undefined) ?? [],
       cheki: replaceMediaUris(payload.data.cheki as unknown as Row[] | undefined, 'photo_uri', uriMap),
       cheki_manual_entries: (payload.data.cheki_manual_entries as unknown as Row[] | undefined) ?? [],
+      cheki_records: (payload.data.cheki_records as unknown as Row[] | undefined) ?? [],
+      cheki_items: (payload.data.cheki_items as unknown as Row[] | undefined) ?? [],
+      cheki_item_images: replaceMediaUris(
+        payload.data.cheki_item_images as unknown as Row[] | undefined,
+        'photo_uri',
+        uriMap,
+      ),
       photos: replaceMediaUris(payload.data.photos as unknown as Row[] | undefined, 'local_uri', uriMap),
       user_config: typeof payload.data.user_config?.avatar_uri === 'string'
         ? {

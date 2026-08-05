@@ -9,8 +9,13 @@ import { UserConfigRepository } from '../../repositories/UserConfigRepository';
 import { PhotoRepository } from '../../repositories/PhotoRepository';
 import { DEFAULT_PROFILE_EMOJI } from '../../utils/profile';
 
+let mockGeneratedIdIndex = 0;
 jest.mock('../../utils/uuid', () => ({
-  generateId: jest.fn(() => 'generated-manual-entry-id'),
+  generateId: jest.fn(() => (
+    mockGeneratedIdIndex++ === 0
+      ? 'generated-manual-entry-id'
+      : `generated-cheki-id-${mockGeneratedIdIndex}`
+  )),
 }));
 
 describe('Cheki repositories', () => {
@@ -22,11 +27,77 @@ describe('Cheki repositories', () => {
   let photoRepository: PhotoRepository;
 
   beforeEach(() => {
+    mockGeneratedIdIndex = 0;
     rawDb = new Database(':memory:');
     rawDb.exec('PRAGMA foreign_keys = ON');
     for (const statement of SCHEMA_STATEMENTS) {
       rawDb.exec(statement);
     }
+    // Keep historical fixture statements readable while exercising the v2 repositories.
+    rawDb.exec(`
+      CREATE TABLE cheki (
+        id TEXT PRIMARY KEY,
+        event_id TEXT,
+        artist_id TEXT,
+        photo_uri TEXT NOT NULL,
+        date TEXT,
+        price REAL,
+        notes TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TRIGGER fixture_cheki_to_v2
+      AFTER INSERT ON cheki
+      BEGIN
+        INSERT INTO cheki_records
+          (id, event_id, artist_id, date, quantity, notes, created_at, updated_at)
+        VALUES
+          ('record-' || NEW.id, NEW.event_id, NEW.artist_id, NEW.date, 1, NULL, NEW.created_at, NEW.created_at);
+        INSERT INTO cheki_items
+          (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+        VALUES
+          (NEW.id, 'record-' || NEW.id, 0, CAST(ROUND(COALESCE(NEW.price, 0)) AS INTEGER), 54.0 / 86.0, 0, NEW.notes, NEW.created_at, NEW.created_at);
+        INSERT INTO cheki_item_images
+          (id, item_id, side, photo_uri, created_at, updated_at)
+        VALUES
+          ('image-' || NEW.id, NEW.id, 'front', NEW.photo_uri, NEW.created_at, NEW.created_at);
+      END;
+      CREATE TABLE cheki_manual_entries (
+        id TEXT PRIMARY KEY,
+        artist_id TEXT NOT NULL,
+        event_id TEXT,
+        date TEXT,
+        count INTEGER NOT NULL,
+        total_price REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TRIGGER fixture_manual_cheki_to_v2
+      AFTER INSERT ON cheki_manual_entries
+      BEGIN
+        INSERT INTO cheki_records
+          (id, event_id, artist_id, date, quantity, notes, created_at, updated_at)
+        VALUES
+          (NEW.id, NEW.event_id, NEW.artist_id, NEW.date, NEW.count, NULL, NEW.created_at, NEW.updated_at);
+        INSERT INTO cheki_items
+          (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+        SELECT
+          NEW.id || '-item-' || n,
+          NEW.id,
+          n - 1,
+          CAST(ROUND(COALESCE(NEW.total_price, 0)) AS INTEGER) / NEW.count
+            + CASE WHEN n <= CAST(ROUND(COALESCE(NEW.total_price, 0)) AS INTEGER) % NEW.count THEN 1 ELSE 0 END,
+          54.0 / 86.0,
+          0,
+          NULL,
+          NEW.created_at,
+          NEW.updated_at
+        FROM (
+          SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+          UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+        )
+        WHERE n <= NEW.count;
+      END;
+    `);
 
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
@@ -186,13 +257,54 @@ describe('Cheki repositories', () => {
     const created = await chekiRepository.create({ photo_uri: 'file:///widget-sync.jpg' });
 
     await chekiRepository.update(created.id, { notes: 'updated' });
+    await chekiRepository.setFavorite(created.id, true);
+    await expect(chekiRepository.findById(created.id)).resolves.toEqual(
+      expect.objectContaining({ is_favorite: 1 }),
+    );
     await chekiRepository.delete(created.id);
 
-    expect(listener).toHaveBeenCalledTimes(3);
+    expect(listener).toHaveBeenCalledTimes(4);
 
     unsubscribe();
-    await chekiRepository.create({ photo_uri: 'file:///widget-sync-unsubscribed.jpg' });
-    expect(listener).toHaveBeenCalledTimes(3);
+    await chekiRepository.setFavorite('cheki-1', true);
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
+  test('deletes one album item and decrements its aggregate record quantity', async () => {
+    rawDb.prepare('UPDATE cheki_records SET quantity = 2 WHERE id = ?').run('record-cheki-1');
+    rawDb.prepare(`INSERT INTO cheki_items
+      (id, record_id, sort_order, unit_price, created_at, updated_at)
+      VALUES ('cheki-1-blank', 'record-cheki-1', 1, 50, ?, ?)`)
+      .run('2026-03-15T10:00:00.000Z', '2026-03-15T10:00:00.000Z');
+
+    await chekiRepository.delete('cheki-1');
+
+    await expect(chekiRepository.findById('cheki-1')).resolves.toBeNull();
+    expect(rawDb.prepare('SELECT quantity FROM cheki_records WHERE id = ?').get('record-cheki-1'))
+      .toEqual({ quantity: 1 });
+  });
+
+  test('projects both sides of a cheki item for shared image viewers', async () => {
+    const created = await chekiRepository.create({ photo_uri: 'file:///front.jpg' });
+    rawDb.prepare(
+      `INSERT INTO cheki_item_images
+         (id, item_id, side, photo_uri, created_at, updated_at)
+       VALUES (?, ?, 'back', ?, ?, ?)`,
+    ).run(
+      'viewer-back-image',
+      created.id,
+      'file:///back.jpg',
+      '2026-07-24T00:00:00.000Z',
+      '2026-07-24T00:00:00.000Z',
+    );
+
+    await expect(chekiRepository.findById(created.id)).resolves.toEqual(
+      expect.objectContaining({
+        photo_uri: 'file:///front.jpg',
+        front_photo_uri: 'file:///front.jpg',
+        back_photo_uri: 'file:///back.jpg',
+      }),
+    );
   });
 
   test('reconciles only expired planned events and preserves review data', async () => {
@@ -519,7 +631,7 @@ describe('Cheki repositories', () => {
         count: 1,
         total_price: -1,
       })
-    ).rejects.toThrow('total_price must be null or a non-negative number');
+    ).rejects.toThrow('total_price must be null or a non-negative integer');
 
     await expect(
       chekiManualEntryRepository.update('manual-1', {
@@ -537,7 +649,7 @@ describe('Cheki repositories', () => {
       chekiManualEntryRepository.update('manual-1', {
         total_price: -1,
       })
-    ).rejects.toThrow('total_price must be null or a non-negative number');
+    ).rejects.toThrow('total_price must be null or a non-negative integer');
   });
 
   test('event spend stats include manual entry total_price', async () => {

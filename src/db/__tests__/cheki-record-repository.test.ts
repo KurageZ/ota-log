@@ -1,0 +1,247 @@
+import Database from 'better-sqlite3';
+import { SCHEMA_STATEMENTS } from '../schema';
+import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
+import { ChekiRecordRepository } from '../../repositories/ChekiRecordRepository';
+
+describe('ChekiRecordRepository', () => {
+  let raw: Database.Database;
+  let repository: ChekiRecordRepository;
+  let nextId: number;
+
+  beforeEach(() => {
+    raw = new Database(':memory:');
+    raw.pragma('foreign_keys = ON');
+    for (const statement of SCHEMA_STATEMENTS) raw.exec(statement);
+    nextId = 0;
+    repository = new ChekiRecordRepository(
+      createAsyncSQLiteAdapter(raw),
+      () => `id-${nextId++}`,
+    );
+  });
+
+  afterEach(() => raw.close());
+
+  test('creates one physical item per quantity with a shared integer unit price', async () => {
+    const record = await repository.createRecord({ quantity: 3, unit_price: 80 });
+    const created = await repository.findRecordById(record.id);
+
+    expect(created?.quantity).toBe(3);
+    expect(created?.items).toHaveLength(3);
+    expect(created?.items.map((item) => item.unit_price)).toEqual([80, 80, 80]);
+    expect(created?.items.every((item) => item.images.length === 0)).toBe(true);
+  });
+
+  test('treats an omitted unit price as zero and rejects invalid prices', async () => {
+    const record = await repository.createRecord({ quantity: 1 });
+    expect((await repository.findRecordById(record.id))?.items[0]?.unit_price).toBe(0);
+
+    await expect(repository.createRecord({ quantity: 1, unit_price: 1.5 }))
+      .rejects.toThrow('non-negative integer');
+    await expect(repository.createRecord({ quantity: 1, unit_price: -1 }))
+      .rejects.toThrow('non-negative integer');
+  });
+
+  test('creates initial images without changing the physical item count', async () => {
+    const record = await repository.createRecordWithItems({
+      quantity: 3,
+      unit_price: 30,
+      items: [
+        { frontUri: 'file:///1.jpg' },
+        { frontUri: 'file:///2.jpg', unitPrice: 40 },
+      ],
+    });
+
+    expect(record.items).toHaveLength(3);
+    expect(record.items.map((item) => item.unit_price)).toEqual([30, 40, 30]);
+    expect(record.items.map((item) => item.images[0]?.photo_uri ?? null)).toEqual([
+      'file:///1.jpg',
+      'file:///2.jpg',
+      null,
+    ]);
+  });
+
+  test('rolls back the record when an initial image insert fails', async () => {
+    const adapter = createAsyncSQLiteAdapter(raw);
+    const failingAdapter = {
+      ...adapter,
+      runAsync: async (sql: string, params?: unknown[]) => {
+        if (sql.includes('INSERT INTO cheki_item_images')) throw new Error('image insert failed');
+        return adapter.runAsync(sql, params as never);
+      },
+    };
+    repository = new ChekiRecordRepository(failingAdapter as typeof adapter, () => `failure-${nextId++}`);
+
+    await expect(repository.createRecordWithItems({
+      quantity: 1,
+      items: [{ frontUri: 'file:///failure.jpg' }],
+    })).rejects.toThrow('image insert failed');
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 0 });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_items').get()).toEqual({ count: 0 });
+  });
+
+  test('resizes a record, creates priced blank items, and fills available image slots', async () => {
+    const record = await repository.createRecord({ quantity: 1, unit_price: 10 });
+    await repository.updateRecordWithItemChanges(
+      record.id,
+      { quantity: 2 },
+      { add: [{ frontUri: 'file:///added.jpg' }], defaultUnitPrice: 20 },
+    );
+
+    const updated = await repository.findRecordById(record.id);
+    expect(updated?.quantity).toBe(2);
+    expect(updated?.items).toHaveLength(2);
+    expect(updated?.items.map((item) => item.unit_price)).toEqual([10, 20]);
+    expect(updated?.items.flatMap((item) => item.images.map((image) => image.photo_uri)))
+      .toEqual(['file:///added.jpg']);
+  });
+
+  test('rolls back quantity and items when adding an image fails', async () => {
+    const record = await repository.createRecord({ quantity: 1, unit_price: 10 });
+    const adapter = createAsyncSQLiteAdapter(raw);
+    const failingAdapter = {
+      ...adapter,
+      runAsync: async (sql: string, params?: unknown[]) => {
+        if (sql.includes('INSERT INTO cheki_item_images')) throw new Error('image insert failed');
+        return adapter.runAsync(sql, params as never);
+      },
+    };
+    repository = new ChekiRecordRepository(failingAdapter as typeof adapter, () => `failure-${nextId++}`);
+
+    await expect(repository.updateRecordWithItemChanges(
+      record.id,
+      { quantity: 2 },
+      { add: [{ frontUri: 'file:///failure.jpg' }], defaultUnitPrice: 20 },
+    )).rejects.toThrow('image insert failed');
+
+    expect(raw.prepare('SELECT quantity FROM cheki_records WHERE id = ?').get(record.id))
+      .toEqual({ quantity: 1 });
+    expect(raw.prepare('SELECT unit_price FROM cheki_items WHERE record_id = ?').all(record.id))
+      .toEqual([{ unit_price: 10 }]);
+  });
+
+  test('removes a physical item and creates its replacement in one transaction', async () => {
+    const record = await repository.createRecordWithItems({
+      quantity: 2,
+      unit_price: 10,
+      items: [
+        { frontUri: 'file:///first.jpg' },
+        { frontUri: 'file:///second.jpg' },
+      ],
+    });
+    const [first, second] = record.items;
+
+    await repository.updateRecordWithItemChanges(
+      record.id,
+      { quantity: 2 },
+      {
+        removeItemIds: [first.id],
+        add: [{ frontUri: 'file:///replacement.jpg', unitPrice: 30 }],
+        defaultUnitPrice: 20,
+      },
+    );
+
+    const updated = await repository.findRecordById(record.id);
+    expect(updated?.items.map((item) => item.id)).toContain(second.id);
+    expect(updated?.items.map((item) => item.id)).not.toContain(first.id);
+    expect(updated?.items.map((item) => item.unit_price)).toEqual([10, 30]);
+    expect(updated?.items.flatMap((item) => item.images.map((image) => image.photo_uri)))
+      .toEqual(['file:///second.jpg', 'file:///replacement.jpg']);
+  });
+
+  test('derives the latest artist unit price directly from items, including zero', async () => {
+    raw.prepare(
+      `INSERT INTO artists
+         (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)`,
+    ).run('artist-price', 'Price Artist', '2026-01-01T00:00:00.000Z');
+    await repository.createRecord({
+      artist_id: 'artist-price', date: '2026-01-01', quantity: 2, unit_price: 80,
+    });
+    await repository.createRecord({
+      artist_id: 'artist-price', date: '2026-02-01', quantity: 1, unit_price: 0,
+    });
+
+    expect(await repository.findLatestUnitPriceByArtistId('artist-price')).toBe(0);
+    expect(await repository.findLatestUnitPriceByArtistId('missing')).toBeNull();
+  });
+
+  test('updates item price and metadata while preserving image-side rules', async () => {
+    const record = await repository.createRecordWithItems({
+      quantity: 1,
+      unit_price: 20,
+      items: [{ frontUri: 'file:///front.jpg', backUri: 'file:///back.jpg' }],
+    });
+    const item = record.items[0];
+
+    await repository.updateItemWithImages(item.id, {
+      unitPrice: 30,
+      displayAspectRatio: 1,
+      isFavorite: true,
+      notes: 'signed on the back',
+      images: { front: 'file:///new-front.jpg', back: null },
+    });
+
+    const updated = await repository.findItemById(item.id);
+    expect(updated).toMatchObject({
+      unit_price: 30,
+      display_aspect_ratio: 1,
+      is_favorite: 1,
+      notes: 'signed on the back',
+    });
+    expect(updated?.images.map((image) => [image.side, image.photo_uri]))
+      .toEqual([['front', 'file:///new-front.jpg']]);
+    await expect(repository.removeItemImage(item.id, 'front'))
+      .rejects.toThrow('front image cannot be removed');
+  });
+
+  test('allows a back-only item to become image-less without deleting the physical item', async () => {
+    const record = await repository.createRecord({ quantity: 1, unit_price: 25 });
+    const item = (await repository.findRecordById(record.id))!.items[0];
+    await repository.addOrReplaceItemImage(item.id, 'back', 'file:///back.jpg');
+
+    await expect(repository.removeItemImage(item.id, 'back')).resolves.toEqual({
+      removed: true,
+      itemDeleted: false,
+    });
+    expect(await repository.findItemById(item.id)).toMatchObject({ unit_price: 25, images: [] });
+  });
+
+  test('computes totals from item prices and image metrics from image-bearing items', async () => {
+    const record = await repository.createRecord({ quantity: 3, unit_price: 30 });
+    const item = (await repository.findRecordById(record.id))!.items[0];
+    await repository.addOrReplaceItemImage(item.id, 'front', 'file:///front.jpg');
+    await repository.addOrReplaceItemImage(item.id, 'back', 'file:///back.jpg');
+    await repository.setItemFavorite(item.id, true);
+
+    expect(await repository.getStatistics()).toEqual({
+      quantity: 3,
+      totalPrice: 90,
+      archivedItems: 1,
+      images: 2,
+      favorites: 1,
+    });
+  });
+
+  test('deleting an item decrements quantity and deleting the last item removes the record', async () => {
+    const record = await repository.createRecord({ quantity: 2, unit_price: 30 });
+    const initial = (await repository.findRecordById(record.id))!.items;
+
+    await repository.deleteItem(initial[0].id);
+    expect(await repository.findRecordById(record.id)).toMatchObject({ quantity: 1 });
+    expect((await repository.findRecordById(record.id))?.items).toHaveLength(1);
+
+    await repository.deleteItem(initial[1].id);
+    expect(await repository.findRecordById(record.id)).toBeNull();
+  });
+
+  test('cascades record deletion and leaves media handling outside the repository', async () => {
+    const record = await repository.createRecordWithItems({
+      quantity: 1,
+      items: [{ frontUri: 'file:///kept-in-documents.jpg' }],
+    });
+    await repository.deleteRecord(record.id);
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 0 });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_items').get()).toEqual({ count: 0 });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_item_images').get()).toEqual({ count: 0 });
+  });
+});

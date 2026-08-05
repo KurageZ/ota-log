@@ -38,6 +38,7 @@ import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
 import { AppIcon, type AppIconName } from '../../../src/components/AppIcon';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
 import { ChekiViewerModal } from '../../../src/components/ChekiViewerModal';
+import type { ChekiViewerItem } from '../../../src/types/chekiViewer';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
 import { useDB } from '../../../src/context/DBContext';
 import { useAppTheme } from '../../../src/theme/appTheme';
@@ -242,6 +243,22 @@ export default function ArtistDetailScreen() {
     ]);
   }, [db, load]);
 
+  const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
+    const nextFavorite = item.isFavorite !== true;
+    const itemId = item.itemId ?? item.id;
+    setChekiList((current) => current.map((cheki) => (
+      cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 1 : 0 } : cheki
+    )));
+    try {
+      await db.cheki.setFavorite(itemId, nextFavorite);
+    } catch {
+      setChekiList((current) => current.map((cheki) => (
+        cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 0 : 1 } : cheki
+      )));
+      Alert.alert('收藏失败', '暂时无法更新收藏状态，请稍后重试。');
+    }
+  }, [db]);
+
   const handleOpenChekiCreate = () => {
     if (!artist) return;
     router.push({ pathname: '/cheki/new', params: { artist_id: artist.id } });
@@ -417,7 +434,7 @@ export default function ArtistDetailScreen() {
             eventMap={eventMap}
             isDark={chekiListIsDark}
             tone={chekiManualTone}
-            onPressEntry={(entry) => router.push(`/cheki/manual/${entry.id}/edit`)}
+            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
         </View>
       );
@@ -1402,8 +1419,9 @@ export default function ArtistDetailScreen() {
         items={viewerItems}
         selectedId={viewerSelectedId}
         onClose={() => setViewerSelectedId(null)}
-        onEdit={(item) => router.push(`/cheki/${item.id}/edit`)}
-        onDelete={(item) => handleDeleteCheki(item.id)}
+        onEdit={(item) => router.push(`/cheki/items/${item.itemId ?? item.id}/edit`)}
+        onDelete={(item) => handleDeleteCheki(item.itemId ?? item.id)}
+        onToggleFavorite={(item) => void handleToggleChekiFavorite(item)}
       />
     </View>
   );

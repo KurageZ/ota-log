@@ -24,7 +24,7 @@ export interface LocalMediaRebaseResult {
 
 const LOCAL_MEDIA_COLUMNS = [
   { table: 'photos', column: 'local_uri' },
-  { table: 'cheki', column: 'photo_uri' },
+  { table: 'cheki_item_images', column: 'photo_uri' },
   { table: 'artists', column: 'avatar_uri' },
   { table: 'artists', column: 'background_uri' },
   { table: 'user_config', column: 'avatar_uri' },
@@ -74,7 +74,7 @@ export async function rebaseLegacyLocalMediaUris(
   const rows = await db.getAllAsync<{ uri: string | null }>(
     `SELECT local_uri AS uri FROM photos WHERE local_uri IS NOT NULL
      UNION
-     SELECT photo_uri AS uri FROM cheki WHERE photo_uri IS NOT NULL
+     SELECT photo_uri AS uri FROM cheki_item_images WHERE photo_uri IS NOT NULL
      UNION
      SELECT avatar_uri AS uri FROM artists WHERE avatar_uri IS NOT NULL
      UNION
@@ -148,7 +148,7 @@ export async function countLocalMediaReferences(db: SQLiteDatabase, uri: string)
   const rows = await db.getAllAsync<{ uri: string | null }>(
     `SELECT local_uri AS uri FROM photos WHERE local_uri = ?
      UNION ALL
-     SELECT photo_uri AS uri FROM cheki WHERE photo_uri = ?
+     SELECT photo_uri AS uri FROM cheki_item_images WHERE photo_uri = ?
      UNION ALL
      SELECT avatar_uri AS uri FROM artists WHERE avatar_uri = ?
      UNION ALL
@@ -177,7 +177,7 @@ export async function collectReferencedLocalMediaUris(db: SQLiteDatabase): Promi
   const rows = await db.getAllAsync<{ uri: string | null }>(
     `SELECT local_uri AS uri FROM photos WHERE local_uri IS NOT NULL
      UNION
-     SELECT photo_uri AS uri FROM cheki WHERE photo_uri IS NOT NULL
+     SELECT photo_uri AS uri FROM cheki_item_images WHERE photo_uri IS NOT NULL
      UNION
      SELECT avatar_uri AS uri FROM artists WHERE avatar_uri IS NOT NULL
      UNION

@@ -51,12 +51,8 @@ export class ArtistRepository {
            GROUP BY ea.artist_id
            UNION ALL
            SELECT artist_id, MAX(COALESCE(date, created_at)) AS sort_value
-           FROM cheki
+           FROM cheki_records
            WHERE artist_id IS NOT NULL
-           GROUP BY artist_id
-           UNION ALL
-           SELECT artist_id, MAX(COALESCE(date, created_at)) AS sort_value
-           FROM cheki_manual_entries
            GROUP BY artist_id
          ) interactions
          GROUP BY artist_id

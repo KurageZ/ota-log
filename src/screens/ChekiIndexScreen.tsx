@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
+  View, Text, FlatList, TouchableOpacity, Alert, Image, Switch, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
 } from 'react-native';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, {
@@ -23,16 +23,15 @@ import { resolveAvatarSource } from '../utils/avatarSource';
 import { getArtistDisplayText, getArtistPrimaryName } from '../utils/artistDisplay';
 import { OshiAvatar, OshiBadge } from '../components/Oshi';
 import { ChekiViewerModal } from '../components/ChekiViewerModal';
+import type { ChekiViewerItem } from '../types/chekiViewer';
 import type { FullscreenImageTransitionOrigin } from '../components/FullscreenImageViewer';
 import {
   buildChekiViewerItems,
   calculateChekiGridLayout,
   ChekiArtistGroup,
   ChekiGridDensity,
-  ChekiDateGroup,
   ChekiGridColumns,
   chunkChekis,
-  groupChekiRecordsByDate,
   groupChekiRecordsByArtist,
   matchesChekiKeyword,
   sortChekisDesc,
@@ -41,6 +40,8 @@ import { showDeleteFailedAlert } from '../utils/failureAlert';
 import { ThemeColors, useAppTheme } from '../theme/appTheme';
 import { ChekiManualEntryList } from '../components/ChekiManualEntryList';
 import { ChekiStackPreviewCard } from '../components/ChekiStackPreviewCard';
+import { ChekiRecordListItem } from '../components/ChekiRecordListItem';
+import type { ChekiRecordWithItems } from '../repositories/ChekiRecordRepository';
 import {
   AndroidCompactTabHeader,
   AndroidLargeTabTitle,
@@ -70,6 +71,7 @@ function recordYear(record: { date: string | null; created_at: string }): string
 }
 
 type ChekiGalleryItem =
+  | { type: 'record'; key: string; record: ChekiRecordWithItems }
   | { type: 'header'; key: string; groupKey: string; group: ChekiArtistGroup }
   | { type: 'dateHeader'; key: string; date: string }
   | { type: 'row'; key: string; groupKey: string; chekis: Cheki[]; viewerChekis: Cheki[]; isLastPhotoRow: boolean }
@@ -346,24 +348,6 @@ function buildAlbumGridItems(
     });
   }
   return items;
-}
-
-function buildDateStackItems(
-  dateGroups: ChekiDateGroup[],
-  sortOrder: ChekiSortOrder,
-): ChekiGalleryItem[] {
-  const groups = sortOrder === 'asc' ? [...dateGroups].reverse() : dateGroups;
-  return groups.map((group) => ({
-    type: 'stack' as const,
-    key: `date-stack:${group.date}`,
-    stackKey: `date:${group.date}`,
-    title: group.date,
-    chekis: group.chekis,
-    manualEntries: group.manualEntries,
-    totalCount: group.totalCount,
-    totalPrice: group.totalPrice,
-    artist: null,
-  }));
 }
 
 function buildManualArtistSummaries(
@@ -848,6 +832,7 @@ export default function ChekiLibraryScreen() {
 
   const [chekiList, setChekiList] = useState<Cheki[]>([]);
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
+  const [recordList, setRecordList] = useState<ChekiRecordWithItems[]>([]);
   const [artistMap, setArtistMap] = useState<Map<string, Artist>>(new Map());
   const [eventMap, setEventMap] = useState<Map<string, Event>>(new Map());
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
@@ -874,15 +859,17 @@ export default function ChekiLibraryScreen() {
   }, []);
 
   const load = useCallback(async () => {
-    const [chekis, manual, artists, events, config] = await Promise.all([
+    const [chekis, manual, records, artists, events, config] = await Promise.all([
       db.cheki.findAll(),
       db.chekiManualEntries.findAll(),
+      db.chekiRecords.findRecords(),
       db.artists.findAll(),
       db.events.findAll(),
       db.userConfig.getConfig(),
     ]);
     setChekiList(chekis);
     setManualEntries(manual);
+    setRecordList(records);
     setArtistMap(new Map(artists.map((artist) => [artist.id, artist])));
     setEventMap(new Map(events.map((event) => [event.id, event])));
     setOshiArtistId(config.oshi_artist_id);
@@ -950,8 +937,8 @@ export default function ChekiLibraryScreen() {
       if (eventLinkFilter === 'unlinked' && cheki.event_id) return false;
       if (notesFilter === 'with_notes' && !cheki.notes?.trim()) return false;
       if (notesFilter === 'without_notes' && cheki.notes?.trim()) return false;
-      if (priceFilter === 'with_price' && cheki.price == null) return false;
-      if (priceFilter === 'without_price' && cheki.price != null) return false;
+      if (priceFilter === 'with_price' && (cheki.price ?? 0) === 0) return false;
+      if (priceFilter === 'without_price' && (cheki.price ?? 0) !== 0) return false;
       return true;
     }),
     [
@@ -982,8 +969,8 @@ export default function ChekiLibraryScreen() {
       if (eventLinkFilter === 'linked' && !entry.event_id) return false;
       if (eventLinkFilter === 'unlinked' && entry.event_id) return false;
       if (notesFilter === 'with_notes') return false;
-      if (priceFilter === 'with_price' && entry.total_price == null) return false;
-      if (priceFilter === 'without_price' && entry.total_price != null) return false;
+      if (priceFilter === 'with_price' && (entry.total_price ?? 0) === 0) return false;
+      if (priceFilter === 'without_price' && (entry.total_price ?? 0) !== 0) return false;
       return true;
     }),
     [
@@ -1002,47 +989,96 @@ export default function ChekiLibraryScreen() {
       priceFilter,
     ],
   );
+  const filteredRecordList = useMemo(
+    () => recordList.filter((record) => {
+      const hasImage = record.items.some((item) => item.images.length > 0);
+      const hasNotes = Boolean(
+        record.notes?.trim()
+        || record.items.some((item) => item.notes?.trim()),
+      );
+      if (recordTypeFilter === 'photo' && !hasImage) return false;
+      if (recordTypeFilter === 'manual' && hasImage) return false;
+      if (!matchesArtist(record.artist_id)) return false;
+      if (filterEventId && record.event_id !== filterEventId) return false;
+      if (!matchesDate(record, filterDate)) return false;
+      if (!matchesPeriod(record, filterYear, filterMonth)) return false;
+      if (!matchesScope(record.artist_id)) return false;
+      if (eventLinkFilter === 'linked' && !record.event_id) return false;
+      if (eventLinkFilter === 'unlinked' && record.event_id) return false;
+      if (notesFilter === 'with_notes' && !hasNotes) return false;
+      if (notesFilter === 'without_notes' && hasNotes) return false;
+      const totalPrice = record.items.reduce((sum, item) => sum + item.unit_price, 0);
+      if (priceFilter === 'with_price' && totalPrice === 0) return false;
+      if (priceFilter === 'without_price' && totalPrice !== 0) return false;
+
+      const normalizedKeyword = keyword.trim().toLowerCase();
+      if (!normalizedKeyword) return true;
+      const artist = record.artist_id ? artistMap.get(record.artist_id) : null;
+      const event = record.event_id ? eventMap.get(record.event_id) : null;
+      const searchableText = [
+        record.date,
+        record.notes,
+        artist ? getArtistSearchText(artist, artistMap) : '未关联艺人',
+        event?.title,
+        ...record.items.map((item) => item.notes),
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(' ')
+        .toLowerCase();
+      return searchableText.includes(normalizedKeyword);
+    }),
+    [
+      recordList,
+      recordTypeFilter,
+      matchesArtist,
+      filterEventId,
+      filterDate,
+      filterYear,
+      filterMonth,
+      matchesScope,
+      eventLinkFilter,
+      notesFilter,
+      priceFilter,
+      keyword,
+      artistMap,
+      eventMap,
+    ],
+  );
 
   const distinctYears = useMemo(() => {
     const years = new Set<string>();
-    for (const cheki of chekiList) years.add(recordYear(cheki));
-    for (const entry of manualEntries) years.add(recordYear(entry));
+    for (const record of recordList) years.add(recordYear(record));
     return [...years]
       .filter((year) => /^\d{4}$/.test(year))
       .sort((a, b) => b.localeCompare(a));
-  }, [chekiList, manualEntries]);
+  }, [recordList]);
 
   // 出现在拍立得记录中的艺人，按记录数降序，供艺人选择器使用
   const distinctArtists = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const cheki of chekiList) {
-      if (cheki.artist_id) counts.set(cheki.artist_id, (counts.get(cheki.artist_id) ?? 0) + 1);
-    }
-    for (const entry of manualEntries) {
-      counts.set(entry.artist_id, (counts.get(entry.artist_id) ?? 0) + entry.count);
+    for (const record of recordList) {
+      if (record.artist_id) {
+        counts.set(record.artist_id, (counts.get(record.artist_id) ?? 0) + record.quantity);
+      }
     }
     return [...counts.entries()]
       .map(([id, count]) => ({ artist: artistMap.get(id), count }))
       .filter((item): item is { artist: Artist; count: number } => Boolean(item.artist))
       .sort((a, b) => b.count - a.count || a.artist.name.localeCompare(b.artist.name))
       .map((item) => item.artist);
-  }, [chekiList, manualEntries, artistMap]);
+  }, [recordList, artistMap]);
 
   const groups = useMemo(
     () => groupChekiRecordsByArtist(filteredChekiList, filteredManualEntries, artistMap, oshiArtistId),
     [filteredChekiList, filteredManualEntries, artistMap, oshiArtistId],
   );
-  const dateGroups = useMemo(
-    () => groupChekiRecordsByDate(filteredChekiList, filteredManualEntries),
-    [filteredChekiList, filteredManualEntries],
-  );
   const galleryItems = useMemo(() => {
-    if (viewPreferences.mode === 'date') {
-      return appendExpandedStackItems(
-        buildDateStackItems(dateGroups, viewPreferences.sortOrder),
-        expandedStacks,
-        columns,
-      );
+    if (viewPreferences.mode === 'record') {
+      return sortChekiRecords(filteredRecordList, viewPreferences.sortOrder).map((record) => ({
+        type: 'record' as const,
+        key: `record:${record.id}`,
+        record,
+      }));
     }
 
     if (viewPreferences.mode === 'album') {
@@ -1052,10 +1088,9 @@ export default function ChekiLibraryScreen() {
     return buildArtistGridItems(groups, columns);
   }, [
     columns,
-    dateGroups,
-    expandedStacks,
     filteredChekiList,
     filteredManualEntries,
+    filteredRecordList,
     groups,
     viewPreferences.mode,
     viewPreferences.sortOrder,
@@ -1232,6 +1267,10 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, density });
   }, [persistViewPreferences, viewPreferences]);
 
+  const handleChangeRecordThumbnails = useCallback((showRecordThumbnails: boolean) => {
+    persistViewPreferences({ ...viewPreferences, showRecordThumbnails });
+  }, [persistViewPreferences, viewPreferences]);
+
   const toggleStack = useCallback((stackKey: string) => {
     setExpandedStacks((current) => {
       const next = new Set(current);
@@ -1333,12 +1372,6 @@ export default function ChekiLibraryScreen() {
     else if (filterEvent?.event_date) params.date = filterEvent.event_date;
     return params;
   }, [selectedArtistIds, filterDate, filterEvent?.event_date, filterEventId]);
-  const openNewCheki = useCallback((source: 'camera' | 'library') => {
-    router.push({ pathname: '/cheki/new', params: { ...filterParams, source } });
-  }, [filterParams]);
-  const openNewManualEntry = useCallback(() => {
-    router.push({ pathname: '/cheki/new', params: { ...filterParams, mode: 'manual' } });
-  }, [filterParams]);
   const openUnifiedCreate = useCallback(() => {
     router.push({ pathname: '/cheki/new', params: filterParams });
   }, [filterParams]);
@@ -1377,6 +1410,32 @@ export default function ChekiLibraryScreen() {
     ]);
   }, [db, load]);
 
+  const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
+    const nextFavorite = item.isFavorite !== true;
+    const itemId = item.itemId ?? item.id;
+    const update = (chekis: Cheki[], isFavorite: boolean): Cheki[] => {
+      const favoriteValue: Cheki['is_favorite'] = isFavorite ? 1 : 0;
+      return chekis.map((cheki) => (
+        cheki.id === itemId ? { ...cheki, is_favorite: favoriteValue } : cheki
+      ));
+    };
+    setChekiList((current) => update(current, nextFavorite));
+    setViewerState((current) => current ? {
+      ...current,
+      chekis: update(current.chekis, nextFavorite),
+    } : current);
+    try {
+      await db.cheki.setFavorite(itemId, nextFavorite);
+    } catch {
+      setChekiList((current) => update(current, !nextFavorite));
+      setViewerState((current) => current ? {
+        ...current,
+        chekis: update(current.chekis, !nextFavorite),
+      } : current);
+      Alert.alert('收藏失败', '暂时无法更新收藏状态，请稍后重试。');
+    }
+  }, [db]);
+
   const renderHeaderActions = useCallback(() => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 4 }}>
       <TouchableOpacity
@@ -1388,7 +1447,7 @@ export default function ChekiLibraryScreen() {
         <AppIcon name="settings" size={22} color={colors.accent} />
       </TouchableOpacity>
       <TouchableOpacity
-        accessibilityLabel="添加拍立得"
+        accessibilityLabel="添加拍立得记录"
         accessibilityRole="button"
         onPress={openUnifiedCreate}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1417,7 +1476,7 @@ export default function ChekiLibraryScreen() {
         还没有记录哦
       </Text>
       <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 28, lineHeight: 20 }}>
-        你可以添加拍立得，也可以直接补录记录
+        可以先记录数量，也可以同时添加图片
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 }}>
         <TouchableOpacity
@@ -1436,32 +1495,34 @@ export default function ChekiLibraryScreen() {
           <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>添加艺人</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={openNewManualEntry}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            paddingHorizontal: 18,
-            paddingVertical: 10,
-            borderRadius: 12,
-            backgroundColor: isDark ? colors.card : colors.accentSofter,
-          }}
-        >
-          <AppIcon name="edit" size={16} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>记录</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => openNewCheki('library')}
+          onPress={openUnifiedCreate}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.accent }}
         >
-          <AppIcon name="image" size={16} color={colors.onAccent} />
-          <Text style={{ color: colors.onAccent, fontWeight: '700', fontSize: 14 }}>添加拍立得</Text>
+          <AppIcon name="add" size={16} color={colors.onAccent} />
+          <Text style={{ color: colors.onAccent, fontWeight: '700', fontSize: 14 }}>添加记录</Text>
         </TouchableOpacity>
       </View>
     </View>
-  ), [colors, isDark, openNewCheki, openNewManualEntry]);
+  ), [colors, isDark, openUnifiedCreate]);
 
   const renderGalleryItem = useCallback(({ item }: { item: ChekiGalleryItem }) => {
+    if (item.type === 'record') {
+      const artist = item.record.artist_id ? artistMap.get(item.record.artist_id) ?? null : null;
+      const event = item.record.event_id ? eventMap.get(item.record.event_id) ?? null : null;
+      const parentName = artist?.parent_id ? artistNameMap[artist.parent_id] ?? null : null;
+      return (
+        <ChekiRecordListItem
+          record={item.record}
+          artist={artist}
+          parentName={parentName}
+          event={event}
+          isOshi={artist?.id === oshiArtistId}
+          showThumbnail={viewPreferences.showRecordThumbnails}
+          onPress={() => router.push(`/cheki/records/${item.record.id}`)}
+        />
+      );
+    }
+
     if (item.type === 'notice') {
       return (
         <View style={{
@@ -1658,7 +1719,7 @@ export default function ChekiLibraryScreen() {
             artistMap={artistMap}
             oshiArtistId={oshiArtistId}
             showArtistMeta
-            onPressEntry={(entry) => router.push(`/cheki/manual/${entry.id}/edit`)}
+            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
         </Animated.View>
       );
@@ -1674,7 +1735,7 @@ export default function ChekiLibraryScreen() {
             artistMap={artistMap}
             oshiArtistId={oshiArtistId}
             showArtistMeta={viewPreferences.mode !== 'artist'}
-            onPressEntry={(entry) => router.push(`/cheki/manual/${entry.id}/edit`)}
+            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
         </View>
       );
@@ -1713,6 +1774,7 @@ export default function ChekiLibraryScreen() {
     stackChekiH,
     stackChekiW,
     toggleStack,
+    viewPreferences.showRecordThumbnails,
   ]);
 
   const galleryList = (
@@ -1777,8 +1839,9 @@ export default function ChekiLibraryScreen() {
         items={viewerItems}
         selectedId={viewerState?.selectedId ?? null}
         onClose={() => setViewerState(null)}
-        onEdit={(item) => router.push(`/cheki/${item.id}/edit`)}
-        onDelete={(item) => handleDeleteCheki(item.id)}
+        onEdit={(item) => router.push(`/cheki/items/${item.itemId ?? item.id}/edit`)}
+        onDelete={(item) => handleDeleteCheki(item.itemId ?? item.id)}
+        onToggleFavorite={(item) => void handleToggleChekiFavorite(item)}
         initialTransitionOrigin={viewerState?.transitionOrigin ?? null}
       />
 
@@ -1807,7 +1870,7 @@ export default function ChekiLibraryScreen() {
               colors={colors}
               options={[
                 { value: 'artist', label: '艺人' },
-                { value: 'date', label: '时间' },
+                { value: 'record', label: '记录' },
                 { value: 'album', label: '相册' },
               ]}
               value={viewPreferences.mode}
@@ -1832,21 +1895,46 @@ export default function ChekiLibraryScreen() {
             </View>
           ) : null}
 
-          <View>
-            <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-              图片大小
-            </Text>
-            <SegmentedOptions
-              colors={colors}
-              options={[
-                { value: 'large', label: '大' },
-                { value: 'medium', label: '中' },
-                { value: 'small', label: '小' },
-              ]}
-              value={viewPreferences.density}
-              onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
-            />
-          </View>
+          {viewPreferences.mode === 'record' ? (
+            <View>
+              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                记录
+              </Text>
+              <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '700', color: colors.text }}>
+                    显示缩略图
+                  </Text>
+                  <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+                    关闭后显示艺人头像
+                  </Text>
+                </View>
+                <Switch
+                  value={viewPreferences.showRecordThumbnails}
+                  onValueChange={handleChangeRecordThumbnails}
+                  accessibilityLabel="显示缩略图"
+                  trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
+                  thumbColor={viewPreferences.showRecordThumbnails ? colors.accent : colors.card}
+                />
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                图片大小
+              </Text>
+              <SegmentedOptions
+                colors={colors}
+                options={[
+                  { value: 'large', label: '大' },
+                  { value: 'medium', label: '中' },
+                  { value: 'small', label: '小' },
+                ]}
+                value={viewPreferences.density}
+                onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
+              />
+            </View>
+          )}
         </BottomSheetDialog>
       ) : null}
     </>
@@ -1889,10 +1977,10 @@ export default function ChekiLibraryScreen() {
               艺人
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
-              isOn={viewPreferences.mode === 'date'}
-              onPress={() => handleChangeMode('date')}
+              isOn={viewPreferences.mode === 'record'}
+              onPress={() => handleChangeMode('record')}
             >
-              时间
+              记录
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
               isOn={viewPreferences.mode === 'album'}
@@ -1917,30 +2005,39 @@ export default function ChekiLibraryScreen() {
               </Stack.Toolbar.MenuAction>
             </Stack.Toolbar.Menu>
           ) : null}
-          <Stack.Toolbar.Menu inline title="图片大小">
+          {viewPreferences.mode !== 'record' ? (
+            <Stack.Toolbar.Menu inline title="图片大小">
+              <Stack.Toolbar.MenuAction
+                isOn={viewPreferences.density === 'large'}
+                onPress={() => handleChangeDensity('large')}
+              >
+                大
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                isOn={viewPreferences.density === 'medium'}
+                onPress={() => handleChangeDensity('medium')}
+              >
+                中
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                isOn={viewPreferences.density === 'small'}
+                onPress={() => handleChangeDensity('small')}
+              >
+                小
+              </Stack.Toolbar.MenuAction>
+            </Stack.Toolbar.Menu>
+          ) : (
             <Stack.Toolbar.MenuAction
-              isOn={viewPreferences.density === 'large'}
-              onPress={() => handleChangeDensity('large')}
+              isOn={viewPreferences.showRecordThumbnails}
+              onPress={() => handleChangeRecordThumbnails(!viewPreferences.showRecordThumbnails)}
             >
-              大
+              显示缩略图
             </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              isOn={viewPreferences.density === 'medium'}
-              onPress={() => handleChangeDensity('medium')}
-            >
-              中
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              isOn={viewPreferences.density === 'small'}
-              onPress={() => handleChangeDensity('small')}
-            >
-              小
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
+          )}
         </Stack.Toolbar.Menu>
         <Stack.Toolbar.Spacer width={8} />
         <Stack.Toolbar.Button
-          accessibilityLabel="添加拍立得"
+          accessibilityLabel="添加拍立得记录"
           icon={getAppIconSFSymbol('add')}
           onPress={openUnifiedCreate}
           separateBackground

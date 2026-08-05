@@ -11,9 +11,15 @@ import { ExpenseRepository } from '../../repositories/ExpenseRepository';
 import { PhotoRepository } from '../../repositories/PhotoRepository';
 import { ChekiRepository } from '../../repositories/ChekiRepository';
 import { ChekiManualEntryRepository } from '../../repositories/ChekiManualEntryRepository';
+import { ChekiRecordRepository } from '../../repositories/ChekiRecordRepository';
 import { UserConfigRepository } from '../../repositories/UserConfigRepository';
 import { DateItemRepository } from '../../repositories/DateItemRepository';
 import { Repositories } from '../../context/DBContext';
+
+let mockBackupUuidIndex = 0;
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => `20000000-0000-4000-8000-${String(mockBackupUuidIndex++).padStart(12, '0')}`,
+}));
 
 jest.mock('expo-file-system', () => ({
   Directory: class {},
@@ -67,6 +73,7 @@ function createRepositories(rawDb: Database.Database): Repositories {
     photos: new PhotoRepository(rawDbAdapter as Repositories['rawDb']),
     cheki: new ChekiRepository(rawDbAdapter as Repositories['rawDb']),
     chekiManualEntries: new ChekiManualEntryRepository(rawDbAdapter as Repositories['rawDb']),
+    chekiRecords: new ChekiRecordRepository(rawDbAdapter as Repositories['rawDb']),
     userConfig: new UserConfigRepository(rawDbAdapter as Repositories['rawDb']),
     dateItems: new DateItemRepository(rawDbAdapter as Repositories['rawDb']),
   };
@@ -77,6 +84,7 @@ describe('backup artist background metadata support', () => {
   let repositories: Repositories;
 
   beforeEach(() => {
+    mockBackupUuidIndex = 0;
     rawDb = new Database(':memory:');
     rawDb.exec('PRAGMA foreign_keys = ON');
     for (const statement of SCHEMA_STATEMENTS) {
@@ -115,6 +123,76 @@ describe('backup artist background metadata support', () => {
         background_color: '#605074',
       }),
     ]);
+  });
+
+  test('backs up and restores cheki v2 records, items, and both image sides', async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    rawDb.prepare(`INSERT INTO cheki_records
+      (id, quantity, created_at, updated_at)
+      VALUES ('record', 2, ?, ?)`).run(now, now);
+    rawDb.prepare(`INSERT INTO cheki_items
+      (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, created_at, updated_at)
+      VALUES ('item', 'record', 0, 40, ?, 1, ?, ?)`).run(54 / 86, now, now);
+    rawDb.prepare(`INSERT INTO cheki_items
+      (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, created_at, updated_at)
+      VALUES ('item-blank', 'record', 1, 40, ?, 0, ?, ?)`).run(54 / 86, now, now);
+    rawDb.prepare(`INSERT INTO cheki_item_images
+      (id, item_id, side, photo_uri, created_at, updated_at)
+      VALUES ('front', 'item', 'front', 'file:///front.jpg', ?, ?)`).run(now, now);
+    rawDb.prepare(`INSERT INTO cheki_item_images
+      (id, item_id, side, photo_uri, created_at, updated_at)
+      VALUES ('back', 'item', 'back', 'file:///back.jpg', ?, ?)`).run(now, now);
+
+    const data = await buildBackupData(repositories);
+    expect(data.cheki_records).toEqual([expect.objectContaining({ id: 'record', quantity: 2 })]);
+    expect(data.cheki_items).toHaveLength(2);
+    expect(data.cheki_items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'item', unit_price: 40, is_favorite: 1 }),
+      expect.objectContaining({ id: 'item-blank', unit_price: 40, is_favorite: 0 }),
+    ]));
+    expect(data.cheki_item_images.map((image) => image.photo_uri).sort()).toEqual([
+      'file:///back.jpg',
+      'file:///front.jpg',
+    ]);
+
+    await restoreBackupData(
+      repositories,
+      data as unknown as Parameters<typeof restoreBackupData>[1],
+    );
+    expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 1 });
+    expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_items').get()).toEqual({ count: 2 });
+    expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_item_images').get()).toEqual({ count: 2 });
+  });
+
+  test('restores legacy cheki backup rows through the shared migration rules', async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    rawDb.prepare(`INSERT INTO artists
+      (id, name, is_favorite, created_at) VALUES ('artist', 'Artist', 0, ?)`).run(now);
+    await restoreBackupData(repositories, {
+      artists: [{
+        id: 'artist', name: 'Artist', short_name: null, parent_id: null,
+        avatar_uri: null, background_uri: null, background_color: null,
+        url: null, is_favorite: 0, created_at: now,
+      }],
+      cheki: [{
+        id: 'legacy-photo', event_id: null, artist_id: 'artist',
+        photo_uri: 'file:///legacy.jpg', date: '2026-01-01', price: 12.4,
+        notes: 'legacy note', created_at: now,
+      }],
+      cheki_manual_entries: [{
+        id: 'legacy-manual', artist_id: 'artist', event_id: null,
+        date: '2026-01-01', count: 2, total_price: 10.4,
+        created_at: now, updated_at: now,
+      }],
+    });
+    expect(rawDb.prepare('SELECT quantity FROM cheki_records').get())
+      .toEqual({ quantity: 3 });
+    expect(rawDb.prepare('SELECT COUNT(*) AS count, SUM(unit_price) AS total FROM cheki_items').get())
+      .toEqual({ count: 3, total: 22 });
+    expect(rawDb.prepare("SELECT id, unit_price, notes FROM cheki_items WHERE id = 'legacy-photo'").get())
+      .toEqual({ id: 'legacy-photo', unit_price: 12, notes: 'legacy note' });
+    expect(rawDb.prepare('SELECT side, photo_uri FROM cheki_item_images').get())
+      .toEqual({ side: 'front', photo_uri: 'file:///legacy.jpg' });
   });
 
   test('export refuses to create an incomplete backup when a preset avatar is unavailable', async () => {

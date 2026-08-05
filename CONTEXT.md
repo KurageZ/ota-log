@@ -23,3 +23,39 @@ _Avoid_: Persisted countdown or anniversary type
 **Important Date Anniversary**:
 An optional derived occurrence from an important date, such as the 100th day, first year, or second year after the base date. It can be enabled or disabled independently, while calendar visibility and reminders are controlled by the parent important date.
 _Avoid_: Separate anniversary record, mandatory anniversary setting, milestone
+
+**Cheki Record**:
+A user-owned record of one cheki entry batch, including its optional artist and activity, record date, total quantity, derived total price, and notes. Price belongs to each Cheki Item; a blank item price is stored as zero, and the Record total is derived from its Items. Having images is optional and does not create a different record type.
+_Avoid_: Photo cheki record, manual cheki entry, no-photo record
+
+**Cheki Item**:
+One identifiable physical cheki within a Cheki Record. It owns that cheki's non-negative integer unit price and anchors its optional front and back images so the two sides remain associated.
+_Avoid_: Cheki image, front photo record, back photo record
+
+**Favorite Cheki Item**:
+A Cheki Item explicitly marked with a heart by the user. Favorite status belongs to the physical cheki, so its front and back images share the same status.
+_Avoid_: Favorite Cheki Record, favorite image
+
+**Cheki Image**:
+One front or back image associated with a Cheki Item. Both sides use the presentation ratio owned by their shared Cheki Item.
+_Avoid_: Cheki Item, edited source image
+
+**Cheki Item Presentation**:
+The display width-to-height ratio applied to both images of one Cheki Item, defaulting to the three-inch cheki ratio. It does not change the source image files.
+_Avoid_: Per-side image ratio, physical cheki size, destructive crop
+
+**Cheki Record Date**:
+The calendar date assigned to a Cheki Record as a whole. It is not the image capture time or image import time.
+_Avoid_: Cheki image date, upload date
+
+**Cheki Item Unit Price**:
+The non-negative integer whole-yuan price of one Cheki Item. If the user leaves it blank, the stored value is zero. A Cheki Record's total price is derived by summing its Item unit prices.
+_Avoid_: Cheki Record source price, derived unit price
+
+**Cheki Record Note**:
+A note about an entire Cheki Record batch.
+_Avoid_: Cheki Item note, image note
+
+**Cheki Item Note**:
+A note about one identifiable physical cheki within a Cheki Record.
+_Avoid_: Cheki Record note, image note

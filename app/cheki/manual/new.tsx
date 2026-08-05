@@ -15,7 +15,6 @@ export default function RedirectManualChekiNewScreen() {
           artist_id,
           event_id,
           date,
-          mode: 'manual',
         },
       }}
     />

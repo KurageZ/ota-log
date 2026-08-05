@@ -3,6 +3,7 @@ import {
   calculateChekiGridLayout,
   calculateChekiStackPreview,
   calculateManualChekiTotalPrice,
+  buildChekiViewerItems,
   chunkChekis,
   groupChekiRecordsByDate,
   matchesChekiKeyword,
@@ -75,9 +76,12 @@ function cheki(input: Partial<Cheki> & Pick<Cheki, 'id'>): Cheki {
     event_id: null,
     artist_id: null,
     photo_uri: `file:///${input.id}.jpg`,
+    front_photo_uri: `file:///${input.id}.jpg`,
+    back_photo_uri: null,
     date: null,
     price: null,
     notes: null,
+    is_favorite: 0,
     created_at: '2026-01-01T00:00:00.000Z',
     ...input,
   };
@@ -101,6 +105,27 @@ describe('cheki view helpers', () => {
     cheki({ id: 'new', date: '2026-06-01', created_at: '2026-06-01T10:00:00.000Z' }),
     cheki({ id: 'created', date: null, created_at: '2026-06-02T10:00:00.000Z' }),
   ];
+
+  test('keeps the back URI paired without adding it to the swipe sequence', () => {
+    const viewerItems = buildChekiViewerItems([
+      cheki({
+        id: 'double-sided',
+        front_photo_uri: 'file:///front.jpg',
+        back_photo_uri: 'file:///back.jpg',
+      }),
+    ], new Map(), new Map());
+
+    expect(viewerItems).toEqual([
+      expect.objectContaining({
+        id: 'double-sided',
+        itemId: 'double-sided',
+        photoUri: 'file:///front.jpg',
+        frontPhotoUri: 'file:///front.jpg',
+        backPhotoUri: 'file:///back.jpg',
+        side: 'front',
+      }),
+    ]);
+  });
 
   test('chunks photo cheki rows by selected column count', () => {
     expect(chunkChekis(chekis, 3).map((row) => row.map((item) => item.id))).toEqual([

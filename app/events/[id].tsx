@@ -18,6 +18,7 @@ import { copyToDocuments } from '../../src/utils/copyToDocuments';
 import { buildChekiViewerItems, getChekiManualCount } from '../../src/utils/cheki';
 import { sortArtistsWithOshi } from '../../src/utils/filter';
 import { ChekiViewerModal } from '../../src/components/ChekiViewerModal';
+import type { ChekiViewerItem } from '../../src/types/chekiViewer';
 import {
   FullscreenImageItem,
   FullscreenImageViewer,
@@ -464,6 +465,22 @@ export default function EventDetailScreen() {
     ]);
   }, [db, load]);
 
+  const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
+    const nextFavorite = item.isFavorite !== true;
+    const itemId = item.itemId ?? item.id;
+    setChekiList((current) => current.map((cheki) => (
+      cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 1 : 0 } : cheki
+    )));
+    try {
+      await db.cheki.setFavorite(itemId, nextFavorite);
+    } catch {
+      setChekiList((current) => current.map((cheki) => (
+        cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 0 : 1 } : cheki
+      )));
+      Alert.alert('收藏失败', '暂时无法更新收藏状态，请稍后重试。');
+    }
+  }, [db]);
+
   const viewerItems = useMemo(
     () => buildChekiViewerItems(chekiList, allArtistsMap, new Map(event ? [[event.id, event]] : [])),
     [allArtistsMap, chekiList, event],
@@ -768,7 +785,7 @@ export default function EventDetailScreen() {
             artistMap={allArtistsMap}
             oshiArtistId={oshiArtistId}
             showArtistMeta
-            onPressEntry={(entry) => router.push(`/cheki/manual/${entry.id}/edit`)}
+            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
           {!hasMoreCheki && chekiList.length === 0 && manualEntries.length > 0 ? (
             <TouchableOpacity
@@ -884,8 +901,9 @@ export default function EventDetailScreen() {
         items={viewerItems}
         selectedId={viewerSelectedId}
         onClose={() => setViewerSelectedId(null)}
-        onEdit={(item) => router.push(`/cheki/${item.id}/edit`)}
-        onDelete={(item) => handleDeleteCheki(item.id)}
+        onEdit={(item) => router.push(`/cheki/items/${item.itemId ?? item.id}/edit`)}
+        onDelete={(item) => handleDeleteCheki(item.itemId ?? item.id)}
+        onToggleFavorite={(item) => void handleToggleChekiFavorite(item)}
       />
 
       <FullscreenImageViewer

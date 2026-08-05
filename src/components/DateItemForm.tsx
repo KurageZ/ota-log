@@ -102,15 +102,9 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
       initial?.item.linked_event_id ? db.events.findById(initial.item.linked_event_id) : Promise.resolve(null),
       db.userConfig.getConfig(),
       db.rawDb.getAllAsync<FirstDateRow>(
-        `SELECT artist_id, MIN(record_date) AS first_date
-         FROM (
-           SELECT artist_id, COALESCE(date, created_at) AS record_date
-           FROM cheki
-           WHERE artist_id IS NOT NULL
-           UNION ALL
-           SELECT artist_id, COALESCE(date, created_at) AS record_date
-           FROM cheki_manual_entries
-         ) combined
+        `SELECT artist_id, MIN(COALESCE(date, created_at)) AS first_date
+         FROM cheki_records
+         WHERE artist_id IS NOT NULL
          GROUP BY artist_id`
       ),
       db.rawDb.getAllAsync<FirstDateRow>(

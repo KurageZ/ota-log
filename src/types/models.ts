@@ -59,9 +59,12 @@ export interface Cheki {
   event_id: string | null;
   artist_id: string | null;
   photo_uri: string;
+  front_photo_uri: string | null;
+  back_photo_uri: string | null;
   date: string | null;
   price: number | null;
   notes: string | null;
+  is_favorite: 0 | 1;
   created_at: string;
 }
 
@@ -72,6 +75,40 @@ export interface ChekiManualEntry {
   date: string | null;
   count: number;
   total_price: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChekiRecord {
+  id: string;
+  event_id: string | null;
+  artist_id: string | null;
+  date: string | null;
+  quantity: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChekiItem {
+  id: string;
+  record_id: string;
+  sort_order: number;
+  unit_price: number;
+  display_aspect_ratio: number;
+  is_favorite: 0 | 1;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChekiImageSide = 'front' | 'back';
+
+export interface ChekiItemImage {
+  id: string;
+  item_id: string;
+  side: ChekiImageSide;
+  photo_uri: string;
   created_at: string;
   updated_at: string;
 }

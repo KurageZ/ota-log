@@ -12,6 +12,8 @@ interface ChekiViewerModalProps {
   onClose: () => void;
   onEdit: (item: ChekiViewerItem) => void;
   onDelete?: (item: ChekiViewerItem) => void;
+  onToggleFavorite: (item: ChekiViewerItem) => void;
+  showPrice?: boolean;
   initialTransitionOrigin?: FullscreenImageTransitionOrigin | null;
 }
 
@@ -70,7 +72,7 @@ function DetailBlock({
   );
 }
 
-function ChekiDetails({ item }: { item: ChekiViewerItem }) {
+function ChekiDetails({ item, showPrice }: { item: ChekiViewerItem; showPrice: boolean }) {
   const { colors } = useAppTheme();
   const detailBlockBackgroundColor = 'rgba(255,255,255,0.07)';
   const detailLabelColor = 'rgba(255,255,255,0.66)';
@@ -81,6 +83,15 @@ function ChekiDetails({ item }: { item: ChekiViewerItem }) {
 
   return (
     <View style={{ gap: 12 }}>
+      {item.side ? (
+        <DetailBlock
+          label="图片"
+          value={item.side === 'front' ? '正面' : '背面'}
+          labelColor={detailLabelColor}
+          textColor={colors.white}
+          backgroundColor={detailBlockBackgroundColor}
+        />
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <DetailBlock
@@ -91,15 +102,17 @@ function ChekiDetails({ item }: { item: ChekiViewerItem }) {
             backgroundColor={detailBlockBackgroundColor}
           />
         </View>
-        <View style={{ flex: 1 }}>
-          <DetailBlock
-            label="价格"
-            value={formatPrice(item.price)}
-            labelColor={detailLabelColor}
-            textColor={colors.white}
-            backgroundColor={detailBlockBackgroundColor}
-          />
-        </View>
+        {showPrice ? (
+          <View style={{ flex: 1 }}>
+            <DetailBlock
+              label="价格"
+              value={formatPrice(item.price)}
+              labelColor={detailLabelColor}
+              textColor={colors.white}
+              backgroundColor={detailBlockBackgroundColor}
+            />
+          </View>
+        ) : null}
       </View>
       <DetailBlock
         label="艺人"
@@ -135,6 +148,8 @@ export function ChekiViewerModal({
   onClose,
   onEdit,
   onDelete,
+  onToggleFavorite,
+  showPrice = true,
   initialTransitionOrigin,
 }: ChekiViewerModalProps) {
   return (
@@ -153,8 +168,20 @@ export function ChekiViewerModal({
           onDelete(item);
         }
         : undefined}
+      isFavorite={(item) => item.isFavorite === true}
+      onToggleFavorite={onToggleFavorite}
+      getAlternateItem={(item) => {
+        if (item.side === 'front' && item.backPhotoUri) {
+          return { ...item, photoUri: item.backPhotoUri, side: 'back' as const };
+        }
+        if (item.side === 'back' && item.frontPhotoUri) {
+          return { ...item, photoUri: item.frontPhotoUri, side: 'front' as const };
+        }
+        return null;
+      }}
+      getAlternateActionLabel={(item) => item.side === 'back' ? '查看正面' : '查看背面'}
       getDetailSummary={(item) => item.date ? formatDate(item.date) : '未记录日期'}
-      renderDetails={(item) => <ChekiDetails item={item} />}
+      renderDetails={(item) => <ChekiDetails item={item} showPrice={showPrice} />}
       initialTransitionOrigin={initialTransitionOrigin}
     />
   );

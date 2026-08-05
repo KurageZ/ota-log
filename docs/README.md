@@ -22,12 +22,13 @@
 
 - UI/UX 设计：`product/ui-ux.md`
 - 首页置顶信息功能设计：`product/home-pinned-info.md`
-- iEvent 轻量活动导入规格：`product/ievent-import.md`
-- 数据结构设计：`data/activity-data-model-design.md`
+- 活动数据结构设计：`data/activity-data-model-design.md`
+- 拍立得数据结构设计：`data/cheki-data-model-design.md`
 - 重要日期数据结构设计：`data/important-date-data-model.md`
 - 技术选型：`tech/stack.md`
 - 决策记录模板：`decisions/0000-template.md`
 - 当前进度：`progress/now.md`
+- 拍立得新版 UI 验收清单：`progress/cheki-v2-ui-checklist.md`
 - 测试验证工作流：`workflows/testing.md`
 - 发版工作流：`workflows/release.md`
 - 私有艺人构建工作流：`workflows/private-artist-build.md`

@@ -1,3 +1,5 @@
+import { CHEKI_V2_SCHEMA_STATEMENTS } from './chekiV2Schema';
+
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS artists (
     id          TEXT PRIMARY KEY,
@@ -67,27 +69,7 @@ export const SCHEMA_STATEMENTS = [
     created_at TEXT NOT NULL
   )`,
 
-  `CREATE TABLE IF NOT EXISTS cheki (
-    id         TEXT PRIMARY KEY,
-    event_id   TEXT REFERENCES events(id) ON DELETE SET NULL,
-    artist_id  TEXT REFERENCES artists(id) ON DELETE SET NULL,
-    photo_uri  TEXT NOT NULL,
-    date       TEXT,
-    price      REAL,
-    notes      TEXT,
-    created_at TEXT NOT NULL
-  )`,
-
-  `CREATE TABLE IF NOT EXISTS cheki_manual_entries (
-    id          TEXT PRIMARY KEY,
-    artist_id   TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-    event_id    TEXT REFERENCES events(id) ON DELETE SET NULL,
-    date        TEXT,
-    count       INTEGER NOT NULL CHECK (count >= 1 AND count = CAST(count AS INTEGER)),
-    total_price REAL CHECK (total_price IS NULL OR total_price >= 0),
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
-  )`,
+  ...CHEKI_V2_SCHEMA_STATEMENTS,
 
   `CREATE TABLE IF NOT EXISTS user_config (
     id            TEXT PRIMARY KEY,
@@ -143,21 +125,6 @@ export const SCHEMA_STATEMENTS = [
     scheduled_for   TEXT NOT NULL,
     updated_at      TEXT NOT NULL
   )`,
-
-  `CREATE INDEX IF NOT EXISTS idx_cheki_sort_date
-    ON cheki (COALESCE(date, created_at) DESC, created_at DESC)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_cheki_artist_sort
-    ON cheki (artist_id, COALESCE(date, created_at) DESC, created_at DESC)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_cheki_event_sort
-    ON cheki (event_id, COALESCE(date, created_at) DESC, created_at DESC)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_cheki_manual_artist_sort
-    ON cheki_manual_entries (artist_id, COALESCE(date, created_at) DESC, created_at DESC)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_cheki_manual_event_sort
-    ON cheki_manual_entries (event_id, COALESCE(date, created_at) DESC, created_at DESC)`,
 
   `CREATE INDEX IF NOT EXISTS idx_important_dates_date
     ON important_dates (date ASC, updated_at DESC)`,

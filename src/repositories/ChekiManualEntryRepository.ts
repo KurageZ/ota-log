@@ -6,22 +6,28 @@ import {
 } from '../types/models';
 import { generateId } from '../utils/uuid';
 import { periodLikeParam, toISODateTime } from '../utils/date';
+import { DEFAULT_CHEKI_ASPECT_RATIO } from '../db/chekiV2Schema';
 
-interface MonthlyCountRow {
-  month: string;
-  count: number;
-}
+const MANUAL_PROJECTION = `SELECT
+  r.id,
+  r.artist_id,
+  r.event_id,
+  r.date,
+  SUM(CASE WHEN NOT EXISTS (
+    SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id
+  ) THEN 1 ELSE 0 END) AS count,
+  SUM(CASE WHEN NOT EXISTS (
+    SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id
+  ) THEN i.unit_price ELSE 0 END) AS total_price,
+  r.created_at,
+  r.updated_at
+FROM cheki_records r
+JOIN cheki_items i ON i.record_id = r.id`;
 
-interface ArtistRankingRow {
-  artist_id: string;
-  artist_name: string | null;
-  count: number;
-}
-
-interface EventPriceRow {
-  event_id: string;
-  total: number;
-}
+const MANUAL_GROUP = `GROUP BY
+  r.id, r.artist_id, r.event_id, r.date, r.quantity,
+  r.created_at, r.updated_at
+HAVING count > 0`;
 
 function assertValidCount(count: number): void {
   if (!Number.isInteger(count) || count < 1) {
@@ -30,98 +36,115 @@ function assertValidCount(count: number): void {
 }
 
 function assertValidTotalPrice(totalPrice: number | null | undefined): void {
-  if (totalPrice != null && (!Number.isFinite(totalPrice) || totalPrice < 0)) {
-    throw new Error('Cheki manual entry total_price must be null or a non-negative number');
+  if (
+    totalPrice != null
+    && (!Number.isInteger(totalPrice) || !Number.isFinite(totalPrice) || totalPrice < 0)
+  ) {
+    throw new Error('Cheki manual entry total_price must be null or a non-negative integer');
   }
 }
 
+function distributeTotalPrice(totalPrice: number, count: number): number[] {
+  const base = Math.floor(totalPrice / count);
+  const remainder = totalPrice % count;
+  return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
 export class ChekiManualEntryRepository {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private readonly db: SQLiteDatabase) {}
+
+  private async findWhere(
+    clause = '1 = 1',
+    params: Array<string | number | null> = [],
+  ): Promise<ChekiManualEntry[]> {
+    return this.db.getAllAsync<ChekiManualEntry>(
+      `${MANUAL_PROJECTION}
+       WHERE ${clause}
+       ${MANUAL_GROUP}
+       ORDER BY COALESCE(r.date, r.created_at) DESC, r.created_at DESC`,
+      params,
+    );
+  }
 
   async findAll(): Promise<ChekiManualEntry[]> {
-    return this.db.getAllAsync<ChekiManualEntry>(
-      'SELECT * FROM cheki_manual_entries ORDER BY COALESCE(date, created_at) DESC, created_at DESC'
-    );
+    return this.findWhere();
   }
 
   async findById(id: string): Promise<ChekiManualEntry | null> {
-    return this.db.getFirstAsync<ChekiManualEntry>(
-      'SELECT * FROM cheki_manual_entries WHERE id = ?',
-      [id]
-    );
+    return (await this.findWhere('r.id = ?', [id]))[0] ?? null;
   }
 
   async findByArtistId(artistId: string): Promise<ChekiManualEntry[]> {
-    return this.db.getAllAsync<ChekiManualEntry>(
-      'SELECT * FROM cheki_manual_entries WHERE artist_id = ? ORDER BY COALESCE(date, created_at) DESC, created_at DESC',
-      [artistId]
-    );
+    return this.findWhere('r.artist_id = ?', [artistId]);
   }
 
   async findByEventId(eventId: string): Promise<ChekiManualEntry[]> {
-    return this.db.getAllAsync<ChekiManualEntry>(
-      'SELECT * FROM cheki_manual_entries WHERE event_id = ? ORDER BY COALESCE(date, created_at) DESC, created_at DESC',
-      [eventId]
-    );
+    return this.findWhere('r.event_id = ?', [eventId]);
   }
 
   async findByDate(date: string): Promise<ChekiManualEntry[]> {
-    return this.db.getAllAsync<ChekiManualEntry>(
-      `SELECT *
-       FROM cheki_manual_entries
-       WHERE strftime('%Y-%m-%d', COALESCE(date, created_at)) = ?
-       ORDER BY COALESCE(date, created_at) DESC, created_at DESC`,
-      [date]
+    return this.findWhere(
+      "strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) = ?",
+      [date],
     );
   }
 
   async sumCountAll(): Promise<number> {
     const row = await this.db.getFirstAsync<{ total: number }>(
-      'SELECT COALESCE(SUM(count), 0) AS total FROM cheki_manual_entries'
+      `SELECT COUNT(*) AS total
+       FROM cheki_items i
+       WHERE NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)`,
     );
     return row?.total ?? 0;
   }
 
   async sumPriceAll(): Promise<number> {
     const row = await this.db.getFirstAsync<{ total: number }>(
-      'SELECT COALESCE(SUM(total_price), 0) AS total FROM cheki_manual_entries'
+      `SELECT COALESCE(SUM(i.unit_price), 0) AS total
+       FROM cheki_items i
+       WHERE NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)`,
     );
     return row?.total ?? 0;
   }
 
   async countByYear(year: number, month?: number): Promise<number> {
     const row = await this.db.getFirstAsync<{ total: number }>(
-      `SELECT COALESCE(SUM(count), 0) AS total
-       FROM cheki_manual_entries
-       WHERE strftime('%Y-%m', COALESCE(date, created_at)) LIKE ?`,
-      [periodLikeParam(year, month)]
+      `SELECT COUNT(*) AS total
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y-%m', COALESCE(r.date, r.created_at)) LIKE ?`,
+      [periodLikeParam(year, month)],
     );
     return row?.total ?? 0;
   }
 
   async sumPriceByYear(year: number, month?: number): Promise<number> {
     const row = await this.db.getFirstAsync<{ total: number }>(
-      `SELECT COALESCE(SUM(total_price), 0) AS total
-       FROM cheki_manual_entries
-       WHERE strftime('%Y-%m', COALESCE(date, created_at)) LIKE ?`,
-      [periodLikeParam(year, month)]
+      `SELECT COALESCE(SUM(i.unit_price), 0) AS total
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y-%m', COALESCE(r.date, r.created_at)) LIKE ?`,
+      [periodLikeParam(year, month)],
     );
     return row?.total ?? 0;
   }
 
   async getMonthlyCountsByYear(year: number): Promise<number[]> {
-    const rows = await this.db.getAllAsync<MonthlyCountRow>(
-      `SELECT strftime('%m', COALESCE(date, created_at)) AS month, COALESCE(SUM(count), 0) AS count
-       FROM cheki_manual_entries
-       WHERE strftime('%Y', COALESCE(date, created_at)) = ?
-       GROUP BY strftime('%m', COALESCE(date, created_at))`,
-      [String(year)]
+    const rows = await this.db.getAllAsync<{ month: string; count: number }>(
+      `SELECT
+         strftime('%m', COALESCE(r.date, r.created_at)) AS month,
+         COUNT(i.id) AS count
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE strftime('%Y', COALESCE(r.date, r.created_at)) = ?
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+       GROUP BY month`,
+      [String(year)],
     );
-    const monthMap = new Map(rows.map((row) => [row.month, row.count]));
-    return Array.from({ length: 12 }, (_, index) => {
-      const month = String(index + 1).padStart(2, '0');
-      return monthMap.get(month) ?? 0;
-    });
+    const counts = new Map(rows.map((row) => [row.month, row.count]));
+    return Array.from({ length: 12 }, (_, index) => counts.get(String(index + 1).padStart(2, '0')) ?? 0);
   }
 
   async groupByArtistYear(
@@ -129,20 +152,27 @@ export class ChekiManualEntryRepository {
     month?: number,
     limit = 6,
   ): Promise<Array<{ artistId: string; name: string; count: number }>> {
-    const rows = await this.db.getAllAsync<ArtistRankingRow>(
+    const rows = await this.db.getAllAsync<{
+      artist_id: string;
+      artist_name: string | null;
+      count: number;
+    }>(
       `SELECT
-         m.artist_id,
+         r.artist_id,
          a.name AS artist_name,
-         COALESCE(SUM(m.count), 0) AS count
-       FROM cheki_manual_entries m
-       LEFT JOIN artists a ON a.id = m.artist_id
-       WHERE strftime('%Y-%m', COALESCE(m.date, m.created_at)) LIKE ?
-       GROUP BY m.artist_id, a.name
-       ORDER BY count DESC, MAX(COALESCE(m.date, m.created_at)) DESC, a.name ASC
+         COUNT(i.id) AS count
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       LEFT JOIN artists a ON a.id = r.artist_id
+       WHERE r.artist_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y-%m', COALESCE(r.date, r.created_at)) LIKE ?
+       GROUP BY r.artist_id, a.name
+       HAVING count > 0
+       ORDER BY count DESC, MAX(COALESCE(r.date, r.created_at)) DESC, a.name ASC
        LIMIT ?`,
-      [periodLikeParam(year, month), limit]
+      [periodLikeParam(year, month), limit],
     );
-
     return rows.map((row) => ({
       artistId: row.artist_id,
       name: row.artist_name ?? '未知艺人',
@@ -152,61 +182,64 @@ export class ChekiManualEntryRepository {
 
   async countByArtistYear(year: number, artistId: string, month?: number): Promise<number> {
     const row = await this.db.getFirstAsync<{ total: number }>(
-      `SELECT COALESCE(SUM(count), 0) AS total
-       FROM cheki_manual_entries
-       WHERE artist_id = ?
-         AND strftime('%Y-%m', COALESCE(date, created_at)) LIKE ?`,
-      [artistId, periodLikeParam(year, month)]
+      `SELECT COUNT(i.id) AS total
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE r.artist_id = ?
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y-%m', COALESCE(r.date, r.created_at)) LIKE ?`,
+      [artistId, periodLikeParam(year, month)],
     );
     return row?.total ?? 0;
   }
 
   async getMonthlyCountsByArtistYear(year: number, artistId: string): Promise<number[]> {
-    const rows = await this.db.getAllAsync<MonthlyCountRow>(
-      `SELECT strftime('%m', COALESCE(date, created_at)) AS month, COALESCE(SUM(count), 0) AS count
-       FROM cheki_manual_entries
-       WHERE artist_id = ?
-         AND strftime('%Y', COALESCE(date, created_at)) = ?
-       GROUP BY strftime('%m', COALESCE(date, created_at))`,
-      [artistId, String(year)]
+    const rows = await this.db.getAllAsync<{ month: string; count: number }>(
+      `SELECT
+         strftime('%m', COALESCE(r.date, r.created_at)) AS month,
+         COUNT(i.id) AS count
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE r.artist_id = ?
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y', COALESCE(r.date, r.created_at)) = ?
+       GROUP BY month`,
+      [artistId, String(year)],
     );
-    const monthMap = new Map(rows.map((row) => [row.month, row.count]));
-    return Array.from({ length: 12 }, (_, index) => {
-      const month = String(index + 1).padStart(2, '0');
-      return monthMap.get(month) ?? 0;
-    });
+    const counts = new Map(rows.map((row) => [row.month, row.count]));
+    return Array.from({ length: 12 }, (_, index) => counts.get(String(index + 1).padStart(2, '0')) ?? 0);
   }
 
   async countDistinctArtistsByYear(year: number, month?: number): Promise<number> {
     const row = await this.db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(DISTINCT artist_id) AS count
-       FROM cheki_manual_entries
-       WHERE strftime('%Y-%m', COALESCE(date, created_at)) LIKE ?`,
-      [periodLikeParam(year, month)]
+      `SELECT COUNT(DISTINCT r.artist_id) AS count
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE r.artist_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y-%m', COALESCE(r.date, r.created_at)) LIKE ?`,
+      [periodLikeParam(year, month)],
     );
     return row?.count ?? 0;
   }
 
   async sumPriceByEventIdYear(year: number): Promise<Record<string, number>> {
-    const rows = await this.db.getAllAsync<EventPriceRow>(
-      `SELECT event_id, COALESCE(SUM(total_price), 0) AS total
-       FROM cheki_manual_entries
-       WHERE event_id IS NOT NULL
-         AND strftime('%Y', COALESCE(date, created_at)) = ?
-       GROUP BY event_id`,
-      [String(year)]
+    const rows = await this.db.getAllAsync<{ event_id: string; total: number }>(
+      `SELECT r.event_id, COALESCE(SUM(i.unit_price), 0) AS total
+       FROM cheki_records r
+       JOIN cheki_items i ON i.record_id = r.id
+       WHERE r.event_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id)
+         AND strftime('%Y', COALESCE(r.date, r.created_at)) = ?
+       GROUP BY r.event_id`,
+      [String(year)],
     );
-
-    return rows.reduce<Record<string, number>>((acc, row) => {
-      acc[row.event_id] = row.total;
-      return acc;
-    }, {});
+    return Object.fromEntries(rows.map((row) => [row.event_id, row.total]));
   }
 
   async create(input: CreateChekiManualEntryInput): Promise<ChekiManualEntry> {
     assertValidCount(input.count);
     assertValidTotalPrice(input.total_price);
-
     const now = toISODateTime();
     const entry: ChekiManualEntry = {
       id: generateId(),
@@ -218,30 +251,48 @@ export class ChekiManualEntryRepository {
       created_at: now,
       updated_at: now,
     };
-
-    await this.db.runAsync(
-      `INSERT INTO cheki_manual_entries
-         (id, artist_id, event_id, date, count, total_price, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        entry.id,
-        entry.artist_id,
-        entry.event_id,
-        entry.date,
-        entry.count,
-        entry.total_price,
-        entry.created_at,
-        entry.updated_at,
-      ]
-    );
-
+    const unitPrices = distributeTotalPrice(entry.total_price ?? 0, entry.count);
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `INSERT INTO cheki_records
+           (id, event_id, artist_id, date, quantity, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+        [
+          entry.id,
+          entry.event_id,
+          entry.artist_id,
+          entry.date,
+          entry.count,
+          entry.created_at,
+          entry.updated_at,
+        ],
+      );
+      for (let index = 0; index < entry.count; index += 1) {
+        await this.db.runAsync(
+          `INSERT INTO cheki_items
+             (id, record_id, sort_order, unit_price, display_aspect_ratio,
+              is_favorite, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
+          [generateId(), entry.id, index, unitPrices[index], DEFAULT_CHEKI_ASPECT_RATIO, now, now],
+        );
+      }
+    });
     return entry;
   }
 
   async update(id: string, input: UpdateChekiManualEntryInput): Promise<void> {
+    const imageCount = await this.db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count
+       FROM cheki_item_images image
+       JOIN cheki_items item ON item.id = image.item_id
+       WHERE item.record_id = ?`,
+      [id],
+    );
+    if ((imageCount?.count ?? 0) > 0) {
+      throw new Error('Partially or fully archived cheki records cannot be edited as manual entries');
+    }
     const fields: string[] = [];
     const values: Array<string | number | null> = [];
-
     if ('artist_id' in input && input.artist_id) {
       fields.push('artist_id = ?');
       values.push(input.artist_id);
@@ -254,29 +305,52 @@ export class ChekiManualEntryRepository {
       fields.push('date = ?');
       values.push(input.date ?? null);
     }
-    if ('count' in input && typeof input.count === 'number') {
-      assertValidCount(input.count);
-      fields.push('count = ?');
-      values.push(input.count);
-    }
-    if ('total_price' in input) {
-      assertValidTotalPrice(input.total_price);
-      fields.push('total_price = ?');
-      values.push(input.total_price ?? null);
-    }
-    if (fields.length === 0) return;
-
-    fields.push('updated_at = ?');
-    values.push(toISODateTime());
-    values.push(id);
-
-    await this.db.runAsync(
-      `UPDATE cheki_manual_entries SET ${fields.join(', ')} WHERE id = ?`,
-      values
+    const currentItems = await this.db.getAllAsync<{ id: string; unit_price: number }>(
+      'SELECT id, unit_price FROM cheki_items WHERE record_id = ? ORDER BY sort_order, id',
+      [id],
     );
+    const nextCount = input.count ?? currentItems.length;
+    assertValidCount(nextCount);
+    assertValidTotalPrice(input.total_price);
+    const nextTotal = 'total_price' in input
+      ? input.total_price ?? 0
+      : currentItems.reduce((sum, item) => sum + item.unit_price, 0);
+    const nextPrices = distributeTotalPrice(nextTotal, nextCount);
+    const now = toISODateTime();
+
+    await this.db.withTransactionAsync(async () => {
+      if (nextCount < currentItems.length) {
+        for (const item of currentItems.slice(nextCount)) {
+          await this.db.runAsync('DELETE FROM cheki_items WHERE id = ?', [item.id]);
+        }
+      }
+      fields.push('quantity = ?', 'updated_at = ?');
+      values.push(nextCount, now, id);
+      await this.db.runAsync(`UPDATE cheki_records SET ${fields.join(', ')} WHERE id = ?`, values);
+
+      for (let index = currentItems.length; index < nextCount; index += 1) {
+        await this.db.runAsync(
+          `INSERT INTO cheki_items
+             (id, record_id, sort_order, unit_price, display_aspect_ratio,
+              is_favorite, notes, created_at, updated_at)
+           VALUES (?, ?, ?, 0, ?, 0, NULL, ?, ?)`,
+          [generateId(), id, index, DEFAULT_CHEKI_ASPECT_RATIO, now, now],
+        );
+      }
+      const finalItems = await this.db.getAllAsync<{ id: string }>(
+        'SELECT id FROM cheki_items WHERE record_id = ? ORDER BY sort_order, id',
+        [id],
+      );
+      for (let index = 0; index < finalItems.length; index += 1) {
+        await this.db.runAsync(
+          'UPDATE cheki_items SET unit_price = ?, updated_at = ? WHERE id = ?',
+          [nextPrices[index], now, finalItems[index].id],
+        );
+      }
+    });
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.runAsync('DELETE FROM cheki_manual_entries WHERE id = ?', [id]);
+    await this.db.runAsync('DELETE FROM cheki_records WHERE id = ?', [id]);
   }
 }

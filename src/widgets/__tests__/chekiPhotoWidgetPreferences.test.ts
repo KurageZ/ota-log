@@ -22,9 +22,12 @@ function createCheki(id: string, artistId: string | null): Cheki {
     artist_id: artistId,
     event_id: null,
     photo_uri: `file:///${id}.jpg`,
+    front_photo_uri: `file:///${id}.jpg`,
+    back_photo_uri: null,
     date: null,
     price: null,
     notes: null,
+    is_favorite: 0,
     created_at: '2026-07-17T00:00:00.000Z',
   };
 }

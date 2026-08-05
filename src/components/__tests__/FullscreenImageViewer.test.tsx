@@ -5,17 +5,19 @@ import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
 jest.mock('react-native-image-viewing', () => ({
   __esModule: true,
-  default: ({ HeaderComponent, FooterComponent, imageIndex, imageHidden }: {
+  default: ({ HeaderComponent, FooterComponent, imageIndex, imageHidden, images, onImageIndexChange }: {
     HeaderComponent?: React.ComponentType<{ imageIndex: number }>;
     FooterComponent?: React.ComponentType<{ imageIndex: number }>;
     imageIndex: number;
     imageHidden?: boolean;
+    images: Array<{ uri: string }>;
+    onImageIndexChange?: (index: number) => void;
   }) => {
     const React = require('react');
     const { View } = require('react-native');
     return React.createElement(
       View,
-      { testID: 'image-viewing', imageHidden },
+      { testID: 'image-viewing', imageHidden, imageIndex, images, onImageIndexChange },
       HeaderComponent ? React.createElement(HeaderComponent, { imageIndex }) : null,
       FooterComponent ? React.createElement(FooterComponent, { imageIndex }) : null,
     );
@@ -135,6 +137,81 @@ describe('FullscreenImageViewer opening transition', () => {
     const deleteButton = renderer.root.findByProps({ accessibilityLabel: '删除图片' });
     act(() => deleteButton.props.onPress());
     expect(onDelete).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
+  });
+
+  test('switches to an alternate image from the shared header action', () => {
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[
+            { id: 'cheki-1:front', photoUri: 'file:///front.jpg' },
+            { id: 'cheki-2:front', photoUri: 'file:///second-front.jpg' },
+          ]}
+          selectedId="cheki-1:front"
+          onClose={jest.fn()}
+          getAlternateItem={(item) => item.photoUri === 'file:///front.jpg'
+            ? { ...item, photoUri: 'file:///back.jpg' }
+            : item.photoUri === 'file:///back.jpg'
+              ? { ...item, photoUri: 'file:///front.jpg' }
+              : null}
+          getAlternateActionLabel={(item) => item.photoUri === 'file:///front.jpg' ? '查看背面' : '查看正面'}
+        />,
+      );
+    });
+
+    const backButton = renderer.root.findByProps({ accessibilityLabel: '查看背面' });
+    act(() => backButton.props.onPress());
+
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.images).toEqual([
+      { uri: 'file:///back.jpg' },
+      { uri: 'file:///second-front.jpg' },
+    ]);
+    expect(renderer.root.findByProps({ accessibilityLabel: '查看正面' })).toBeTruthy();
+
+    const imageViewing = renderer.root.findByProps({ testID: 'image-viewing' });
+    act(() => imageViewing.props.onImageIndexChange(1));
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.images).toEqual([
+      { uri: 'file:///front.jpg' },
+      { uri: 'file:///second-front.jpg' },
+    ]);
+  });
+
+  test('keeps alternate-side metadata in sync when the source item updates', () => {
+    type ViewerItem = { id: string; photoUri: string; backUri: string; favorite: boolean };
+    const getAlternateItem = (item: ViewerItem) => item.photoUri === item.backUri
+      ? { ...item, photoUri: 'file:///front.jpg' }
+      : { ...item, photoUri: item.backUri };
+    const onClose = jest.fn();
+    const onToggleFavorite = jest.fn();
+    const render = (favorite: boolean) => (
+      <FullscreenImageViewer
+        visible
+        items={[{
+          id: 'cheki-1',
+          photoUri: 'file:///front.jpg',
+          backUri: 'file:///back.jpg',
+          favorite,
+        }]}
+        selectedId="cheki-1"
+        onClose={onClose}
+        getAlternateItem={getAlternateItem}
+        getAlternateActionLabel={(item) => item.photoUri === item.backUri ? '查看正面' : '查看背面'}
+        isFavorite={(item) => item.favorite}
+        onToggleFavorite={onToggleFavorite}
+      />
+    );
+
+    act(() => {
+      renderer = create(render(false));
+    });
+    act(() => renderer.root.findByProps({ accessibilityLabel: '查看背面' }).props.onPress());
+    expect(renderer.root.findByProps({ accessibilityLabel: '收藏这张拍立得' })).toBeTruthy();
+
+    act(() => renderer.update(render(true)));
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.images)
+      .toEqual([{ uri: 'file:///back.jpg' }]);
+    expect(renderer.root.findByProps({ accessibilityLabel: '取消收藏这张拍立得' })).toBeTruthy();
   });
 
   test('keeps the collapsed details pill closer to the iOS bottom safe area', () => {

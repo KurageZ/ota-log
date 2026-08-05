@@ -1,8 +1,15 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { SCHEMA_STATEMENTS } from './schema';
 import { insertBundledArtists } from './bundledArtistCatalog';
+import { CHEKI_V2_SCHEMA_STATEMENTS } from './chekiV2Schema';
+import {
+  LegacyChekiManualEntryRow,
+  LegacyChekiRow,
+  migrateLegacyChekiData,
+} from './legacyChekiMigration';
+import { generateId } from '../utils/uuid';
 
-const CURRENT_VERSION = 16;
+export const CURRENT_VERSION = 17;
 
 async function createImportantDateTables(db: SQLiteDatabase): Promise<void> {
   await db.runAsync(`CREATE TABLE IF NOT EXISTS important_dates (
@@ -52,6 +59,129 @@ async function createImportantDateTables(db: SQLiteDatabase): Promise<void> {
   await db.runAsync('CREATE INDEX IF NOT EXISTS idx_important_dates_source ON important_dates (source_kind)');
   await db.runAsync('CREATE INDEX IF NOT EXISTS idx_important_date_artists_artist ON important_date_artists (artist_id, important_date_id)');
   await db.runAsync('CREATE INDEX IF NOT EXISTS idx_important_date_anniversaries_item ON important_date_anniversary_rules (important_date_id, anniversary_kind, anniversary_value)');
+}
+
+async function migrateChekiV2(db: SQLiteDatabase): Promise<void> {
+  const existingTables = await db.getAllAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master
+     WHERE type = 'table' AND name IN ('cheki', 'cheki_manual_entries')`,
+  );
+  const tableNames = new Set(existingTables.map((table) => table.name));
+  const [cheki, manualEntries, eventDates] = await Promise.all([
+    tableNames.has('cheki')
+      ? db.getAllAsync<LegacyChekiRow>(
+          `SELECT id, event_id, artist_id, photo_uri, date, price, notes, created_at
+           FROM cheki`,
+        )
+      : Promise.resolve([]),
+    tableNames.has('cheki_manual_entries')
+      ? db.getAllAsync<LegacyChekiManualEntryRow>(
+          `SELECT id, artist_id, event_id, date, count, total_price, created_at, updated_at
+           FROM cheki_manual_entries`,
+        )
+      : Promise.resolve([]),
+    db.getAllAsync<{ id: string; event_date: string }>(
+      'SELECT id, event_date FROM events',
+    ),
+  ]);
+  const migrated = migrateLegacyChekiData(
+    {
+      cheki,
+      manualEntries,
+      eventDatesById: new Map(eventDates.map((event) => [event.id, event.event_date])),
+    },
+    { generateId },
+  );
+  const expectedQuantity = cheki.length
+    + manualEntries.reduce((sum, entry) => sum + entry.count, 0);
+
+  await db.withTransactionAsync(async () => {
+    for (const statement of CHEKI_V2_SCHEMA_STATEMENTS) {
+      await db.runAsync(statement);
+    }
+    for (const record of migrated.records) {
+      await db.runAsync(
+        `INSERT INTO cheki_records
+           (id, event_id, artist_id, date, quantity, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          record.id,
+          record.event_id,
+          record.artist_id,
+          record.date,
+          record.quantity,
+          record.notes,
+          record.created_at,
+          record.updated_at,
+        ],
+      );
+    }
+    for (const item of migrated.items) {
+      await db.runAsync(
+        `INSERT INTO cheki_items
+           (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          item.id,
+          item.record_id,
+          item.sort_order,
+          item.unit_price,
+          item.display_aspect_ratio,
+          item.is_favorite,
+          item.notes,
+          item.created_at,
+          item.updated_at,
+        ],
+      );
+    }
+    for (const image of migrated.images) {
+      await db.runAsync(
+        `INSERT INTO cheki_item_images
+           (id, item_id, side, photo_uri, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          image.id,
+          image.item_id,
+          image.side,
+          image.photo_uri,
+          image.created_at,
+          image.updated_at,
+        ],
+      );
+    }
+
+    const quantityRow = await db.getFirstAsync<{ total: number }>(
+      'SELECT COALESCE(SUM(quantity), 0) AS total FROM cheki_records',
+    );
+    if ((quantityRow?.total ?? 0) !== expectedQuantity) {
+      throw new Error('Cheki v2 migration quantity verification failed');
+    }
+    const itemRow = await db.getFirstAsync<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM cheki_items',
+    );
+    if ((itemRow?.total ?? 0) !== expectedQuantity) {
+      throw new Error('Cheki v2 migration item verification failed');
+    }
+    const imageRow = await db.getFirstAsync<{ total: number }>(
+      `SELECT COUNT(*) AS total
+       FROM cheki_item_images
+       WHERE side = 'front'`,
+    );
+    if ((imageRow?.total ?? 0) !== cheki.length) {
+      throw new Error('Cheki v2 migration image verification failed');
+    }
+    const foreignKeyErrors = await db.getAllAsync<Record<string, unknown>>(
+      'PRAGMA foreign_key_check',
+    );
+    if (foreignKeyErrors.length > 0) {
+      throw new Error('Cheki v2 migration foreign key verification failed');
+    }
+
+    if (tableNames.has('cheki')) await db.runAsync('DROP TABLE cheki');
+    if (tableNames.has('cheki_manual_entries')) {
+      await db.runAsync('DROP TABLE cheki_manual_entries');
+    }
+  });
 }
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
@@ -170,6 +300,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 16) {
       await createImportantDateTables(db);
+    }
+    if (version < 17) {
+      await migrateChekiV2(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

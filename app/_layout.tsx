@@ -78,7 +78,9 @@ function RootNavigator() {
       <Stack.Screen name="artists/new" options={{ presentation: 'modal', title: '新建艺人' }} />
       <Stack.Screen name="artists/[id]/index" options={{ title: '艺人详情' }} />
       <Stack.Screen name="artists/[id]/edit" options={{ presentation: 'modal', title: '编辑艺人' }} />
-      <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得' }} />
+      <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得记录' }} />
+      <Stack.Screen name="cheki/records/[id]/index" options={{ title: '拍立得记录' }} />
+      <Stack.Screen name="cheki/records/[id]/edit" options={{ presentation: 'modal', title: '编辑拍立得记录' }} />
       <Stack.Screen name="cheki/[id]/edit" options={{ presentation: 'modal', title: '编辑拍立得' }} />
       <Stack.Screen name="cheki/manual/new" options={{ presentation: 'modal', title: '添加记录' }} />
       <Stack.Screen name="cheki/manual/[id]/edit" options={{ presentation: 'modal', title: '编辑记录' }} />

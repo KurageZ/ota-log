@@ -30,6 +30,7 @@ describe('chekiViewPreferences', () => {
       mode: 'artist',
       sortOrder: 'desc',
       density: 'small',
+      showRecordThumbnails: true,
     });
   });
 
@@ -38,29 +39,34 @@ describe('chekiViewPreferences', () => {
       mode: 'artist',
       sortOrder: 'desc',
       density: 'large',
+      showRecordThumbnails: true,
     });
     expect(sanitizeChekiViewPreferences({ organization: 'artist', display: 'grid', columns: 4 })).toEqual({
       mode: 'artist',
       sortOrder: 'desc',
       density: 'medium',
+      showRecordThumbnails: true,
     });
     expect(sanitizeChekiViewPreferences({ organization: 'artist', display: 'grid', columns: 5 })).toEqual({
       mode: 'artist',
       sortOrder: 'desc',
       density: 'small',
+      showRecordThumbnails: true,
     });
   });
 
   it('migrates old time stack and time grid preferences to the new modes', () => {
     expect(sanitizeChekiViewPreferences({ organization: 'time', display: 'stack', density: 'medium' })).toEqual({
-      mode: 'date',
+      mode: 'record',
       sortOrder: 'desc',
       density: 'medium',
+      showRecordThumbnails: true,
     });
     expect(sanitizeChekiViewPreferences({ organization: 'time', display: 'grid', density: 'small' })).toEqual({
       mode: 'album',
       sortOrder: 'desc',
       density: 'small',
+      showRecordThumbnails: true,
     });
   });
 
@@ -72,9 +78,24 @@ describe('chekiViewPreferences', () => {
     }));
 
     await expect(loadChekiViewPreferences()).resolves.toEqual({
-      mode: 'date',
+      mode: 'record',
       sortOrder: 'asc',
       density: 'medium',
+      showRecordThumbnails: true,
+    });
+  });
+
+  it('preserves the record thumbnail preference', () => {
+    expect(sanitizeChekiViewPreferences({
+      mode: 'record',
+      sortOrder: 'desc',
+      density: 'medium',
+      showRecordThumbnails: false,
+    })).toEqual({
+      mode: 'record',
+      sortOrder: 'desc',
+      density: 'medium',
+      showRecordThumbnails: false,
     });
   });
 
@@ -85,11 +106,21 @@ describe('chekiViewPreferences', () => {
   });
 
   it('saves sanitized preferences under the cheki view storage key', async () => {
-    await saveChekiViewPreferences({ mode: 'album', sortOrder: 'asc', density: 'small' });
+    await saveChekiViewPreferences({
+      mode: 'album',
+      sortOrder: 'asc',
+      density: 'small',
+      showRecordThumbnails: false,
+    });
 
     expect(mockedAsyncStorage.setItem).toHaveBeenCalledWith(
       CHEKI_VIEW_PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ mode: 'album', sortOrder: 'asc', density: 'small' }),
+      JSON.stringify({
+        mode: 'album',
+        sortOrder: 'asc',
+        density: 'small',
+        showRecordThumbnails: false,
+      }),
     );
   });
 });

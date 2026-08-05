@@ -871,7 +871,7 @@ export default function CalendarScreen() {
             oshiArtistId={oshiArtistId}
             showArtistMeta
             title={null}
-            onPressEntry={(entry) => router.push(`/cheki/manual/${entry.id}/edit`)}
+            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
         </CalendarDetailCard>
       ) : null}

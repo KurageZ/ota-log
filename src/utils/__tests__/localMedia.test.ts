@@ -86,11 +86,22 @@ describe('rebaseLegacyLocalMediaUris', () => {
     db.prepare(
       'INSERT INTO photos (id, event_id, local_uri, created_at) VALUES (?, NULL, ?, ?)',
     ).run('photo-1', `${oldBase}${files.event}`, '2026-01-01T00:00:00.000Z');
+    const now = '2026-01-01T00:00:00.000Z';
     db.prepare(
-      `INSERT INTO cheki
-       (id, event_id, artist_id, photo_uri, created_at)
-       VALUES (?, NULL, NULL, ?, ?)`,
-    ).run('cheki-1', `${oldBase}${files.cheki}`, '2026-01-01T00:00:00.000Z');
+      `INSERT INTO cheki_records
+       (id, quantity, created_at, updated_at)
+       VALUES ('record-1', 1, ?, ?)`,
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO cheki_items
+       (id, record_id, sort_order, created_at, updated_at)
+       VALUES ('item-1', 'record-1', 0, ?, ?)`,
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO cheki_item_images
+       (id, item_id, side, photo_uri, created_at, updated_at)
+       VALUES ('image-1', 'item-1', 'back', ?, ?, ?)`,
+    ).run(`${oldBase}${files.cheki}`, now, now);
     db.prepare(
       `INSERT INTO user_config (id, name, avatar_uri, avatar_emoji, updated_at)
        VALUES ('default', 'Otaku', ?, '🎤', ?)`,
@@ -106,7 +117,7 @@ describe('rebaseLegacyLocalMediaUris', () => {
     expect(db.prepare('SELECT local_uri FROM photos').get()).toEqual({
       local_uri: `${CURRENT_DOCUMENT_URI}${files.event}`,
     });
-    expect(db.prepare('SELECT photo_uri FROM cheki').get()).toEqual({
+    expect(db.prepare('SELECT photo_uri FROM cheki_item_images').get()).toEqual({
       photo_uri: `${CURRENT_DOCUMENT_URI}${files.cheki}`,
     });
     expect(db.prepare('SELECT avatar_uri FROM user_config').get()).toEqual({
