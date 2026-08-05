@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.otalog",
+      "bundleIdentifier": "com.otalog.app",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true
       }
@@ -21,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.otalog"
+      "package": "com.otalog.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
