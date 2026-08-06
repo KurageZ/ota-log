@@ -4,6 +4,7 @@ export interface EventDraft {
   prefill: EventFormPrefill | null;
   photoUris: string[];
   showPrefillNotice: boolean;
+  prefillWarning?: string | null;
 }
 
 let draft: EventDraft | null = null;

@@ -35,7 +35,10 @@ import {
   fetchImportedEvent,
   IEVENT_URL_RE,
 } from '../../src/utils/ievent/importEvent';
-import { prepareImportedEventDraft } from '../../src/utils/importedEventDraft';
+import {
+  applyImportedTimetableArtistResolutions,
+  prepareImportedEventDraft,
+} from '../../src/utils/importedEventDraft';
 import type { ParsedEventDraftResult } from '../../src/utils/parsedEventDraft';
 
 // ── ParseModal ────────────────────────────────────────────────────────────────
@@ -507,6 +510,7 @@ export default function NewEventScreen() {
   const [artistConfirmInteractive, setArtistConfirmInteractive] = useState(false);
   const [pendingMatchedIds, setPendingMatchedIds] = useState<string[]>([]);
   const [pendingFields, setPendingFields] = useState<EventFormPrefill | null>(null);
+  const [pendingPrefillWarning, setPendingPrefillWarning] = useState<string | null>(null);
   const confirmVisibilityTaskRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
   const confirmInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -526,8 +530,9 @@ export default function NewEventScreen() {
     prefill: EventFormPrefill | null,
     showPrefillNotice: boolean,
     photoUris: string[] = pendingPhotoUris,
+    prefillWarning: string | null = null,
   ) => {
-    setEventDraft({ prefill, photoUris, showPrefillNotice });
+    setEventDraft({ prefill, photoUris, showPrefillNotice, prefillWarning });
     router.replace('/events/create');
   };
 
@@ -576,11 +581,13 @@ export default function NewEventScreen() {
   const applyDraftResult = (
     draft: ParsedEventDraftResult,
     photoUris: string[] = pendingPhotoUris,
+    prefillWarning: string | null = null,
   ) => {
     const { matchedIds, candidates, fields, shouldConfirmArtists } = draft;
     if (shouldConfirmArtists) {
       setPendingMatchedIds(matchedIds);
       setPendingFields(fields);
+      setPendingPrefillWarning(prefillWarning);
       setArtistCandidates(candidates);
       setArtistConfirmInteractive(false);
       confirmVisibilityTaskRef.current?.cancel();
@@ -601,6 +608,7 @@ export default function NewEventScreen() {
         { ...fields, ...(matchedIds.length ? { artist_ids: matchedIds } : {}) },
         true,
         photoUris,
+        prefillWarning,
       );
     }
   };
@@ -656,7 +664,10 @@ export default function NewEventScreen() {
           setPendingPhotoUris(nextPhotoUris);
         }
 
-        applyDraftResult(handoff.draft, nextPhotoUris);
+        const prefillWarning = result.event.partialFailures.length > 0
+          ? `以下场次仅使用父活动摘要预填，详细时间表未能完整获取：${result.event.partialFailures.join('、')}`
+          : null;
+        applyDraftResult(handoff.draft, nextPhotoUris, prefillWarning);
       } finally {
         setParseLoading(false);
       }
@@ -719,18 +730,31 @@ export default function NewEventScreen() {
       .map((candidate) => candidate.resolution)
       .filter((resolution) => resolution !== 'create' && resolution !== 'skip');
     const newIds: string[] = [];
+    const timetableResolutions = new Map<string, string>();
 
     for (const c of selected) {
       const { name, short_name } = splitArtistHandle(c.editName.trim() || c.rawName);
       const newArtist = await db.artists.create({ name, short_name });
       newIds.push(newArtist.id);
+      timetableResolutions.set(c.rawName.trim(), newArtist.id);
       setAllArtists((prev) => [...prev, newArtist]);
     }
 
+    for (const candidate of confirmed) {
+      if (candidate.resolution !== 'create' && candidate.resolution !== 'skip') {
+        timetableResolutions.set(candidate.rawName.trim(), candidate.resolution);
+      }
+    }
+
     const allIds = [...new Set([...pendingMatchedIds, ...resolvedIds, ...newIds])];
+    const resolvedFields = pendingFields
+      ? applyImportedTimetableArtistResolutions(pendingFields, timetableResolutions)
+      : pendingFields;
     openCreateForm(
-      { ...pendingFields, ...(allIds.length ? { artist_ids: allIds } : {}) },
+      { ...resolvedFields, ...(allIds.length ? { artist_ids: allIds } : {}) },
       true,
+      pendingPhotoUris,
+      pendingPrefillWarning,
     );
   };
 

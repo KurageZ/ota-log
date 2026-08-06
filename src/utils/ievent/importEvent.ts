@@ -17,11 +17,20 @@ interface SourcePerformer {
   name: string;
 }
 
+interface SourceTimetableEntry {
+  title: string;
+  startTime: string | null;
+  endTime: string | null;
+  notes: string | null;
+  artistName: string | null;
+}
+
 interface SourceEvent {
   title: string | null;
   date: string | null;
   openTime: string | null;
   startTime: string | null;
+  endTime: string | null;
   description: string | null;
   coverUrl: string | null;
   officialUrl: string | null;
@@ -32,13 +41,41 @@ interface SourceEvent {
   tags: string[];
   tickets: SourceTicket[];
   performers: SourcePerformer[];
+  timetable: SourceTimetableEntry[];
+  timetableImageUrls: string[];
+  childEvents: Record<string, unknown>[];
+}
+
+export interface ImportedEventTimetableEntry {
+  title: string;
+  startTime: string | null;
+  endTime: string | null;
+  notes: string | null;
+  artistName: string | null;
+}
+
+export interface ImportedEventSession {
+  sourceEventId: number;
+  title: string;
+  sessionDate: string;
+  endDate: string | null;
+  openTime: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  city: string | null;
+  venue: string | null;
+  timetable: ImportedEventTimetableEntry[];
+  sourceDetails: string;
 }
 
 export interface ImportedEventPage {
   sourceUrl: string;
   coverUrl: string | null;
+  photoUrls: string[];
   details: string;
   parsed: ParsedAnnouncement;
+  sessions: ImportedEventSession[];
+  partialFailures: string[];
 }
 
 export type FetchImportedEventResult =
@@ -96,6 +133,20 @@ function asSafeCoverUrl(value: unknown): string | null {
   try {
     const url = new URL(raw);
     return url.protocol === 'https:' && url.hostname.toLowerCase() === 'image.ievent.life'
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function asSafeTimetableImageUrl(value: unknown): string | null {
+  const raw = asString(value);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:'
+      && url.hostname.toLowerCase() === 'idols-events.oss-cn-hangzhou.aliyuncs.com'
       ? url.toString()
       : null;
   } catch {
@@ -301,14 +352,67 @@ function parseTickets(props: Record<string, unknown> | null): SourceTicket[] {
   });
 }
 
+function parseTimeRange(value: unknown): { startTime: string | null; endTime: string | null } {
+  const raw = asString(value);
+  if (!raw) return { startTime: null, endTime: null };
+  const times = raw.match(/\b\d{1,2}:\d{2}\b/gu) ?? [];
+  const normalize = (time: string | undefined) => {
+    if (!time) return null;
+    const [hour, minute] = time.split(':');
+    return `${hour.padStart(2, '0')}:${minute}`;
+  };
+  return {
+    startTime: normalize(times[0]),
+    endTime: normalize(times[1]),
+  };
+}
+
+function parseTimetable(props: Record<string, unknown> | null): {
+  entries: SourceTimetableEntry[];
+  imageUrls: string[];
+} {
+  const entries: SourceTimetableEntry[] = [];
+  const imageUrls: string[] = [];
+
+  for (const timetable of asRecords(props?.timetable)) {
+    const value = asRecord(timetable.value);
+    if (value?.type === 'image') {
+      const imageUrl = asSafeTimetableImageUrl(value.value);
+      if (imageUrl) imageUrls.push(imageUrl);
+    }
+
+    const addition = asRecord(timetable.property_addition);
+    for (const section of asRecords(addition?.sections)) {
+      const title = asString(section.title);
+      if (!title) continue;
+      const range = parseTimeRange(section.time_range);
+      const tokutenRange = asString(section.tokuten_time_range);
+      entries.push({
+        title,
+        startTime: range.startTime,
+        endTime: range.endTime,
+        notes: tokutenRange ? `特典会时间：${tokutenRange}` : null,
+        artistName: asString(section.type) === 'person' ? title : null,
+      });
+    }
+  }
+
+  return {
+    entries,
+    imageUrls: [...new Set(imageUrls)],
+  };
+}
+
 function sourceFromOriginal(event: Record<string, unknown> | null): SourceEvent {
   const props = asRecord(event?.props);
   const location = asRecords(event?.locations)[0] ?? null;
+  const timetable = parseTimetable(props);
   return {
     title: asString(event?.title),
     date: asString(event?.date),
     openTime: firstPropValue(props, 'openTime'),
     startTime: firstPropValue(props, 'startTime'),
+    endTime: firstPropValue(props, 'endTime'),
     description: asString(event?.description),
     coverUrl: asSafeCoverUrl(event?.cover),
     officialUrl: firstPropValue(props, 'officialSite'),
@@ -324,6 +428,9 @@ function sourceFromOriginal(event: Record<string, unknown> | null): SourceEvent 
       const name = asString(person.name);
       return name ? [{ name }] : [];
     }),
+    timetable: timetable.entries,
+    timetableImageUrls: timetable.imageUrls,
+    childEvents: asRecords(props?.childEvent),
   };
 }
 
@@ -341,6 +448,7 @@ function sourceFromJsonLd(event: Record<string, unknown> | null): SourceEvent {
     date: start.date,
     openTime: null,
     startTime: start.time,
+    endTime: null,
     description: null,
     coverUrl: Array.isArray(event?.image)
       ? asSafeCoverUrl(event.image[0])
@@ -356,6 +464,9 @@ function sourceFromJsonLd(event: Record<string, unknown> | null): SourceEvent {
       const name = asString(person.name);
       return name ? [{ name }] : [];
     }),
+    timetable: [],
+    timetableImageUrls: [],
+    childEvents: [],
   };
 }
 
@@ -365,6 +476,7 @@ function preferPrimary(primary: SourceEvent, fallback: SourceEvent): SourceEvent
     date: primary.date ?? fallback.date,
     openTime: primary.openTime,
     startTime: primary.startTime ?? fallback.startTime,
+    endTime: primary.endTime,
     description: primary.description ?? fallback.description,
     coverUrl: primary.coverUrl ?? fallback.coverUrl,
     officialUrl: primary.officialUrl,
@@ -375,6 +487,9 @@ function preferPrimary(primary: SourceEvent, fallback: SourceEvent): SourceEvent
     tags: primary.tags.length > 0 ? primary.tags : fallback.tags,
     tickets: primary.tickets.length > 0 ? primary.tickets : fallback.tickets,
     performers: primary.performers.length > 0 ? primary.performers : fallback.performers,
+    timetable: primary.timetable,
+    timetableImageUrls: primary.timetableImageUrls,
+    childEvents: primary.childEvents,
   };
 }
 
@@ -402,6 +517,7 @@ function buildDetails(source: SourceEvent, ticketPrice: number | null): string {
   const facts: string[] = [];
   if (source.openTime) facts.push(`开场：${source.openTime}`);
   if (source.startTime) facts.push(`开演：${source.startTime}`);
+  if (source.endTime) facts.push(`结束：${source.endTime}`);
   if (source.tickets.length > 0) {
     facts.push(`票价：${source.tickets
       .map((ticket) => `${ticket.name} ¥${formatMoney(ticket.price)}`)
@@ -422,6 +538,78 @@ function buildDetails(source: SourceEvent, ticketPrice: number | null): string {
   return sections.join('\n\n');
 }
 
+function stripParentTitle(parentTitle: string, childTitle: string): string {
+  let parentIndex = 0;
+  let childIndex = 0;
+  while (parentIndex < parentTitle.length && childIndex < childTitle.length) {
+    if (/\s/u.test(parentTitle[parentIndex])) {
+      parentIndex += 1;
+      continue;
+    }
+    if (/\s/u.test(childTitle[childIndex])) {
+      childIndex += 1;
+      continue;
+    }
+    if (parentTitle[parentIndex] !== childTitle[childIndex]) return childTitle;
+    parentIndex += 1;
+    childIndex += 1;
+  }
+  while (parentIndex < parentTitle.length && /\s/u.test(parentTitle[parentIndex])) parentIndex += 1;
+  if (parentIndex !== parentTitle.length) return childTitle;
+  const remainder = childTitle.slice(childIndex).trim();
+  return remainder || childTitle;
+}
+
+function toImportedSession(
+  source: SourceEvent,
+  sourceEventId: number,
+  title: string,
+  fallback: SourceEvent | null = null,
+): ImportedEventSession | null {
+  const sessionDate = source.date ?? fallback?.date;
+  if (!sessionDate) return null;
+  const ticketPrice = source.tickets.length > 0
+    ? Math.min(...source.tickets.map((ticket) => ticket.price + ticket.mandatoryAddition))
+    : null;
+  return {
+    sourceEventId,
+    title,
+    sessionDate,
+    endDate: null,
+    openTime: source.openTime,
+    startTime: source.startTime ?? source.openTime,
+    endTime: source.endTime,
+    city: cityFromSource(source) ?? (fallback ? cityFromSource(fallback) : null),
+    venue: source.locationName ?? fallback?.locationName ?? null,
+    timetable: source.timetable.map((entry) => ({ ...entry })),
+    sourceDetails: buildDetails(source, ticketPrice),
+  };
+}
+
+function uniquePerformerNames(sources: SourceEvent[]): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const source of sources) {
+    for (const performer of source.performers) {
+      const key = performer.name.trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      names.push(key);
+    }
+    for (const entry of source.timetable) {
+      const key = entry.artistName?.trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      names.push(key);
+    }
+  }
+  return names;
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
 export function parseImportedEventPage(html: string, inputUrl: string): ImportedEventPage | null {
   const normalizedUrl = normalizeEventUrl(inputUrl);
   if (!normalizedUrl || !html || html.length > MAX_HTML_LENGTH) return null;
@@ -437,27 +625,64 @@ export function parseImportedEventPage(html: string, inputUrl: string): Imported
   const ticketPrice = source.tickets.length > 0
     ? Math.min(...source.tickets.map((ticket) => ticket.price + ticket.mandatoryAddition))
     : null;
-  const eventTime = source.startTime ?? source.openTime;
   const details = buildDetails(source, ticketPrice);
+  const childSources = source.childEvents.map((child) => ({
+    eventId: asNumber(child.event_id),
+    source: sourceFromOriginal(child),
+  })).filter((child): child is { eventId: number; source: SourceEvent } => (
+    child.eventId != null && Number.isSafeInteger(child.eventId) && child.eventId > 0
+  ));
+  const sessions = childSources.length > 0
+    ? childSources.flatMap(({ eventId, source: childSource }) => {
+        if (!childSource.title) return [];
+        const session = toImportedSession(
+          childSource,
+          eventId,
+          stripParentTitle(source.title!, childSource.title),
+          source,
+        );
+        return session ? [session] : [];
+      })
+    : [toImportedSession(source, normalizedUrl.eventId, '')].filter(
+        (session): session is ImportedEventSession => session != null,
+      );
+  if (sessions.length === 0) return null;
+
+  const performerNames = uniquePerformerNames([
+    source,
+    ...childSources.map((child) => child.source),
+  ]);
+  const firstSession = sessions[0];
+  const photoUrls = uniqueStrings([
+    source.coverUrl,
+    ...source.timetableImageUrls,
+    ...childSources.flatMap((child) => [
+      child.source.coverUrl,
+      ...child.source.timetableImageUrls,
+    ]),
+  ]);
 
   return {
     sourceUrl: normalizedUrl.sourceUrl,
     coverUrl: source.coverUrl,
+    photoUrls,
     details,
     parsed: {
       title: source.title,
-      event_date: source.date,
-      event_time: eventTime,
-      city: cityFromSource(source),
-      venue: source.locationName,
+      event_date: firstSession.sessionDate,
+      event_time: firstSession.startTime,
+      city: firstSession.city,
+      venue: firstSession.venue,
       artist: null,
       ticket_price: ticketPrice,
-      artist_mentions: source.performers.map((performer, order) => ({
-        rawName: performer.name,
+      artist_mentions: performerNames.map((name, order) => ({
+        rawName: name,
         source: 'lineup',
         order,
       })),
     },
+    sessions,
+    partialFailures: [],
   };
 }
 
@@ -513,6 +738,69 @@ async function readResponseTextWithLimit(
   }
 }
 
+async function fetchImportedEventPage(
+  sourceUrl: string,
+  fetcher: FetchLike,
+  signal: AbortSignal,
+): Promise<{ ok: true; event: ImportedEventPage } | { ok: false; message: string }> {
+  try {
+    const response = await fetcher(sourceUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+      signal,
+    });
+    if (!response.ok) {
+      return { ok: false, message: `请求失败（HTTP ${response.status}）。` };
+    }
+    if (!isAllowedResponseUrl(response.url)) {
+      return { ok: false, message: '页面跳转到了不受支持的地址。' };
+    }
+    const html = await readResponseTextWithLimit(response, MAX_HTML_LENGTH);
+    const event = parseImportedEventPage(html, sourceUrl);
+    return event
+      ? { ok: true, event }
+      : { ok: false, message: '页面中没有找到足够的活动信息。' };
+  } catch (error) {
+    const message = error instanceof ResponseTooLargeError
+      ? error.message
+      : error instanceof Error && (error.name === 'AbortError' || signal.aborted)
+        ? '请求超时。'
+        : `请求失败：${error instanceof Error ? error.message : String(error)}`;
+    return { ok: false, message };
+  }
+}
+
+function combineImportedDetails(
+  rootDetails: string,
+  childDetails: Array<{ title: string; details: string }>,
+): string {
+  const sections = rootDetails ? [rootDetails] : [];
+  for (const child of childDetails) {
+    if (child.details) sections.push(`【${child.title}】\n${child.details}`);
+  }
+  return sections.join('\n\n');
+}
+
+function mergeArtistMentions(
+  events: ImportedEventPage[],
+): ParsedAnnouncement['artist_mentions'] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const event of events) {
+    for (const mention of event.parsed.artist_mentions) {
+      const name = mention.rawName.trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      names.push(name);
+    }
+  }
+  return names.map((rawName, order) => ({ rawName, source: 'lineup', order }));
+}
+
 export async function fetchImportedEvent(
   inputUrl: string,
   fetcher: FetchLike = expoFetch as FetchLike,
@@ -525,33 +813,71 @@ export async function fetchImportedEvent(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetcher(normalizedUrl.sourceUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
+    const rootResult = await fetchImportedEventPage(
+      normalizedUrl.sourceUrl,
+      fetcher,
+      controller.signal,
+    );
+    if (!rootResult.ok) return rootResult;
+
+    const root = rootResult.event;
+    const childSessions = root.sessions.filter(
+      (session) => session.sourceEventId !== normalizedUrl.eventId,
+    );
+    if (childSessions.length === 0) return rootResult;
+
+    const childResults = await Promise.all(childSessions.map(async (summary) => ({
+      summary,
+      result: await fetchImportedEventPage(
+        `https://ievent.life/event/${summary.sourceEventId}`,
+        fetcher,
+        controller.signal,
+      ),
+    })));
+
+    const importedChildren: ImportedEventPage[] = [];
+    const details: Array<{ title: string; details: string }> = [];
+    const partialFailures: string[] = [];
+    const sessions = childResults.map(({ summary, result }) => {
+      if (!result.ok || result.event.sessions.length === 0) {
+        partialFailures.push(summary.title || `子活动 ${summary.sourceEventId}`);
+        details.push({ title: summary.title, details: summary.sourceDetails });
+        return summary;
+      }
+      importedChildren.push(result.event);
+      details.push({ title: summary.title, details: result.event.details });
+      return {
+        ...result.event.sessions[0],
+        sourceEventId: summary.sourceEventId,
+        title: summary.title,
+      };
     });
-    if (!response.ok) {
-      return { ok: false, message: `请求失败（HTTP ${response.status}）。` };
-    }
-    if (!isAllowedResponseUrl(response.url)) {
-      return { ok: false, message: '页面跳转到了不受支持的地址。' };
-    }
-    const html = await readResponseTextWithLimit(response, MAX_HTML_LENGTH);
-    const event = parseImportedEventPage(html, normalizedUrl.sourceUrl);
-    return event
-      ? { ok: true, event }
-      : { ok: false, message: '页面中没有找到足够的活动信息。' };
-  } catch (error) {
-    const message = error instanceof ResponseTooLargeError
-      ? error.message
-      : error instanceof Error && (error.name === 'AbortError' || controller.signal.aborted)
-        ? '请求超时。'
-        : `请求失败：${error instanceof Error ? error.message : String(error)}`;
-    return { ok: false, message };
+    const allEvents = [root, ...importedChildren];
+    const admissionCosts = allEvents
+      .map((event) => event.parsed.ticket_price)
+      .filter((value): value is number => value != null);
+    const actualExpense = admissionCosts.length > 0 ? Math.min(...admissionCosts) : null;
+    const firstSession = sessions[0];
+
+    return {
+      ok: true,
+      event: {
+        ...root,
+        details: combineImportedDetails(root.details, details),
+        photoUrls: uniqueStrings(allEvents.flatMap((event) => event.photoUrls)),
+        sessions,
+        partialFailures,
+        parsed: {
+          ...root.parsed,
+          event_date: firstSession.sessionDate,
+          event_time: firstSession.startTime,
+          city: firstSession.city,
+          venue: firstSession.venue,
+          ticket_price: actualExpense,
+          artist_mentions: mergeArtistMentions(allEvents),
+        },
+      },
+    };
   } finally {
     clearTimeout(timeout);
   }

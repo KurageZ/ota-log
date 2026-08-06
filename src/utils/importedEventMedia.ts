@@ -5,22 +5,27 @@ export type RemoteFileDownloader = (
   filenamePrefix: string,
 ) => Promise<string | null>;
 
-export interface ImportedEventCoverResult {
+export interface ImportedEventMediaResult {
   photoUris: string[];
   downloadFailed: boolean;
 }
 
-export async function appendImportedEventCover(
+export async function appendImportedEventMedia(
   photoUris: string[],
-  coverUrl: string | null,
+  mediaUrls: string[],
   downloader: RemoteFileDownloader = downloadRemoteFile,
-): Promise<ImportedEventCoverResult> {
-  if (!coverUrl) {
+): Promise<ImportedEventMediaResult> {
+  const uniqueUrls = [...new Set(mediaUrls)];
+  if (uniqueUrls.length === 0) {
     return { photoUris, downloadFailed: false };
   }
 
-  const downloadedUri = await downloader(coverUrl, 'event');
-  return downloadedUri
-    ? { photoUris: [...photoUris, downloadedUri], downloadFailed: false }
-    : { photoUris, downloadFailed: true };
+  const downloads = await Promise.all(
+    uniqueUrls.map((url, index) => downloader(url, index === 0 ? 'event' : 'event_info')),
+  );
+  const downloadedUris = downloads.filter((uri): uri is string => uri != null);
+  return {
+    photoUris: [...photoUris, ...downloadedUris],
+    downloadFailed: downloadedUris.length !== uniqueUrls.length,
+  };
 }

@@ -11,6 +11,7 @@ import { FormFieldLabel } from './FormPrimitives';
 export interface EventTimetableEntryDraft {
   key: string;
   id?: string;
+  source_artist_name?: string;
   title: string;
   artist_id: string;
   start_time: string;

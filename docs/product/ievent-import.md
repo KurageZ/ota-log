@@ -1,6 +1,6 @@
 # iEvent 轻量活动导入规格
 
-状态：旧版单场导入已实现（2026-07-24）；Migration v18 多场次适配待实现
+状态：已实现；Migration v18 多场次适配完成（2026-08-06）
 
 范围：从 `ievent.life` 活动详情页和其子活动生成一次性、可编辑的活动草稿
 
@@ -36,6 +36,8 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - 来源详情继续保留。时间表原图作为普通活动资料图导入，不以图片替代扁平时间表。
 - 某个子活动详情抓取失败时，用父页摘要创建对应 Session，继续导入其他内容，并报告“部分内容未完整导入”。
 - 不读取或投影 iEvent 的取消状态。
+
+实现使用 iEvent 当前公开页面的实际字段：父活动读取 `props.childEvent`，子活动读取 `props.timetable[].property_addition.sections`，原始时间表图片读取 `props.timetable[].value.value`。这些来源字段只存在于提取层，不作为本地持久化契约。
 
 ## User Stories
 

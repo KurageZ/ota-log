@@ -104,7 +104,7 @@ export default function CreateEventScreen() {
           }}>
             <AppIcon name="sparkles" size={18} color={colors.accent} />
             <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, color: colors.accentText }}>
-              已从公告预填信息，请确认后创建
+              {draft?.prefillWarning ?? '已从公告预填信息，请确认后创建'}
             </Text>
             <TouchableOpacity onPress={() => setPrefillNoticeVisible(false)}>
               <AppIcon name="close" size={18} color={colors.accentText} />

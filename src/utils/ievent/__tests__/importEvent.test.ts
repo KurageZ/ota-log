@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   fetchImportedEvent,
   IEVENT_URL_RE,
@@ -5,6 +7,14 @@ import {
 } from '../importEvent';
 
 const sourceUrl = 'https://ievent.life/event/10365';
+const referenceParentHtml = fs.readFileSync(
+  path.resolve(__dirname, 'fixtures/event-10022-parent.html'),
+  'utf8',
+);
+const referenceChildHtml = fs.readFileSync(
+  path.resolve(__dirname, 'fixtures/event-10016-child.html'),
+  'utf8',
+);
 
 const performerNames = [
   'Arena',
@@ -79,6 +89,32 @@ function buildOriginalEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildTimetableProperty() {
+  return [{
+    value: {
+      type: 'image',
+      value: 'https://idols-events.oss-cn-hangzhou.aliyuncs.com/event_timetable/test.jpg',
+      status: 'ai_parsed',
+    },
+    property_addition: {
+      sections: [
+        {
+          time_range: '11:00~11:20',
+          title: '绮幻人形KisMetis',
+          type: 'person',
+          pid: 3185,
+          tokuten_time_range: '11:40~13:10',
+        },
+        {
+          time_range: '21:00~21:15',
+          title: '大合影',
+          type: 'text',
+        },
+      ],
+    },
+  }];
+}
+
 function flightHtml(event: Record<string, unknown>): string {
   const eventId = event.event_id;
   const payload =
@@ -124,6 +160,41 @@ function streamingResponse(
 }
 
 describe('parseImportedEventPage', () => {
+  test('parses minimized fixtures derived from the reference parent and child pages', () => {
+    const parent = parseImportedEventPage(
+      referenceParentHtml,
+      'https://ievent.life/event/10022',
+    );
+    const child = parseImportedEventPage(
+      referenceChildHtml,
+      'https://ievent.life/event/10016',
+    );
+
+    expect(parent?.sessions).toEqual([
+      expect.objectContaining({
+        sourceEventId: 10016,
+        title: '主舞台 SUMMER STAGE',
+        sourceDetails: expect.stringContaining('标签：地下偶像'),
+      }),
+    ]);
+    expect(child?.sessions[0]).toEqual(expect.objectContaining({
+      startTime: '11:00',
+      timetable: [
+        expect.objectContaining({
+          title: '绮幻人形KisMetis',
+          notes: '特典会时间：11:40~13:10',
+          artistName: '绮幻人形KisMetis',
+        }),
+        expect.objectContaining({ title: '大合影', artistName: null }),
+      ],
+    }));
+    expect(child?.photoUrls).toContain(
+      'https://idols-events.oss-cn-hangzhou.aliyuncs.com/event_timetable/9624b7f4f8702c3734f9b01516a5225c.jpg',
+    );
+    expect(parent).not.toHaveProperty('status');
+    expect(child).not.toHaveProperty('status');
+  });
+
   test('projects the reference activity through the existing draft contract', () => {
     const parsed = parseImportedEventPage(flightHtml(buildOriginalEvent()), sourceUrl);
 
@@ -143,6 +214,15 @@ describe('parseImportedEventPage', () => {
       '蛋黄派Sizzle',
       ...performerNames.slice(20),
     ]);
+    expect(parsed?.sessions).toEqual([expect.objectContaining({
+      sourceEventId: 10365,
+      title: '',
+      sessionDate: '2026-07-25',
+      openTime: '10:45',
+      startTime: '11:00',
+      city: '上海',
+      venue: '世界树剧场一号馆',
+    })]);
     expect(parsed?.details).toBe(
       '本场演出禁止一切形式的摄影摄像，谢谢大家的理解与配合。\n\n'
       + '开场：10:45\n'
@@ -321,6 +401,46 @@ describe('parseImportedEventPage', () => {
     expect(parsed?.coverUrl).toBe('https://image.ievent.life/cover/og.jpg');
   });
 
+  test('extracts flat timetable entries and the original timetable image', () => {
+    const original = buildOriginalEvent({
+      event_id: 10016,
+      title: '@ JAM上海 主舞台 SUMMER STAGE',
+      props: {
+        startTime: [{ value: '11:00' }],
+        timetable: buildTimetableProperty(),
+        officialSite: [{ value: 'https://weibo.com/example' }],
+      },
+      persons: [{ pid: 3185, name: '绮幻人形KisMetis' }],
+      status: 'cancel',
+    });
+    const parsed = parseImportedEventPage(
+      flightHtml(original),
+      'https://ievent.life/event/10016',
+    );
+
+    expect(parsed?.sessions[0].timetable).toEqual([
+      {
+        title: '绮幻人形KisMetis',
+        startTime: '11:00',
+        endTime: '11:20',
+        notes: '特典会时间：11:40~13:10',
+        artistName: '绮幻人形KisMetis',
+      },
+      {
+        title: '大合影',
+        startTime: '21:00',
+        endTime: '21:15',
+        notes: null,
+        artistName: null,
+      },
+    ]);
+    expect(parsed?.photoUrls).toEqual([
+      'https://image.ievent.life/cover/event.jpg',
+      'https://idols-events.oss-cn-hangzhou.aliyuncs.com/event_timetable/test.jpg',
+    ]);
+    expect(parsed).not.toHaveProperty('status');
+  });
+
   test('requires title, date, and location for a usable draft', () => {
     const html = jsonLdHtml({
       '@context': 'https://schema.org',
@@ -360,6 +480,97 @@ describe('fetchImportedEvent', () => {
       sourceUrl,
       expect.objectContaining({ method: 'GET', redirect: 'follow' }),
     );
+  });
+
+  test('enriches child sessions and keeps summaries when one child fails', async () => {
+    const parentUrl = 'https://ievent.life/event/10022';
+    const location = buildOriginalEvent().locations;
+    const parent = buildOriginalEvent({
+      event_id: 10022,
+      title: '@JAM上海 2026夏日嘉年华 7月11日',
+      status: 'cancel',
+      description: '父活动详情',
+      persons: [],
+      props: {
+        childEvent: [
+          {
+            event_id: 10016,
+            title: '@ JAM上海 2026夏日嘉年华 7月11日 主舞台 SUMMER STAGE',
+            date: '2026-07-11',
+            status: 'cancel',
+            cover: 'https://image.ievent.life/cover/main.jpg',
+            locations: location,
+            persons: [{ pid: 3185, name: '绮幻人形KisMetis' }],
+          },
+          {
+            event_id: 10017,
+            title: '@ JAM上海 2026夏日嘉年华 7月11日 副舞台 HOT STAGE',
+            date: '2026-07-11',
+            status: 'cancel',
+            cover: 'https://image.ievent.life/cover/hot.jpg',
+            locations: location,
+            persons: [{ pid: 539, name: 'TrueMask' }],
+          },
+        ],
+      },
+    });
+    const child = buildOriginalEvent({
+      event_id: 10016,
+      title: '@ JAM上海 2026夏日嘉年华 7月11日 主舞台 SUMMER STAGE',
+      date: '2026-07-11',
+      description: '主舞台详情',
+      status: 'cancel',
+      props: {
+        startTime: [{ value: '11:00' }],
+        price: [{
+          value: '普通票 | 48',
+          property_addition: { ticket_name: '普通票', price: 48 },
+        }],
+        timetable: buildTimetableProperty(),
+      },
+      persons: [{ pid: 3185, name: '绮幻人形KisMetis' }],
+    });
+    const pages: Record<string, Response> = {
+      [parentUrl]: streamingResponse([new TextEncoder().encode(flightHtml(parent))], { url: parentUrl }),
+      'https://ievent.life/event/10016': streamingResponse(
+        [new TextEncoder().encode(flightHtml(child))],
+        { url: 'https://ievent.life/event/10016' },
+      ),
+      'https://ievent.life/event/10017': streamingResponse([], {
+        status: 503,
+        url: 'https://ievent.life/event/10017',
+      }),
+    };
+    const fetcher = jest.fn(async (url: string) => pages[url]);
+
+    const result = await fetchImportedEvent(parentUrl, fetcher);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.event.sessions).toEqual([
+      expect.objectContaining({
+        sourceEventId: 10016,
+        title: '主舞台 SUMMER STAGE',
+        startTime: '11:00',
+        timetable: expect.arrayContaining([
+          expect.objectContaining({ title: '绮幻人形KisMetis' }),
+        ]),
+      }),
+      expect.objectContaining({
+        sourceEventId: 10017,
+        title: '副舞台 HOT STAGE',
+        timetable: [],
+      }),
+    ]);
+    expect(result.event.parsed.ticket_price).toBe(48);
+    expect(result.event.details).toContain('父活动详情');
+    expect(result.event.details).toContain('【主舞台 SUMMER STAGE】');
+    expect(result.event.details).toContain('主舞台详情');
+    expect(result.event.details).toContain('【副舞台 HOT STAGE】');
+    expect(result.event.partialFailures).toEqual(['副舞台 HOT STAGE']);
+    expect(result.event.parsed.artist_mentions.map((mention) => mention.rawName))
+      .toEqual(['绮幻人形KisMetis', 'TrueMask']);
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
   test('rejects redirects away from the supported host', async () => {
