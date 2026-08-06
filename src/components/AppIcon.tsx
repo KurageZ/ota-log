@@ -68,8 +68,10 @@ export type AppIconName =
   | 'refresh'
   | 'remove'
   | 'reorder'
+  | 'save'
   | 'search'
   | 'settings'
+  | 'share'
   | 'sparkles'
   | 'stats'
   | 'statusCancelled'
@@ -175,8 +177,10 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   refresh: { icon: 'refresh-cw' },
   remove: { icon: 'minus' },
   reorder: { icon: 'list' },
+  save: { icon: 'save' },
   search: { icon: 'search' },
   settings: { icon: 'settings' },
+  share: { icon: 'share-2' },
   sparkles: { icon: 'sparkles' },
   stats: { icon: 'chart-column' },
   statusCancelled: { icon: 'x' },

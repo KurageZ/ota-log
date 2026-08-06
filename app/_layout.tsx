@@ -95,6 +95,15 @@ function RootNavigator() {
       <Stack.Screen name="settings/widget" options={{ title: '小组件设置' }} />
       <Stack.Screen name="weibo" options={{ title: '微博抓取' }} />
       <Stack.Screen name="tools/index" options={{ title: '工具箱' }} />
+      <Stack.Screen
+        name="tools/cheki-sticker-camera"
+        options={{
+          presentation: 'fullScreenModal',
+          animation: 'fade',
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="tools/ultima-stamp-planner" options={{ title: '集章规划' }} />
       <Stack.Screen name="tools/weibo-following" options={{ title: '微博关注导入' }} />
     </Stack>

@@ -82,7 +82,7 @@ Profile 上不直接放备份、清理、微博登录、主题、日历默认视
 
 ### 工具箱
 
-`/tools` 承载低频但独立的工具入口。当前包含微博关注导入和 Ultima stamp planner。新增工具时优先放这里，不要塞回 Profile。
+`/tools` 承载低频但独立的工具入口。当前包含微博关注导入、Ultima stamp planner，以及 iOS「拍立得贴纸相机」Demo。新增工具时优先放这里，不要塞回 Profile。
 
 ---
 

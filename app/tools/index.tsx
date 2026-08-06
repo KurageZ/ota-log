@@ -18,6 +18,22 @@ export default function ToolboxScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       >
+        {process.env.EXPO_OS === 'ios' ? (
+          <View style={{ marginBottom: 16 }}>
+            <SectionLabel label="影像" />
+            <MenuCard>
+              <MenuItem
+                icon="camera"
+                label="拍立得贴纸相机"
+                subtitle="选择一张照片作为贴纸，合成到拍摄成果中"
+                tint={toolTints.planner}
+                isLast
+                onPress={() => router.push('/tools/cheki-sticker-camera')}
+              />
+            </MenuCard>
+          </View>
+        ) : null}
+
         <View style={{ marginBottom: 16 }}>
           <SectionLabel label="规划" />
           <MenuCard>

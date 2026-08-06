@@ -36,6 +36,25 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "ota log 需要访问相机，用于拍摄带有拍立得贴纸的照片。",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "ota log 需要访问照片，用于选择拍立得贴纸。",
+          "savePhotosPermission": "ota log 需要将生成的贴纸照片保存到你的相册。",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
