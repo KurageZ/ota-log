@@ -47,7 +47,7 @@ export class ArtistRepository {
          FROM (
            SELECT ea.artist_id, MAX(e.event_date) AS sort_value
            FROM event_artists ea
-           JOIN events e ON e.id = ea.event_id
+           JOIN event_summaries e ON e.id = ea.event_id
            GROUP BY ea.artist_id
            UNION ALL
            SELECT artist_id, MAX(COALESCE(date, created_at)) AS sort_value

@@ -10,7 +10,7 @@ import { materializePresetArtistAvatars } from './presetArtistMedia';
 import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
 import { generateId } from './uuid';
 
-const BACKUP_VERSION = 5;
+const BACKUP_VERSION = 6;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -18,7 +18,7 @@ const ZIP_PROGRESS_END = 99;
 const UNIQUE_PATH_ATTEMPTS = 100;
 const BACKUP_EXPORT_FILENAME_PATTERN = /^ota_log_backup_\d{8}_\d{6}(?:_\d+)?\.zip$/;
 
-interface EventArtistRow { event_id: string; artist_id: string }
+interface EventArtistRow { event_id: string; artist_id: string; sort_order?: number }
 interface ImportantDateArtistRow { important_date_id: string; artist_id: string }
 
 type Row = Record<string, string | number | null>;
@@ -26,7 +26,9 @@ type Row = Record<string, string | number | null>;
 interface BackupData {
   artists: Awaited<ReturnType<Repositories['artists']['findAll']>>;
   trips: Awaited<ReturnType<Repositories['trips']['findAll']>>;
-  events: Awaited<ReturnType<Repositories['events']['findAll']>>;
+  events: Row[];
+  event_sessions: Row[];
+  event_timetable_entries: Row[];
   event_artists: EventArtistRow[];
   expenses: Awaited<ReturnType<Repositories['expenses']['findAll']>>;
   cheki_records: Row[];
@@ -68,6 +70,8 @@ interface ImportDataShape {
   artists?: Row[];
   trips?: Row[];
   events?: Row[];
+  event_sessions?: Row[];
+  event_timetable_entries?: Row[];
   event_artists?: EventArtistRow[];
   expenses?: Row[];
   cheki?: Row[];
@@ -97,6 +101,8 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     artists,
     trips,
     events,
+    eventSessions,
+    timetableEntries,
     expenses,
     chekiRecords,
     chekiItems,
@@ -110,7 +116,9 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
   ] = await Promise.all([
     db.artists.findAll(),
     db.trips.findAll(),
-    db.events.findAll(),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM events'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM event_sessions'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM event_timetable_entries'),
     db.expenses.findAll(),
     db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_records'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_items'),
@@ -128,6 +136,8 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     artists,
     trips,
     events,
+    event_sessions: eventSessions,
+    event_timetable_entries: timetableEntries,
     event_artists: eventArtists,
     expenses,
     cheki_records: chekiRecords,
@@ -336,11 +346,30 @@ function getErrorMessage(error: unknown): string {
   return '请确认选择的是正确的备份文件后再试一次。';
 }
 
+function buildEventDatesById(events: Row[], sessions: Row[]): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const event of events) {
+    if (typeof event.event_date === 'string') {
+      result.set(String(event.id), event.event_date);
+    }
+  }
+  for (const session of [...sessions].sort((a, b) =>
+    String(a.session_date).localeCompare(String(b.session_date)))) {
+    const eventId = String(session.event_id);
+    if (!result.has(eventId) && typeof session.session_date === 'string') {
+      result.set(eventId, session.session_date);
+    }
+  }
+  return result;
+}
+
 export async function restoreBackupData(db: Repositories, data: ImportDataShape): Promise<void> {
   const {
     artists = [],
     trips = [],
     events = [],
+    event_sessions = [],
+    event_timetable_entries = [],
     event_artists = [],
     expenses = [],
     cheki = [],
@@ -378,9 +407,7 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
             created_at: String(row.created_at),
             updated_at: String(row.updated_at ?? row.created_at),
           })),
-          eventDatesById: new Map(
-            events.map((event) => [String(event.id), String(event.event_date)]),
-          ),
+          eventDatesById: buildEventDatesById(events, event_sessions),
         },
         { generateId },
       )
@@ -397,6 +424,8 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
         DELETE FROM important_date_anniversary_rules;
         DELETE FROM important_date_artists;
         DELETE FROM important_dates;
+        DELETE FROM event_timetable_entries;
+        DELETE FROM event_sessions;
         DELETE FROM event_artists;
         DELETE FROM photos;
         DELETE FROM expenses;
@@ -449,24 +478,20 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
       for (const e of events) {
         await db.rawDb.runAsync(
           `INSERT OR REPLACE INTO events
-             (id, title, event_type, event_date, event_time, city, venue, ticket_price,
-              status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, title, event_type, status, review_score, notes, details, url,
+              setlist_text, actual_expense, trip_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             String(e.id),
             String(e.title),
             String(e.event_type ?? 'livehouse'),
-            String(e.event_date),
-            e.event_time ?? null,
-            e.city ?? null,
-            e.venue ?? null,
-            e.ticket_price ?? null,
             String(e.status),
             e.review_score ?? null,
             e.notes ?? null,
             e.details ?? null,
             e.url ?? null,
             e.setlist_text ?? null,
+            e.actual_expense ?? e.ticket_price ?? null,
             e.trip_id ?? null,
             String(e.created_at),
             String(e.updated_at),
@@ -474,10 +499,76 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
         );
       }
 
-      for (const ea of event_artists) {
+      const sessionsToRestore = event_sessions.length > 0
+        ? event_sessions
+        : events.map((event) => ({
+            id: generateId(),
+            event_id: String(event.id),
+            title: null,
+            session_date: String(event.event_date),
+            end_date: null,
+            open_time: null,
+            start_time: event.event_time ?? null,
+            end_time: null,
+            city: event.city ?? null,
+            venue: event.venue ?? null,
+            sort_order: 0,
+            created_at: String(event.created_at),
+            updated_at: String(event.updated_at),
+          }));
+
+      for (const session of sessionsToRestore) {
         await db.rawDb.runAsync(
-          'INSERT OR IGNORE INTO event_artists (event_id, artist_id) VALUES (?, ?)',
-          [ea.event_id, ea.artist_id]
+          `INSERT OR REPLACE INTO event_sessions
+             (id, event_id, title, session_date, end_date, open_time, start_time,
+              end_time, city, venue, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            String(session.id),
+            String(session.event_id),
+            session.title ?? null,
+            String(session.session_date),
+            session.end_date ?? null,
+            session.open_time ?? null,
+            session.start_time ?? null,
+            session.end_time ?? null,
+            session.city ?? null,
+            session.venue ?? null,
+            Number(session.sort_order ?? 0),
+            String(session.created_at),
+            String(session.updated_at),
+          ],
+        );
+      }
+
+      const nextArtistOrderByEvent = new Map<string, number>();
+      for (const ea of event_artists) {
+        const fallbackOrder = nextArtistOrderByEvent.get(ea.event_id) ?? 0;
+        await db.rawDb.runAsync(
+          'INSERT OR IGNORE INTO event_artists (event_id, artist_id, sort_order) VALUES (?, ?, ?)',
+          [ea.event_id, ea.artist_id, ea.sort_order ?? fallbackOrder]
+        );
+        nextArtistOrderByEvent.set(ea.event_id, fallbackOrder + 1);
+      }
+
+      for (const entry of event_timetable_entries) {
+        await db.rawDb.runAsync(
+          `INSERT OR REPLACE INTO event_timetable_entries
+             (id, session_id, title, artist_id, start_time, end_time, notes,
+              sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            String(entry.id),
+            String(entry.session_id),
+            String(entry.title),
+            entry.artist_id ?? null,
+            entry.start_time ?? null,
+            entry.end_time ?? null,
+            entry.notes ?? null,
+            Number(entry.sort_order ?? 0),
+            String(entry.created_at),
+            String(entry.updated_at),
+          ],
         );
       }
 
@@ -711,6 +802,11 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       };
     case 5:
       return {
+        version: BACKUP_VERSION,
+        data: candidate.data as ImportDataShape,
+      };
+    case 6:
+      return {
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       };
@@ -800,6 +896,8 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
       ),
       trips: (payload.data.trips as unknown as Row[] | undefined) ?? [],
       events: (payload.data.events as unknown as Row[] | undefined) ?? [],
+      event_sessions: (payload.data.event_sessions as unknown as Row[] | undefined) ?? [],
+      event_timetable_entries: (payload.data.event_timetable_entries as unknown as Row[] | undefined) ?? [],
       event_artists: payload.data.event_artists,
       expenses: (payload.data.expenses as unknown as Row[] | undefined) ?? [],
       cheki: replaceMediaUris(payload.data.cheki as unknown as Row[] | undefined, 'photo_uri', uriMap),

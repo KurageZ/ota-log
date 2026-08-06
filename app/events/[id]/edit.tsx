@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useDB } from '../../../src/context/DBContext';
-import { Event, Artist, Photo } from '../../../src/types/models';
+import { Event, Artist, EventSession, Photo } from '../../../src/types/models';
 import { EventForm, EventFormHandle, EventFormValues } from '../../../src/components/EventForm';
+import { toTimetableReplacementInput } from '../../../src/components/EventTimetableEditor';
 import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useAppTheme } from '../../../src/theme/appTheme';
+import { showOperationFailedAlert } from '../../../src/utils/failureAlert';
 
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,17 +26,38 @@ export default function EditEventScreen() {
       db.events.findById(id),
       db.events.getArtists(id),
       db.photos.findByEventId(id),
-    ]).then(([event, artists, photos]: [Event | null, Artist[], Photo[]]) => {
+      db.eventSchedules.findSessions(id),
+    ]).then(async ([event, artists, photos, sessions]: [Event | null, Artist[], Photo[], EventSession[]]) => {
       if (!event) return;
+      const timetables = await Promise.all(
+        sessions.map((session) => db.eventSchedules.findTimetable(session.id)),
+      );
       setInitialValues({
         title: event.title,
-        event_date: event.event_date,
-        event_time: event.event_time ?? '',
-        city: event.city ?? '',
-        venue: event.venue ?? '',
+        sessions: sessions.map((session, sessionIndex) => ({
+          key: session.id,
+          id: session.id,
+          title: session.title ?? '',
+          session_date: session.session_date,
+          end_date: session.end_date ?? '',
+          open_time: session.open_time ?? '',
+          start_time: session.start_time ?? '',
+          end_time: session.end_time ?? '',
+          city: session.city ?? '',
+          venue: session.venue ?? '',
+          timetable: timetables[sessionIndex].map((entry) => ({
+            key: entry.id,
+            id: entry.id,
+            title: entry.title,
+            artist_id: entry.artist_id ?? '',
+            start_time: entry.start_time ?? '',
+            end_time: entry.end_time ?? '',
+            notes: entry.notes ?? '',
+          })),
+        })),
         status: event.status,
         trip_id: event.trip_id,
-        ticket_price: event.ticket_price != null ? String(event.ticket_price) : '',
+        actual_expense: event.actual_expense != null ? String(event.actual_expense) : '',
         url: event.url ?? '',
         notes: event.notes ?? '',
         details: event.details ?? '',
@@ -63,24 +86,52 @@ export default function EditEventScreen() {
   };
 
   const handleSubmit = async (values: EventFormValues) => {
-    await db.events.update(id!, {
+    await db.events.updateWithSchedule(id!, {
       title: values.title,
-      event_date: values.event_date,
-      event_time: values.event_time || null,
-      city: values.city || null,
-      venue: values.venue || null,
       status: values.status,
       trip_id: values.trip_id,
-      ticket_price: values.ticket_price ? parseFloat(values.ticket_price) : null,
+      actual_expense: values.actual_expense ? parseFloat(values.actual_expense) : null,
       notes: values.notes || null,
       details: values.details || null,
       url: values.url || null,
       setlist_text: values.setlist_text || null,
       review_score: values.review_score,
+      artist_ids: [...new Set(values.artist_ids)],
+      sessions: values.sessions.map((session) => ({
+        id: session.id,
+        title: session.title || null,
+        session_date: session.session_date,
+        end_date: session.end_date || null,
+        open_time: session.open_time || null,
+        start_time: session.start_time || null,
+        end_time: session.end_time || null,
+        city: session.city || null,
+        venue: session.venue || null,
+        timetable: toTimetableReplacementInput(session.timetable),
+      })),
     });
-    await db.events.setArtists(id!, values.artist_ids);
-    for (const uri of photosToAdd) { await db.photos.create(uri, id!); }
-    for (const photoId of photosToDelete) { await db.photos.delete(photoId); }
+    let photoSaveError: unknown = null;
+    for (const uri of photosToAdd) {
+      try {
+        await db.photos.create(uri, id!);
+      } catch (error) {
+        photoSaveError ??= error;
+      }
+    }
+    for (const photoId of photosToDelete) {
+      try {
+        await db.photos.delete(photoId);
+      } catch (error) {
+        photoSaveError ??= error;
+      }
+    }
+    if (photoSaveError) {
+      showOperationFailedAlert(
+        '活动已保存，但部分资料图未能更新。',
+        '可以稍后再次编辑资料图。',
+        photoSaveError,
+      );
+    }
     router.back();
   };
 

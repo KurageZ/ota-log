@@ -9,6 +9,7 @@ function event(input: Pick<Event, 'id' | 'event_date'> & Partial<Event>): Event 
     city: null,
     venue: null,
     ticket_price: null,
+    actual_expense: null,
     status: 'completed',
     review_score: null,
     notes: null,

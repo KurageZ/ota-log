@@ -9,14 +9,16 @@ import * as Calendar from 'expo-calendar/legacy';
 import Clipboard from '@react-native-clipboard/clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useDB } from '../../src/context/DBContext';
-import { Event, Artist, Cheki, ChekiManualEntry, Photo, EventStatus } from '../../src/types/models';
+import {
+  Event, Artist, Cheki, ChekiManualEntry, Photo, EventStatus,
+  EventSession, EventTimetableEntry,
+} from '../../src/types/models';
 import { formatDate, daysUntil } from '../../src/utils/date';
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { copyToDocuments } from '../../src/utils/copyToDocuments';
 import { buildChekiViewerItems, getChekiManualCount } from '../../src/utils/cheki';
-import { sortArtistsWithOshi } from '../../src/utils/filter';
 import { ChekiViewerModal } from '../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../src/types/chekiViewer';
 import {
@@ -80,6 +82,103 @@ function InfoRow({ icon, text, isDark }: { icon: AppIconName; text: string; isDa
       <Text style={{ fontSize: 14, color: colors.textSecondary, flex: 1 }}>{text}</Text>
     </View>
   );
+}
+
+function formatSessionTime(session: EventSession): string | null {
+  const parts = [
+    session.open_time ? `开场 ${session.open_time}` : null,
+    session.start_time ? `开始 ${session.start_time}` : null,
+    session.end_time ? `结束 ${session.end_time}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function SessionSummaryRow({
+  session,
+  index,
+  isLast,
+  embedded = false,
+  eventStatus,
+  addingSessionId,
+  onAddToCalendar,
+}: {
+  session: EventSession;
+  index: number;
+  isLast: boolean;
+  embedded?: boolean;
+  eventStatus: EventStatus;
+  addingSessionId: string | null;
+  onAddToCalendar: (session: EventSession) => void;
+}) {
+  const { colors } = useAppTheme();
+  const sessionTime = formatSessionTime(session);
+  const location = [session.venue, session.city].filter(Boolean).join(' · ');
+  const displayTitle = session.title || (embedded ? null : `场次 ${index + 1}`);
+  const calendarSubject = session.title || (embedded ? '活动' : `场次 ${index + 1}`);
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingTop: embedded ? 15 : 11,
+        paddingBottom: 11,
+        marginTop: embedded ? 10 : 0,
+        borderTopWidth: embedded ? 1 : 0,
+        borderTopColor: colors.divider,
+        borderBottomWidth: !embedded && !isLast ? 1 : 0,
+        borderBottomColor: colors.divider,
+      }}
+    >
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {displayTitle ? (
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>
+            {displayTitle}
+          </Text>
+        ) : null}
+        <Text style={{
+          marginTop: displayTitle ? 4 : 0,
+          fontSize: displayTitle ? 13 : 15,
+          fontWeight: displayTitle ? '400' : '700',
+          color: displayTitle ? colors.textSecondary : colors.text,
+        }}>
+          {formatDate(session.session_date)}
+          {session.end_date ? ` – ${formatDate(session.end_date)}` : ''}
+        </Text>
+        {sessionTime ? (
+          <Text style={{ marginTop: 3, fontSize: 12.5, color: colors.textMuted }}>
+            {sessionTime}
+          </Text>
+        ) : null}
+        {location ? (
+          <Text style={{ marginTop: 3, fontSize: 12.5, color: colors.textMuted }}>
+            {location}
+          </Text>
+        ) : null}
+      </View>
+      {eventStatus !== 'cancelled' ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`将${calendarSubject}添加到日历`}
+          activeOpacity={0.7}
+          disabled={addingSessionId != null}
+          onPress={() => onAddToCalendar(session)}
+          style={{
+            width: 44, height: 44, borderRadius: 22,
+            alignItems: 'center', justifyContent: 'center',
+            backgroundColor: withAlpha(colors.accent, 0.1),
+            opacity: addingSessionId && addingSessionId !== session.id ? 0.4 : 1,
+          }}
+        >
+          <AppIcon name="calendar" size={18} color={colors.accent} />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+function formatTimetableTime(start: string | null, end: string | null): string {
+  if (start && end) return `${start}–${end}`;
+  return start ?? end ?? '—';
 }
 
 // M10: module-level to avoid re-mounting subtrees on every render
@@ -215,10 +314,18 @@ function InlineAction({
   );
 }
 
-function buildCalendarEventPayload(event: Event) {
-  const [year, month, day] = event.event_date.split('-').map(Number);
-  const hasTime = typeof event.event_time === 'string' && /^\d{2}:\d{2}$/.test(event.event_time);
-  const location = [event.venue, event.city].filter(Boolean).join(' · ') || undefined;
+function parseLocalDate(date: string, time?: string | null) {
+  const [year, month, day] = date.split('-').map(Number);
+  if (time && /^\d{2}:\d{2}$/.test(time)) {
+    const [hours, minutes] = time.split(':').map(Number);
+    return new Date(year, month - 1, day, hours, minutes);
+  }
+  return new Date(year, month - 1, day);
+}
+
+function buildCalendarEventPayload(event: Event, session: EventSession) {
+  const hasTime = typeof session.start_time === 'string' && /^\d{2}:\d{2}$/.test(session.start_time);
+  const location = [session.venue, session.city].filter(Boolean).join(' · ') || undefined;
   const notes = [
     event.notes ? `备注：${event.notes}` : null,
     event.url ? `链接：${event.url}` : null,
@@ -227,10 +334,11 @@ function buildCalendarEventPayload(event: Event) {
     .join('\n');
 
   if (!hasTime) {
-    const startDate = new Date(year, month - 1, day);
-    const endDate = new Date(year, month - 1, day + 1);
+    const startDate = parseLocalDate(session.session_date);
+    const endDate = parseLocalDate(session.end_date ?? session.session_date);
+    endDate.setDate(endDate.getDate() + 1);
     return {
-      title: event.title,
+      title: session.title ? `${event.title} · ${session.title}` : event.title,
       startDate,
       endDate,
       allDay: true,
@@ -240,12 +348,17 @@ function buildCalendarEventPayload(event: Event) {
     };
   }
 
-  const [hours, minutes] = event.event_time!.split(':').map(Number);
-  const startDate = new Date(year, month - 1, day, hours, minutes);
-  const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+  const startDate = parseLocalDate(session.session_date, session.start_time);
+  let endDate = session.end_time
+    ? parseLocalDate(session.end_date ?? session.session_date, session.end_time)
+    : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+  if (session.end_time && !session.end_date && endDate <= startDate) {
+    endDate = new Date(endDate);
+    endDate.setDate(endDate.getDate() + 1);
+  }
 
   return {
-    title: event.title,
+    title: session.title ? `${event.title} · ${session.title}` : event.title,
     startDate,
     endDate,
     allDay: false,
@@ -271,8 +384,10 @@ export default function EventDetailScreen() {
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
   const [infoPhotos, setInfoPhotos] = useState<Photo[]>([]);
+  const [sessions, setSessions] = useState<EventSession[]>([]);
+  const [timetables, setTimetables] = useState<Record<string, EventTimetableEntry[]>>({});
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
-  const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [copyToastVisible, setCopyToastVisible] = useState(false);
@@ -292,7 +407,7 @@ export default function EventDetailScreen() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [ev, ar, ck, manual, photos, allArs, config] = await Promise.all([
+    const [ev, ar, ck, manual, photos, allArs, config, loadedSessions] = await Promise.all([
       db.events.findById(id),
       db.events.getArtists(id),
       db.cheki.findByEventId(id),
@@ -300,14 +415,22 @@ export default function EventDetailScreen() {
       db.photos.findByEventId(id),
       db.artists.findAll(),
       db.userConfig.getConfig(),
+      db.eventSchedules.findSessions(id),
     ]);
+    const loadedTimetables = await Promise.all(
+      loadedSessions.map((session) => db.eventSchedules.findTimetable(session.id)),
+    );
     setEvent(ev);
-    setArtists(sortArtistsWithOshi(ar, config.oshi_artist_id));
+    setArtists(ar);
     setChekiList(ck);
     setManualEntries(manual);
     setInfoPhotos(photos);
     setAllArtists(allArs);
     setOshiArtistId(config.oshi_artist_id);
+    setSessions(loadedSessions);
+    setTimetables(Object.fromEntries(
+      loadedSessions.map((session, index) => [session.id, loadedTimetables[index]]),
+    ));
   }, [db, id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -338,8 +461,8 @@ export default function EventDetailScreen() {
     ]);
   };
 
-  const handleAddToSystemCalendar = async () => {
-    if (!event || addingToCalendar) return;
+  const handleAddToSystemCalendar = async (session: EventSession) => {
+    if (!event || addingSessionId) return;
     if (Platform.OS === 'web') {
       showOperationFailedAlert(
         'Web 端暂不支持直接写入系统日历。',
@@ -349,8 +472,8 @@ export default function EventDetailScreen() {
     }
 
     try {
-      setAddingToCalendar(true);
-      await addEventToSystemCalendar(buildCalendarEventPayload(event), Calendar);
+      setAddingSessionId(session.id);
+      await addEventToSystemCalendar(buildCalendarEventPayload(event, session), Calendar);
     } catch (error) {
       showOperationFailedAlert(
         '无法打开系统日历。',
@@ -358,7 +481,7 @@ export default function EventDetailScreen() {
         error,
       );
     } finally {
-      setAddingToCalendar(false);
+      setAddingSessionId(null);
     }
   };
 
@@ -550,12 +673,8 @@ export default function EventDetailScreen() {
             <OshiMatchBadge oshiArtistName={oshiArtistName} style={{ marginBottom: 12 }} />
           ) : null}
 
-          <InfoRow icon="eventDate" text={`${formatDate(event.event_date)}${event.event_time ? ' · ' + event.event_time : ''}`} isDark={isDark} />
-          {(event.city || event.venue) && (
-            <InfoRow icon="eventLocation" text={[event.venue, event.city].filter(Boolean).join(' · ')} isDark={isDark} />
-          )}
-          {event.ticket_price != null && (
-            <InfoRow icon="ticket" text={`¥${event.ticket_price.toFixed(0)}`} isDark={isDark} />
+          {event.actual_expense != null && (
+            <InfoRow icon="ticket" text={`实际支出 ¥${event.actual_expense.toFixed(2).replace(/\.00$/, '')}`} isDark={isDark} />
           )}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 4 }}>
             <InlineAction
@@ -578,15 +697,6 @@ export default function EventDetailScreen() {
                 isDark={isDark}
               />
             ) : null}
-            {event.status !== 'cancelled' ? (
-              <InlineAction
-                icon="calendar"
-                label={addingToCalendar ? '打开中...' : '添加日历'}
-                onPress={handleAddToSystemCalendar}
-                isDark={isDark}
-                disabled={addingToCalendar}
-              />
-            ) : null}
           </View>
           {event.status === 'completed' ? (
             <View style={{ marginTop: 14 }}>
@@ -599,7 +709,37 @@ export default function EventDetailScreen() {
               )}
             </View>
           ) : null}
+          {sessions.length === 1 ? (
+            <SessionSummaryRow
+              session={sessions[0]}
+              index={0}
+              isLast
+              embedded
+              eventStatus={event.status}
+              addingSessionId={addingSessionId}
+              onAddToCalendar={handleAddToSystemCalendar}
+            />
+          ) : null}
         </Card>
+
+        {sessions.length > 1 ? (
+          <>
+            <SectionTitle label="场次" />
+            <Card cardBg={cardBg}>
+              {sessions.map((session, index) => (
+                <SessionSummaryRow
+                  key={session.id}
+                  session={session}
+                  index={index}
+                  isLast={index === sessions.length - 1}
+                  eventStatus={event.status}
+                  addingSessionId={addingSessionId}
+                  onAddToCalendar={handleAddToSystemCalendar}
+                />
+              ))}
+            </Card>
+          </>
+        ) : null}
 
         {/* Mini countdown banner */}
         {event.status !== 'completed' && event.status !== 'cancelled' && (() => {
@@ -630,6 +770,61 @@ export default function EventDetailScreen() {
             </View>
           );
         })()}
+
+        {sessions.some((session) => (timetables[session.id]?.length ?? 0) > 0) ? (
+          <>
+            <SectionTitle label="时间表" />
+            {sessions.flatMap((session, sessionIndex) => {
+              const entries = timetables[session.id] ?? [];
+              if (entries.length === 0) return [];
+              return [(
+                <Card cardBg={cardBg} key={session.id}>
+                  {sessions.length > 1 ? (
+                    <Text style={{ marginBottom: 10, fontSize: 15, fontWeight: '700', color: colors.text }}>
+                      {session.title || `场次 ${sessionIndex + 1}`} · {formatDate(session.session_date)}
+                    </Text>
+                  ) : null}
+                  {entries.map((entry, entryIndex) => {
+                    const artist = entry.artist_id ? allArtistsMap.get(entry.artist_id) : null;
+                    return (
+                      <TouchableOpacity
+                        key={entry.id}
+                        disabled={!artist}
+                        onPress={() => artist && router.push(`/artists/${artist.id}`)}
+                        activeOpacity={0.72}
+                        style={{
+                          flexDirection: 'row', gap: 12, paddingVertical: 9,
+                          borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
+                          borderBottomColor: colors.divider,
+                        }}
+                      >
+                        <Text style={{ width: 82, fontSize: 12.5, fontWeight: '600', color: colors.accent }}>
+                          {formatTimetableTime(entry.start_time, entry.end_time)}
+                        </Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
+                            {entry.title}
+                          </Text>
+                          {artist ? (
+                            <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }}>
+                              {getArtistPrimaryName(artist)}
+                            </Text>
+                          ) : null}
+                          {entry.notes ? (
+                            <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 18, color: colors.textMuted }}>
+                              {entry.notes}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {artist ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </Card>
+              )];
+            })}
+          </>
+        ) : null}
 
         {/* 详细信息 */}
         <SectionTitle label="详细信息" />
@@ -716,7 +911,7 @@ export default function EventDetailScreen() {
                 borderStyle: 'dashed', borderRadius: 10 }}
             >
               <Text style={{ fontSize: 13, color: colors.placeholder }}>
-                添加时间表、出演阵容等资料图
+                添加海报、出演阵容等资料图
               </Text>
             </TouchableOpacity>
           )}

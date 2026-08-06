@@ -1,4 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Platform, Image,
@@ -7,9 +14,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { copyToDocuments } from '../utils/copyToDocuments';
 import { Artist, EventStatus } from '../types/models';
 import { useDB } from '../context/DBContext';
-import { toISODate } from '../utils/date';
+import { formatTimeInput, isValidISODate, isValidTime, toISODate } from '../utils/date';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
-import { filterArtistsByQuery, sortArtistsWithOshi } from '../utils/filter';
+import { filterArtistsByQuery } from '../utils/filter';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { EventStatusChips } from './EventStatusChips';
 import { showPhotoLibraryPermissionAlert, showSaveFailedAlert } from '../utils/failureAlert';
@@ -18,18 +25,35 @@ import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
 import { AppIcon } from './AppIcon';
 import { FormFieldLabel, FormSectionLabel } from './FormPrimitives';
+import { generateId } from '../utils/uuid';
+import {
+  EventTimetableEditor,
+  getTimetableValidationError,
+  type EventTimetableEntryDraft,
+} from './EventTimetableEditor';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface EventFormValues {
+export interface EventFormSessionValues {
+  key: string;
+  id?: string;
   title: string;
-  event_date: string;
-  event_time: string;
+  session_date: string;
+  end_date: string;
+  open_time: string;
+  start_time: string;
+  end_time: string;
   city: string;
   venue: string;
+  timetable: EventTimetableEntryDraft[];
+}
+
+export interface EventFormValues {
+  title: string;
+  sessions: EventFormSessionValues[];
   status: EventStatus;
   trip_id: string | null;
-  ticket_price: string;
+  actual_expense: string;
   url: string;
   notes: string;
   details: string;
@@ -38,15 +62,35 @@ export interface EventFormValues {
   review_score: number | null;
 }
 
+export type EventFormPrefill = Partial<EventFormValues> & {
+  event_date?: string;
+  event_time?: string;
+  city?: string;
+  venue?: string;
+};
+
+function createEmptySession(overrides: Partial<EventFormSessionValues> = {}): EventFormSessionValues {
+  return {
+    key: generateId(),
+    title: '',
+    session_date: toISODate(new Date()),
+    end_date: '',
+    open_time: '',
+    start_time: '',
+    end_time: '',
+    city: '',
+    venue: '',
+    timetable: [],
+    ...overrides,
+  };
+}
+
 export const defaultFormValues: EventFormValues = {
   title: '',
-  event_date: toISODate(new Date()),
-  event_time: '',
-  city: '',
-  venue: '',
+  sessions: [createEmptySession()],
   status: 'planned',
   trip_id: null,
-  ticket_price: '',
+  actual_expense: '',
   url: '',
   notes: '',
   details: '',
@@ -57,7 +101,7 @@ export const defaultFormValues: EventFormValues = {
 
 interface Props {
   mode?: 'create' | 'edit';
-  initialValues?: Partial<EventFormValues>;
+  initialValues?: EventFormPrefill;
   onSubmit: (values: EventFormValues) => Promise<void>;
   submitLabel?: string;
   hideSubmitButton?: boolean;
@@ -72,12 +116,6 @@ export interface EventFormHandle {
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-
-function formatTimeInput(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
 
 function formatDateInput(raw: string, previousValue?: string): string {
   let digits = raw.replace(/\D/g, '').slice(0, 8);
@@ -112,15 +150,20 @@ function normalizeDateInput(raw: string): string {
   return `${year}-${monthDigits}-${dayDigits}`;
 }
 
-function isValidISODate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+function normalizeInitialValues(initialValues?: EventFormPrefill): EventFormValues {
+  const sessions = initialValues?.sessions?.length
+    ? initialValues.sessions.map((session) => createEmptySession({ ...session, key: session.key || session.id || generateId() }))
+    : [createEmptySession({
+        session_date: initialValues?.event_date ?? toISODate(new Date()),
+        start_time: initialValues?.event_time ?? '',
+        city: initialValues?.city ?? '',
+        venue: initialValues?.venue ?? '',
+      })];
+  return {
+    ...defaultFormValues,
+    ...initialValues,
+    sessions,
+  };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -279,16 +322,13 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   const db = useDB();
   const { colors, isDark } = useAppTheme();
 
-  const merged = { ...defaultFormValues, ...initialValues };
+  const merged = normalizeInitialValues(initialValues);
 
   const [title, setTitle] = useState(merged.title);
-  const [eventDate, setEventDate] = useState(merged.event_date);
-  const [eventTime, setEventTime] = useState(merged.event_time);
-  const [city, setCity] = useState(merged.city);
-  const [venue, setVenue] = useState(merged.venue);
+  const [sessions, setSessions] = useState(merged.sessions);
   const [status, setStatus] = useState<EventStatus>(merged.status);
   const [tripId, setTripId] = useState<string | null>(merged.trip_id);
-  const [ticketPrice, setTicketPrice] = useState(merged.ticket_price);
+  const [actualExpense, setActualExpense] = useState(merged.actual_expense);
   const [url, setUrl] = useState(merged.url);
   const [notes, setNotes] = useState(merged.notes);
   const [details, setDetails] = useState(merged.details);
@@ -299,11 +339,17 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [artistSearch, setArtistSearch] = useState('');
+  const [activeVenueKey, setActiveVenueKey] = useState<string | null>(null);
   const [venueSuggestions, setVenueSuggestions] = useState<string[]>([]);
+  const [expandedSessionKeys, setExpandedSessionKeys] = useState<Set<string>>(
+    () => new Set(merged.sessions.filter((session) => (
+      session.end_date || session.open_time || session.end_time
+    )).map((session) => session.key)),
+  );
   const [saving, setSaving] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
-  const [eventDateTouched, setEventDateTouched] = useState(false);
-  const [ticketPriceTouched, setTicketPriceTouched] = useState(false);
+  const [sessionDateTouched, setSessionDateTouched] = useState<Set<string>>(new Set());
+  const [actualExpenseTouched, setActualExpenseTouched] = useState(false);
   const [didTrySubmit, setDidTrySubmit] = useState(false);
 
   useEffect(() => {
@@ -315,14 +361,19 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
 
   useEffect(() => {
     if (mode !== 'create') return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return;
-    if (eventDate >= toISODate(new Date())) return;
+    const lastDate = sessions.reduce((latest, session) => (
+      (session.end_date || session.session_date) > latest
+        ? (session.end_date || session.session_date)
+        : latest
+    ), '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(lastDate)) return;
+    if (lastDate >= toISODate(new Date())) return;
     if (status === 'cancelled' || status === 'completed') return;
     setStatus('completed');
-  }, [eventDate, mode, status]);
+  }, [sessions, mode, status]);
 
   useEffect(() => {
-    const query = venue.trim();
+    const query = sessions.find((session) => session.key === activeVenueKey)?.venue.trim() ?? '';
     if (query.length < 1) {
       setVenueSuggestions([]);
       return;
@@ -340,7 +391,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     return () => {
       active = false;
     };
-  }, [db, venue]);
+  }, [activeVenueKey, db, sessions]);
 
   const toggleArtist = useCallback((id: string) => {
     setArtistIds((prev) =>
@@ -357,9 +408,42 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     setArtistSearch('');
   };
 
-  const handleSelectVenueSuggestion = useCallback((suggestion: string) => {
-    setVenue(suggestion);
+  const updateSession = useCallback((key: string, patch: Partial<EventFormSessionValues>) => {
+    setSessions((current) => current.map((session) => (
+      session.key === key ? { ...session, ...patch } : session
+    )));
+  }, []);
+
+  const handleSelectVenueSuggestion = useCallback((key: string, suggestion: string) => {
+    updateSession(key, { venue: suggestion });
     setVenueSuggestions([]);
+    setActiveVenueKey(null);
+  }, [updateSession]);
+
+  const moveSession = useCallback((index: number, direction: -1 | 1) => {
+    setSessions((current) => {
+      const destination = index + direction;
+      if (destination < 0 || destination >= current.length) return current;
+      const next = [...current];
+      [next[index], next[destination]] = [next[destination], next[index]];
+      return next;
+    });
+  }, []);
+
+  const removeSession = useCallback((session: EventFormSessionValues) => {
+    const remove = () => setSessions((current) => current.filter((item) => item.key !== session.key));
+    if (!session.id) {
+      remove();
+      return;
+    }
+    Alert.alert(
+      '删除这个场次？',
+      '保存活动后，这个场次及其时间表会一并删除。',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: remove },
+      ],
+    );
   }, []);
 
   const filteredArtists = useMemo(() => {
@@ -368,28 +452,40 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
 
   const artistIdSet = useMemo(() => new Set(artistIds), [artistIds]);
 
-  const selectedArtists = useMemo(
-    () => sortArtistsWithOshi(allArtists.filter((a) => artistIdSet.has(a.id)), oshiArtistId),
-    [allArtists, artistIdSet, oshiArtistId],
-  );
+  const selectedArtists = useMemo(() => {
+    const artistMap = new Map(allArtists.map((artist) => [artist.id, artist]));
+    return artistIds.flatMap((id) => {
+      const artist = artistMap.get(id);
+      return artist ? [artist] : [];
+    });
+  }, [allArtists, artistIds]);
   const titleError = useMemo(() => {
     if (!title.trim()) return '请填写活动标题';
     return null;
   }, [title]);
-  const eventDateError = useMemo(() => {
-    if (!eventDate.trim()) return '请填写活动日期';
-    if (eventDate.length < 10) return '日期格式应为 YYYY-MM-DD';
-    if (!isValidISODate(eventDate)) return '请输入有效日期，例如 2026-05-15';
+  const sessionErrors = useMemo(() => sessions.map((session) => {
+    if (!session.session_date.trim()) return '请填写场次日期';
+    if (!isValidISODate(session.session_date)) return '日期格式应为 YYYY-MM-DD';
+    if (session.end_date && !isValidISODate(session.end_date)) return '结束日期格式应为 YYYY-MM-DD';
+    if (session.end_date && session.end_date < session.session_date) return '结束日期不能早于开始日期';
+    for (const value of [session.open_time, session.start_time, session.end_time]) {
+      if (value && !isValidTime(value)) return '时间格式应为 HH:MM';
+    }
     return null;
-  }, [eventDate]);
-  const ticketPriceError = useMemo(() => {
-    const trimmed = ticketPrice.trim();
+  }), [sessions]);
+  const timetableErrors = useMemo(() => sessions.map((session, index) => {
+    const error = getTimetableValidationError(session.timetable);
+    if (!error || sessions.length === 1) return error;
+    return `${session.title.trim() || `场次 ${index + 1}`}：${error}`;
+  }), [sessions]);
+  const actualExpenseError = useMemo(() => {
+    const trimmed = actualExpense.trim();
     if (!trimmed) return null;
-    return Number.isFinite(Number(trimmed)) ? null : '票价请输入有效数字';
-  }, [ticketPrice]);
+    const amount = Number(trimmed);
+    return Number.isFinite(amount) && amount >= 0 ? null : '实际支出请输入不小于 0 的数字';
+  }, [actualExpense]);
   const showTitleError = (titleTouched || didTrySubmit) && titleError != null;
-  const showEventDateError = (eventDateTouched || didTrySubmit) && eventDateError != null;
-  const showTicketPriceError = (ticketPriceTouched || didTrySubmit) && ticketPriceError != null;
+  const showActualExpenseError = (actualExpenseTouched || didTrySubmit) && actualExpenseError != null;
   const artistNameMap = useMemo(
     () => Object.fromEntries(allArtists.map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [allArtists],
@@ -418,16 +514,36 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   const handleSave = async () => {
     setDidTrySubmit(true);
     if (titleError) { Alert.alert(titleError); return; }
-    if (eventDateError) { Alert.alert(eventDateError); return; }
-    if (ticketPriceError) { Alert.alert(ticketPriceError); return; }
+    const firstSessionError = sessionErrors.find(Boolean);
+    if (firstSessionError) { Alert.alert(firstSessionError); return; }
+    const firstTimetableError = timetableErrors.find(Boolean);
+    if (firstTimetableError) { Alert.alert(firstTimetableError); return; }
+    if (actualExpenseError) { Alert.alert(actualExpenseError); return; }
 
     setSaving(true);
     try {
       await onSubmit({
         title: title.trim(),
-        event_date: eventDate, event_time: eventTime.trim(),
-        city: city.trim(), venue: venue.trim(), status,
-        trip_id: tripId, ticket_price: ticketPrice,
+        sessions: sessions.map((session) => ({
+          ...session,
+          title: session.title.trim(),
+          session_date: session.session_date,
+          end_date: session.end_date.trim(),
+          open_time: session.open_time.trim(),
+          start_time: session.start_time.trim(),
+          end_time: session.end_time.trim(),
+          city: session.city.trim(),
+          venue: session.venue.trim(),
+          timetable: session.timetable.map((entry) => ({
+            ...entry,
+            title: entry.title.trim(),
+            artist_id: artistIds.includes(entry.artist_id) ? entry.artist_id : '',
+            start_time: entry.start_time.trim(),
+            end_time: entry.end_time.trim(),
+            notes: entry.notes.trim(),
+          })),
+        })),
+        status, trip_id: tripId, actual_expense: actualExpense,
         url: url.trim(), notes: notes.trim(), details: details.trim(),
         artist_ids: artistIds, setlist_text: setlistText.trim(),
         review_score: status === 'completed' ? reviewScore : null,
@@ -499,89 +615,20 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
         )}
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-          <View style={{ flex: 2 }}>
-            <FormFieldLabel required>日期</FormFieldLabel>
+          <View style={{ flex: 1 }}>
+            <FormFieldLabel>实际支出</FormFieldLabel>
             <FieldInput
-              value={eventDate}
-              onChangeText={(text) => setEventDate((current) => formatDateInput(text, current))}
-              onBlur={() => {
-                setEventDateTouched(true);
-                setEventDate((current) => normalizeDateInput(current));
-              }}
-              placeholder="YYYY-MM-DD"
-              isDark={isDark}
-              keyboardType="numeric"
-              maxLength={10}
-              hasError={showEventDateError}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <FormFieldLabel>时间</FormFieldLabel>
-            <FieldInput value={eventTime} onChangeText={(t) => setEventTime(formatTimeInput(t))} placeholder="HH:MM" isDark={isDark} keyboardType="numeric" />
-          </View>
-        </View>
-        {showEventDateError ? (
-          <Text style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
-            {eventDateError}
-          </Text>
-        ) : null}
-
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-          <View style={{ flex: 1 }}>
-            <FormFieldLabel>城市</FormFieldLabel>
-            <FieldInput value={city} onChangeText={setCity} placeholder="城市" isDark={isDark} />
-          </View>
-          <View style={{ flex: 2 }}>
-            <FormFieldLabel>场地</FormFieldLabel>
-            <FieldInput value={venue} onChangeText={setVenue} placeholder="场地名称" isDark={isDark} />
-          </View>
-        </View>
-        {venueSuggestions.length > 0 ? (
-          <View style={{
-            marginTop: 10,
-            borderRadius: 10,
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: colors.inputBorder,
-          }}>
-            {venueSuggestions.map((suggestion, index) => {
-              const isLast = index === venueSuggestions.length - 1;
-              return (
-                <TouchableOpacity
-                  key={suggestion}
-                  activeOpacity={0.7}
-                  onPress={() => handleSelectVenueSuggestion(suggestion)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    backgroundColor: colors.input,
-                    borderBottomWidth: isLast ? 0 : 1,
-                    borderBottomColor: isDark ? colors.inputBorder : colors.cardAlt,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                    {suggestion}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : null}
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-          <View style={{ flex: 1 }}>
-            <FormFieldLabel>票价</FormFieldLabel>
-            <FieldInput
-              value={ticketPrice}
-              onChangeText={setTicketPrice}
-              placeholder="票价"
+              value={actualExpense}
+              onChangeText={setActualExpense}
+              placeholder="0"
               isDark={isDark}
               keyboardType="decimal-pad"
-              onBlur={() => setTicketPriceTouched(true)}
-              hasError={showTicketPriceError}
+              onBlur={() => setActualExpenseTouched(true)}
+              hasError={showActualExpenseError}
             />
-            {showTicketPriceError ? (
+            {showActualExpenseError ? (
               <Text style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
-                {ticketPriceError}
+                {actualExpenseError}
               </Text>
             ) : null}
           </View>
@@ -591,6 +638,217 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           </View>
         </View>
       </Card>
+
+      <FormSectionLabel label={sessions.length === 1 ? '时间与地点' : '场次'} />
+      {sessions.map((session, sessionIndex) => {
+        const sessionError = sessionErrors[sessionIndex];
+        const showSessionError = (sessionDateTouched.has(session.key) || didTrySubmit) && sessionError != null;
+        const expanded = expandedSessionKeys.has(session.key);
+        return (
+          <Card bg={cardBg} key={session.key}>
+            {sessions.length > 1 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.text }}>
+                  场次 {sessionIndex + 1}
+                </Text>
+                <TouchableOpacity
+                  accessibilityLabel="上移场次"
+                  disabled={sessionIndex === 0}
+                  onPress={() => moveSession(sessionIndex, -1)}
+                  style={{ padding: 10, opacity: sessionIndex === 0 ? 0.3 : 1 }}
+                >
+                  <AppIcon name="chevron" variant="up" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel="下移场次"
+                  disabled={sessionIndex === sessions.length - 1}
+                  onPress={() => moveSession(sessionIndex, 1)}
+                  style={{ padding: 10, opacity: sessionIndex === sessions.length - 1 ? 0.3 : 1 }}
+                >
+                  <AppIcon name="chevron" variant="down" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel="删除场次"
+                  onPress={() => removeSession(session)}
+                  style={{ padding: 10 }}
+                >
+                  <AppIcon name="trash" size={17} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <FormFieldLabel>{sessions.length === 1 ? '补充名称' : '场次名称'}</FormFieldLabel>
+            <FieldInput
+              value={session.title}
+              onChangeText={(titleValue) => updateSession(session.key, { title: titleValue })}
+              placeholder="如：昼场、夜场、DAY 1（选填）"
+              isDark={isDark}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <View style={{ flex: 2 }}>
+                <FormFieldLabel required>日期</FormFieldLabel>
+                <FieldInput
+                  value={session.session_date}
+                  onChangeText={(text) => updateSession(session.key, {
+                    session_date: formatDateInput(text, session.session_date),
+                  })}
+                  onBlur={() => {
+                    setSessionDateTouched((current) => new Set(current).add(session.key));
+                    updateSession(session.key, { session_date: normalizeDateInput(session.session_date) });
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  isDark={isDark}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  hasError={showSessionError}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <FormFieldLabel>开始时间</FormFieldLabel>
+                <FieldInput
+                  value={session.start_time}
+                  onChangeText={(value) => updateSession(session.key, { start_time: formatTimeInput(value) })}
+                  placeholder="HH:MM"
+                  isDark={isDark}
+                  keyboardType="numeric"
+                  maxLength={5}
+                />
+              </View>
+            </View>
+            {showSessionError ? (
+              <Text style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>{sessionError}</Text>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <View style={{ flex: 1 }}>
+                <FormFieldLabel>城市</FormFieldLabel>
+                <FieldInput
+                  value={session.city}
+                  onChangeText={(value) => updateSession(session.key, { city: value })}
+                  placeholder="城市"
+                  isDark={isDark}
+                />
+              </View>
+              <View style={{ flex: 2 }}>
+                <FormFieldLabel>场地</FormFieldLabel>
+                <FieldInput
+                  value={session.venue}
+                  onChangeText={(value) => {
+                    setActiveVenueKey(session.key);
+                    updateSession(session.key, { venue: value });
+                  }}
+                  onBlur={() => setTimeout(() => setActiveVenueKey(null), 150)}
+                  placeholder="输入部分名称即可匹配历史场地"
+                  isDark={isDark}
+                />
+              </View>
+            </View>
+            {activeVenueKey === session.key && venueSuggestions.length > 0 ? (
+              <View style={{
+                marginTop: 10, borderRadius: 10, overflow: 'hidden',
+                borderWidth: 1, borderColor: colors.inputBorder,
+              }}>
+                {venueSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={suggestion}
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectVenueSuggestion(session.key, suggestion)}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.input,
+                      borderBottomWidth: index === venueSuggestions.length - 1 ? 0 : 1,
+                      borderBottomColor: isDark ? colors.inputBorder : colors.cardAlt,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: colors.textSecondary }}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={() => setExpandedSessionKeys((current) => {
+                const next = new Set(current);
+                if (next.has(session.key)) next.delete(session.key); else next.add(session.key);
+                return next;
+              })}
+              style={{
+                minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center',
+                justifyContent: 'center', gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>
+                {expanded ? '收起更多时间' : '更多时间'}
+              </Text>
+              <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={15} color={colors.accent} />
+            </TouchableOpacity>
+
+            {expanded ? (
+              <>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <View style={{ flex: 1 }}>
+                    <FormFieldLabel>开场时间</FormFieldLabel>
+                    <FieldInput
+                      value={session.open_time}
+                      onChangeText={(value) => updateSession(session.key, { open_time: formatTimeInput(value) })}
+                      placeholder="HH:MM"
+                      isDark={isDark}
+                      keyboardType="numeric"
+                      maxLength={5}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <FormFieldLabel>结束时间</FormFieldLabel>
+                    <FieldInput
+                      value={session.end_time}
+                      onChangeText={(value) => updateSession(session.key, { end_time: formatTimeInput(value) })}
+                      placeholder="HH:MM"
+                      isDark={isDark}
+                      keyboardType="numeric"
+                      maxLength={5}
+                    />
+                  </View>
+                </View>
+                <View style={{ marginTop: 14 }}>
+                  <FormFieldLabel>结束日期</FormFieldLabel>
+                  <FieldInput
+                    value={session.end_date}
+                    onChangeText={(text) => updateSession(session.key, {
+                      end_date: formatDateInput(text, session.end_date),
+                    })}
+                    onBlur={() => updateSession(session.key, { end_date: normalizeDateInput(session.end_date) })}
+                    placeholder="跨日时填写 YYYY-MM-DD"
+                    isDark={isDark}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+              </>
+            ) : null}
+
+            <EventTimetableEditor
+              entries={session.timetable}
+              artists={selectedArtists}
+              onChange={(timetable) => updateSession(session.key, { timetable })}
+            />
+          </Card>
+        );
+      })}
+      <TouchableOpacity
+        onPress={() => setSessions((current) => [...current, createEmptySession()])}
+        activeOpacity={0.7}
+        style={{
+          minHeight: 48, marginBottom: 12, borderRadius: 14, borderWidth: 1,
+          borderStyle: 'dashed', borderColor: colors.accent,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+          backgroundColor: withAlpha(colors.accent, isDark ? 0.1 : 0.05),
+        }}
+      >
+        <AppIcon name="add" size={18} color={colors.accent} />
+        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+          {sessions.length === 1 ? '添加其他场次' : '添加场次'}
+        </Text>
+      </TouchableOpacity>
 
       {/* 详细信息 */}
       <FormSectionLabel label="详细信息" />
@@ -687,7 +945,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
             }}
           >
             <Text style={{ fontSize: 13, color: colors.placeholder }}>
-              添加时间表、出演阵容等资料图
+              添加海报、出演阵容等资料图
             </Text>
           </TouchableOpacity>
         )}

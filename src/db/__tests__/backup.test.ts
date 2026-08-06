@@ -14,6 +14,7 @@ import { ChekiManualEntryRepository } from '../../repositories/ChekiManualEntryR
 import { ChekiRecordRepository } from '../../repositories/ChekiRecordRepository';
 import { UserConfigRepository } from '../../repositories/UserConfigRepository';
 import { DateItemRepository } from '../../repositories/DateItemRepository';
+import { EventScheduleRepository } from '../../repositories/EventScheduleRepository';
 import { Repositories } from '../../context/DBContext';
 
 let mockBackupUuidIndex = 0;
@@ -68,6 +69,7 @@ function createRepositories(rawDb: Database.Database): Repositories {
     rawDb: rawDbAdapter as Repositories['rawDb'],
     artists: new ArtistRepository(rawDbAdapter as Repositories['rawDb']),
     events: new EventRepository(rawDbAdapter as Repositories['rawDb']),
+    eventSchedules: new EventScheduleRepository(rawDbAdapter as Repositories['rawDb']),
     trips: new TripRepository(rawDbAdapter as Repositories['rawDb']),
     expenses: new ExpenseRepository(rawDbAdapter as Repositories['rawDb']),
     photos: new PhotoRepository(rawDbAdapter as Repositories['rawDb']),
@@ -162,6 +164,97 @@ describe('backup artist background metadata support', () => {
     expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 1 });
     expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_items').get()).toEqual({ count: 2 });
     expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_item_images').get()).toEqual({ count: 2 });
+  });
+
+  test('backs up and restores activity sessions and timetable rows', async () => {
+    const now = '2026-08-01T00:00:00.000Z';
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, is_favorite, created_at)
+       VALUES ('artist-schedule', 'Schedule Artist', 0, ?)`,
+    ).run(now);
+    rawDb.prepare(
+      `INSERT INTO events
+         (id, title, event_type, status, actual_expense, created_at, updated_at)
+       VALUES ('event-schedule', 'Festival', 'festival', 'planned', 880, ?, ?)`,
+    ).run(now, now);
+    rawDb.prepare(
+      `INSERT INTO event_sessions
+         (id, event_id, title, session_date, start_time, city, venue, sort_order, created_at, updated_at)
+       VALUES ('session-schedule', 'event-schedule', 'Day 1', '2026-08-08', '18:00', '上海', '场馆', 0, ?, ?)`,
+    ).run(now, now);
+    rawDb.prepare(
+      `INSERT INTO event_timetable_entries
+         (id, session_id, title, artist_id, start_time, sort_order, created_at, updated_at)
+       VALUES ('entry-schedule', 'session-schedule', '出演', 'artist-schedule', '18:00', 0, ?, ?)`,
+    ).run(now, now);
+
+    const data = await buildBackupData(repositories);
+
+    expect(data.events).toEqual([
+      expect.objectContaining({ id: 'event-schedule', actual_expense: 880 }),
+    ]);
+    expect(data.events[0]).not.toHaveProperty('event_date');
+    expect(data.event_sessions).toEqual([
+      expect.objectContaining({ id: 'session-schedule', session_date: '2026-08-08' }),
+    ]);
+    expect(data.event_timetable_entries).toEqual([
+      expect.objectContaining({
+        id: 'entry-schedule',
+        session_id: 'session-schedule',
+        artist_id: 'artist-schedule',
+      }),
+    ]);
+
+    await restoreBackupData(
+      repositories,
+      data as unknown as Parameters<typeof restoreBackupData>[1],
+    );
+
+    expect(rawDb.prepare("SELECT actual_expense FROM events WHERE id = 'event-schedule'").get())
+      .toEqual({ actual_expense: 880 });
+    expect(rawDb.prepare("SELECT session_date FROM event_sessions WHERE id = 'session-schedule'").get())
+      .toEqual({ session_date: '2026-08-08' });
+    expect(rawDb.prepare("SELECT title FROM event_timetable_entries WHERE id = 'entry-schedule'").get())
+      .toEqual({ title: '出演' });
+  });
+
+  test('restores a v5-shaped activity as a root event with one default session', async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+
+    await restoreBackupData(repositories, {
+      events: [{
+        id: 'legacy-event',
+        title: 'Legacy Event',
+        event_type: 'livehouse',
+        event_date: '2026-03-04',
+        event_time: '19:30',
+        city: '东京',
+        venue: 'Legacy Hall',
+        ticket_price: 520,
+        status: 'completed',
+        review_score: null,
+        notes: null,
+        details: null,
+        url: null,
+        setlist_text: null,
+        trip_id: null,
+        created_at: now,
+        updated_at: now,
+      }],
+    });
+
+    expect(rawDb.prepare("SELECT actual_expense FROM events WHERE id = 'legacy-event'").get())
+      .toEqual({ actual_expense: 520 });
+    expect(rawDb.prepare(
+      `SELECT session_date, start_time, city, venue, sort_order
+       FROM event_sessions WHERE event_id = 'legacy-event'`,
+    ).get()).toEqual({
+      session_date: '2026-03-04',
+      start_time: '19:30',
+      city: '东京',
+      venue: 'Legacy Hall',
+      sort_order: 0,
+    });
   });
 
   test('restores legacy cheki backup rows through the shared migration rules', async () => {

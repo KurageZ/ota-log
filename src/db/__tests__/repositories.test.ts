@@ -8,6 +8,7 @@ import { ArtistRepository } from '../../repositories/ArtistRepository';
 import { UserConfigRepository } from '../../repositories/UserConfigRepository';
 import { PhotoRepository } from '../../repositories/PhotoRepository';
 import { DEFAULT_PROFILE_EMOJI } from '../../utils/profile';
+import { installLegacyEventFixture } from './fixtures/installLegacyEventFixture';
 
 let mockGeneratedIdIndex = 0;
 jest.mock('../../utils/uuid', () => ({
@@ -33,6 +34,7 @@ describe('Cheki repositories', () => {
     for (const statement of SCHEMA_STATEMENTS) {
       rawDb.exec(statement);
     }
+    installLegacyEventFixture(rawDb);
     // Keep historical fixture statements readable while exercising the v2 repositories.
     rawDb.exec(`
       CREATE TABLE cheki (
@@ -109,7 +111,7 @@ describe('Cheki repositories', () => {
     ).run('artist-2', 'Artist Two', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
 
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -133,7 +135,7 @@ describe('Cheki repositories', () => {
     );
 
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -308,15 +310,16 @@ describe('Cheki repositories', () => {
   });
 
   test('reconciles only expired planned events and preserves review data', async () => {
-    rawDb.prepare('UPDATE events SET event_date = ? WHERE id = ?').run('2026-07-25', 'event-2');
+    rawDb.prepare('UPDATE event_sessions SET session_date = ? WHERE event_id = ?')
+      .run('2026-07-25', 'event-2');
     rawDb.prepare('UPDATE events SET review_score = 5, notes = ? WHERE id = ?').run('keep this', 'event-2');
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run('expired-planned', 'Expired', 'livehouse', '2026-05-01', null, null, null, null, 'planned', 4, 'note', null, null, null, null, '2026-04-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run('wishlist-old', 'Wishlist', 'livehouse', '2026-05-01', null, null, null, null, 'wishlist', null, null, null, null, null, null, '2026-04-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z');
@@ -343,6 +346,110 @@ describe('Cheki repositories', () => {
     await eventRepository.delete(created.id);
     expect(listener).toHaveBeenCalledTimes(3);
     unsubscribe();
+  });
+
+  test('creates a multi-session activity atomically', async () => {
+    const created = await eventRepository.createWithSessions({
+      title: 'Two Day Festival',
+      event_type: 'festival',
+      status: 'planned',
+      actual_expense: 680,
+      sessions: [
+        { title: 'DAY 1', session_date: '2099-08-08', start_time: '12:00', city: '上海' },
+        { title: 'DAY 2', session_date: '2099-08-09', start_time: '11:00', city: '上海' },
+      ],
+    });
+
+    expect(created).toEqual(expect.objectContaining({
+      title: 'Two Day Festival',
+      actual_expense: 680,
+      ticket_price: 680,
+      event_date: '2099-08-08',
+    }));
+    expect(rawDb.prepare(
+      'SELECT title, session_date, sort_order FROM event_sessions WHERE event_id = ? ORDER BY sort_order',
+    ).all(created.id)).toEqual([
+      { title: 'DAY 1', session_date: '2099-08-08', sort_order: 0 },
+      { title: 'DAY 2', session_date: '2099-08-09', sort_order: 1 },
+    ]);
+
+    await expect(eventRepository.createWithSessions({
+      title: 'Invalid',
+      event_type: 'other',
+      status: 'planned',
+      sessions: [],
+    })).rejects.toThrow('An activity must include at least one dated session');
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM events WHERE title = 'Invalid'").get())
+      .toEqual({ count: 0 });
+  });
+
+  test('creates and updates the complete activity schedule atomically', async () => {
+    const created = await eventRepository.createWithSchedule({
+      title: 'Atomic Festival',
+      event_type: 'festival',
+      status: 'planned',
+      artist_ids: ['artist-1'],
+      sessions: [{
+        title: 'DAY 1',
+        session_date: '2099-09-01',
+        timetable: [{ title: 'Artist Live', artist_id: 'artist-1', start_time: '18:00' }],
+      }],
+    });
+
+    expect(rawDb.prepare(
+      'SELECT artist_id FROM event_artists WHERE event_id = ?',
+    ).all(created.id)).toEqual([{ artist_id: 'artist-1' }]);
+    expect(rawDb.prepare(
+      `SELECT e.title FROM event_timetable_entries e
+       JOIN event_sessions s ON s.id = e.session_id
+       WHERE s.event_id = ?`,
+    ).all(created.id)).toEqual([{ title: 'Artist Live' }]);
+
+    await expect(eventRepository.updateWithSchedule(created.id, {
+      title: 'Partially Updated Festival',
+      status: 'completed',
+      artist_ids: ['artist-1'],
+      sessions: [{
+        session_date: '2099-09-02',
+        timetable: [{ title: 'Broken', artist_id: 'missing-artist' }],
+      }],
+    })).rejects.toThrow();
+
+    expect(await eventRepository.findById(created.id)).toEqual(expect.objectContaining({
+      title: 'Atomic Festival',
+      status: 'planned',
+      event_date: '2099-09-01',
+    }));
+    expect(rawDb.prepare(
+      `SELECT e.title FROM event_timetable_entries e
+       JOIN event_sessions s ON s.id = e.session_id
+       WHERE s.event_id = ?`,
+    ).all(created.id)).toEqual([{ title: 'Artist Live' }]);
+
+    await expect(eventRepository.createWithSchedule({
+      title: 'Invalid Aggregate',
+      event_type: 'festival',
+      status: 'planned',
+      artist_ids: [],
+      sessions: [{
+        session_date: '2099-09-03',
+        timetable: [{ title: 'Broken', artist_id: 'missing-artist' }],
+      }],
+    })).rejects.toThrow();
+    expect(rawDb.prepare(
+      "SELECT COUNT(*) AS count FROM events WHERE title = 'Invalid Aggregate'",
+    ).get()).toEqual({ count: 0 });
+
+    await expect(eventRepository.createWithSchedule({
+      title: 'Invalid Date Aggregate',
+      event_type: 'festival',
+      status: 'planned',
+      artist_ids: [],
+      sessions: [{ session_date: '2099-02-30', timetable: [] }],
+    })).rejects.toThrow('Session date must be a valid YYYY-MM-DD date');
+    expect(rawDb.prepare(
+      "SELECT COUNT(*) AS count FROM events WHERE title = 'Invalid Date Aggregate'",
+    ).get()).toEqual({ count: 0 });
   });
 
   test('notifies subscribers after photo mutations', async () => {
@@ -511,7 +618,7 @@ describe('Cheki repositories', () => {
 
   test('findNextPlannedByArtistId returns the nearest planned event for the artist', async () => {
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -710,7 +817,7 @@ describe('Cheki repositories', () => {
     ).run('group-2', 'Group Two', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
 
     const insertEvent = rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
@@ -762,7 +869,7 @@ describe('Cheki repositories', () => {
 
   test('all-time stats include records across years', async () => {
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -855,7 +962,7 @@ describe('Cheki repositories', () => {
       (await eventRepository.findFiltered(filter)).map((event) => event.id);
 
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -864,7 +971,7 @@ describe('Cheki repositories', () => {
       '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'
     );
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -886,7 +993,7 @@ describe('Cheki repositories', () => {
     await expect(eventRepository.findDistinctYears()).resolves.toEqual([2026]);
 
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -902,7 +1009,7 @@ describe('Cheki repositories', () => {
     // 基线：event-1=Tokyo/Zepp，event-2=Osaka/Namba Hatch
     // 再插入一场 Tokyo 活动，让 Tokyo 计数领先
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -958,7 +1065,7 @@ describe('Cheki repositories', () => {
     ).run('member-1', 'Member One', null, 'group-1', null, null, 1, '2026-01-01T00:00:00.000Z');
 
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(

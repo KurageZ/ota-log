@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { SCHEMA_STATEMENTS } from '../schema';
 
-function names(db: Database.Database, type: 'table' | 'index' | 'trigger'): string[] {
+function names(db: Database.Database, type: 'table' | 'index' | 'trigger' | 'view'): string[] {
   return (db.prepare('SELECT name FROM sqlite_master WHERE type = ? ORDER BY name').all(type) as Array<{ name: string }>)
     .map((row) => row.name);
 }
@@ -10,7 +10,7 @@ function columns(db: Database.Database, table: string): string[] {
   return (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((column) => column.name);
 }
 
-describe('Fresh cheki v2 schema', () => {
+describe('Fresh database schema', () => {
   let db: Database.Database;
 
   beforeEach(() => {
@@ -31,6 +31,69 @@ describe('Fresh cheki v2 schema', () => {
       'cheki_item_images',
     ]));
     expect(names(db, 'table')).not.toEqual(expect.arrayContaining(['cheki', 'cheki_manual_entries']));
+  });
+
+  test('creates the activity v2 root, sessions, timetable, and compatibility views', () => {
+    expect(columns(db, 'events')).toEqual([
+      'id', 'title', 'event_type', 'status', 'review_score', 'notes', 'details',
+      'url', 'setlist_text', 'actual_expense', 'trip_id', 'created_at', 'updated_at',
+    ]);
+    expect(columns(db, 'event_sessions')).toEqual([
+      'id', 'event_id', 'title', 'session_date', 'end_date', 'open_time',
+      'start_time', 'end_time', 'city', 'venue', 'sort_order', 'created_at', 'updated_at',
+    ]);
+    expect(names(db, 'table')).not.toContain('event_timetable_sections');
+    expect(columns(db, 'event_timetable_entries')).toEqual([
+      'id', 'session_id', 'title', 'artist_id', 'start_time', 'end_time',
+      'notes', 'sort_order', 'created_at', 'updated_at',
+    ]);
+    expect(columns(db, 'event_artists')).toEqual([
+      'event_id', 'artist_id', 'sort_order',
+    ]);
+    expect(names(db, 'index')).toEqual(expect.arrayContaining([
+      'idx_event_sessions_event_sort',
+      'idx_event_sessions_date',
+      'idx_event_timetable_entries_session',
+    ]));
+    expect(names(db, 'view')).toEqual(expect.arrayContaining([
+      'event_first_summaries',
+      'event_summaries',
+    ]));
+  });
+
+  test('enforces activity session and timetable aggregate constraints', () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    db.prepare(`INSERT INTO events
+      (id, title, event_type, status, actual_expense, created_at, updated_at)
+      VALUES ('event', 'Event', 'livehouse', 'planned', 120, ?, ?)`).run(now, now);
+    const insertSession = db.prepare(`INSERT INTO event_sessions
+      (id, event_id, session_date, end_date, sort_order, created_at, updated_at)
+      VALUES (?, 'event', ?, ?, ?, ?, ?)`);
+    expect(() => insertSession.run('bad-date', '', null, 0, now, now)).toThrow();
+    expect(() => insertSession.run('bad-end', '2026-03-02', '2026-03-01', 0, now, now)).toThrow();
+    insertSession.run('day-1', '2026-03-02', null, 0, now, now);
+    insertSession.run('day-2', '2026-03-03', null, 1, now, now);
+    expect(() => insertSession.run('duplicate-order', '2026-03-04', null, 1, now, now)).toThrow();
+
+    db.prepare(`INSERT INTO event_timetable_entries
+      (id, session_id, title, artist_id, start_time, sort_order, created_at, updated_at)
+      VALUES ('entry', 'day-1', 'Artist', 'artist', '12:00', 0, ?, ?)`).run(now, now);
+
+    expect(db.prepare(`SELECT event_date, event_time, city, venue, ticket_price
+      FROM event_first_summaries WHERE id = 'event'`).get()).toEqual({
+      event_date: '2026-03-02',
+      event_time: null,
+      city: null,
+      venue: null,
+      ticket_price: 120,
+    });
+
+    db.prepare("DELETE FROM artists WHERE id = 'artist'").run();
+    expect(db.prepare("SELECT artist_id FROM event_timetable_entries WHERE id = 'entry'").get())
+      .toEqual({ artist_id: null });
+    db.prepare("DELETE FROM event_sessions WHERE id = 'day-1'").run();
+    expect(db.prepare("SELECT COUNT(*) AS count FROM event_timetable_entries").get())
+      .toEqual({ count: 0 });
   });
 
   test('creates all fields, indexes, foreign keys, and triggers', () => {

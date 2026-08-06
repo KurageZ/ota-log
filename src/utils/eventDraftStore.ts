@@ -1,7 +1,7 @@
-import type { EventFormValues } from '../components/EventForm';
+import type { EventFormPrefill } from '../components/EventForm';
 
 export interface EventDraft {
-  prefill: Partial<EventFormValues> | null;
+  prefill: EventFormPrefill | null;
   photoUris: string[];
   showPrefillNotice: boolean;
 }

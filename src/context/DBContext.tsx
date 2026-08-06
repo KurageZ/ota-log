@@ -13,6 +13,7 @@ import { ChekiManualEntryRepository } from '../repositories/ChekiManualEntryRepo
 import { ChekiRecordRepository } from '../repositories/ChekiRecordRepository';
 import { UserConfigRepository } from '../repositories/UserConfigRepository';
 import { DateItemRepository } from '../repositories/DateItemRepository';
+import { EventScheduleRepository } from '../repositories/EventScheduleRepository';
 import { useAppTheme } from '../theme/appTheme';
 import { rebaseLegacyLocalMediaUris } from '../utils/localMedia';
 import { materializePresetArtistAvatars } from '../utils/presetArtistMedia';
@@ -21,6 +22,7 @@ import { toISODate } from '../utils/date';
 export interface Repositories {
   artists: ArtistRepository;
   events: EventRepository;
+  eventSchedules: EventScheduleRepository;
   trips: TripRepository;
   expenses: ExpenseRepository;
   photos: PhotoRepository;
@@ -43,6 +45,7 @@ function buildRepositories(db: SQLiteDatabase): Repositories {
     rawDb: db,
     artists: new ArtistRepository(db),
     events: new EventRepository(db),
+    eventSchedules: new EventScheduleRepository(db),
     trips: new TripRepository(db),
     expenses: new ExpenseRepository(db),
     photos: new PhotoRepository(db),

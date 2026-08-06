@@ -8,8 +8,23 @@ import {
   migrateLegacyChekiData,
 } from './legacyChekiMigration';
 import { generateId } from '../utils/uuid';
+import {
+  ACTIVITY_V2_SCHEMA_STATEMENTS,
+  createEventArtistsV2TableSql,
+  createEventsV2TableSql,
+} from './activityV2Schema';
 
-export const CURRENT_VERSION = 17;
+export const CURRENT_VERSION = 18;
+
+interface LegacyEventV17Row {
+  id: string;
+  event_date: string;
+  event_time: string | null;
+  city: string | null;
+  venue: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 async function createImportantDateTables(db: SQLiteDatabase): Promise<void> {
   await db.runAsync(`CREATE TABLE IF NOT EXISTS important_dates (
@@ -184,6 +199,81 @@ async function migrateChekiV2(db: SQLiteDatabase): Promise<void> {
   });
 }
 
+async function migrateActivityV2(db: SQLiteDatabase): Promise<void> {
+  const legacyEvents = await db.getAllAsync<LegacyEventV17Row>(
+    `SELECT id, event_date, event_time, city, venue, created_at, updated_at
+     FROM events`,
+  );
+
+  await db.runAsync('PRAGMA foreign_keys = OFF');
+  try {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DROP VIEW IF EXISTS event_summaries');
+      await db.runAsync('DROP VIEW IF EXISTS event_first_summaries');
+
+      await db.runAsync(createEventsV2TableSql('events_v18'));
+      await db.runAsync(
+        `INSERT INTO events_v18
+           (id, title, event_type, status, review_score, notes, details, url,
+            setlist_text, actual_expense, trip_id, created_at, updated_at)
+         SELECT
+           id, title, event_type, status, review_score, notes, details, url,
+           setlist_text, ticket_price, trip_id, created_at, updated_at
+         FROM events`,
+      );
+      await db.runAsync('DROP TABLE events');
+      await db.runAsync('ALTER TABLE events_v18 RENAME TO events');
+
+      await db.runAsync(createEventArtistsV2TableSql('event_artists_v18'));
+      await db.runAsync(
+        `INSERT INTO event_artists_v18 (event_id, artist_id, sort_order)
+         SELECT
+           event_id,
+           artist_id,
+           ROW_NUMBER() OVER (
+             PARTITION BY event_id
+             ORDER BY rowid ASC, artist_id ASC
+           ) - 1
+         FROM event_artists`,
+      );
+      await db.runAsync('DROP TABLE event_artists');
+      await db.runAsync('ALTER TABLE event_artists_v18 RENAME TO event_artists');
+
+      for (const statement of ACTIVITY_V2_SCHEMA_STATEMENTS) {
+        await db.runAsync(statement);
+      }
+
+      for (const event of legacyEvents) {
+        await db.runAsync(
+          `INSERT INTO event_sessions
+             (id, event_id, title, session_date, end_date, open_time, start_time,
+              end_time, city, venue, sort_order, created_at, updated_at)
+           VALUES (?, ?, NULL, ?, NULL, NULL, ?, NULL, ?, ?, 0, ?, ?)`,
+          [
+            generateId(),
+            event.id,
+            event.event_date,
+            event.event_time,
+            event.city,
+            event.venue,
+            event.created_at,
+            event.updated_at,
+          ],
+        );
+      }
+    });
+  } finally {
+    await db.runAsync('PRAGMA foreign_keys = ON');
+  }
+
+  const foreignKeyErrors = await db.getAllAsync<Record<string, unknown>>(
+    'PRAGMA foreign_key_check',
+  );
+  if (foreignKeyErrors.length > 0) {
+    throw new Error('Activity v2 migration foreign key verification failed');
+  }
+}
+
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
@@ -303,6 +393,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 17) {
       await migrateChekiV2(db);
+    }
+    if (version < 18) {
+      await migrateActivityV2(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

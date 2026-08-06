@@ -89,7 +89,7 @@ export class ExpenseRepository {
       return this.db.getAllAsync<{ category: string; total: number }>(
         `SELECT e.category, SUM(e.amount) AS total
          FROM expenses e
-         WHERE e.event_id IN (SELECT id FROM events WHERE event_date LIKE ? || '-%')
+         WHERE e.event_id IN (SELECT id FROM event_first_summaries WHERE event_date LIKE ? || '-%')
             OR e.trip_id IN (SELECT id FROM trips WHERE depart_date LIKE ? || '-%')
          GROUP BY e.category
          ORDER BY total DESC`,
@@ -112,7 +112,7 @@ export class ExpenseRepository {
     const row = await this.db.getFirstAsync<{ total: number }>(
       `SELECT COALESCE(SUM(e.amount), 0) AS total
        FROM expenses e
-       WHERE e.event_id IN (SELECT id FROM events WHERE event_date LIKE ? || '-%')
+       WHERE e.event_id IN (SELECT id FROM event_first_summaries WHERE event_date LIKE ? || '-%')
           OR e.trip_id IN (SELECT id FROM trips WHERE depart_date LIKE ? || '-%')`,
       [String(year), String(year)]
     );

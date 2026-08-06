@@ -1,7 +1,17 @@
 import { SQLiteDatabase } from 'expo-sqlite';
-import { Artist, CreateEventInput, Event, EventStatus } from '../types/models';
+import {
+  Artist,
+  CreateEventInput,
+  CreateEventWithScheduleInput,
+  CreateEventWithSessionsInput,
+  Event,
+  EventSessionScheduleInput,
+  EventStatus,
+  CreateEventTimetableEntryInput,
+  UpdateEventWithScheduleInput,
+} from '../types/models';
 import { generateId } from '../utils/uuid';
-import { eventDateLikeParam, toISODateTime } from '../utils/date';
+import { eventDateLikeParam, isValidISODate, toISODateTime } from '../utils/date';
 import { selectCurrentPlannedEvent } from '../utils/currentEvent';
 
 export interface EventFilter {
@@ -95,21 +105,91 @@ export class EventRepository {
     for (const listener of this.changeListeners) listener();
   }
 
+  private validateScheduleSessions(sessions: EventSessionScheduleInput[]): void {
+    if (sessions.length === 0) {
+      throw new Error('An activity must include at least one dated session');
+    }
+    for (const session of sessions) {
+      if (!isValidISODate(session.session_date)) {
+        throw new Error('Session date must be a valid YYYY-MM-DD date');
+      }
+      if (session.end_date && !isValidISODate(session.end_date)) {
+        throw new Error('Session end date must be a valid YYYY-MM-DD date');
+      }
+      if (session.end_date && session.end_date < session.session_date) {
+        throw new Error('Session end date cannot be earlier than its start date');
+      }
+    }
+    if (sessions.some((session) => session.timetable.some((entry) => !entry.title.trim()))) {
+      throw new Error('Timetable entry title is required');
+    }
+  }
+
+  private async insertTimetableRows(
+    sessionId: string,
+    timetable: CreateEventTimetableEntryInput[],
+    now: string,
+  ): Promise<void> {
+    for (const [entryIndex, entry] of timetable.entries()) {
+      await this.db.runAsync(
+        `INSERT INTO event_timetable_entries
+           (id, session_id, title, artist_id, start_time, end_time, notes,
+            sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          generateId(), sessionId, entry.title, entry.artist_id ?? null,
+          entry.start_time ?? null, entry.end_time ?? null, entry.notes ?? null,
+          entryIndex, now, now,
+        ],
+      );
+    }
+  }
+
+  private async replaceArtistRows(eventId: string, artistIds: string[]): Promise<void> {
+    await this.db.runAsync('DELETE FROM event_artists WHERE event_id = ?', [eventId]);
+    for (const [sortOrder, artistId] of [...new Set(artistIds)].entries()) {
+      await this.db.runAsync(
+        `INSERT INTO event_artists (event_id, artist_id, sort_order)
+         VALUES (?, ?, ?)`,
+        [eventId, artistId, sortOrder],
+      );
+    }
+  }
+
+  private async findRepresentativeSessionId(eventId: string): Promise<string | null> {
+    const row = await this.db.getFirstAsync<{ id: string }>(
+      `SELECT id
+       FROM event_sessions
+       WHERE event_id = ?
+       ORDER BY
+         CASE WHEN session_date >= date('now', 'localtime') THEN 0 ELSE 1 END ASC,
+         CASE WHEN session_date >= date('now', 'localtime') THEN session_date END ASC,
+         CASE WHEN session_date < date('now', 'localtime') THEN session_date END DESC,
+         CASE WHEN session_date >= date('now', 'localtime') THEN start_time END ASC,
+         CASE WHEN session_date < date('now', 'localtime') THEN start_time END DESC,
+         sort_order ASC,
+         id ASC
+       LIMIT 1`,
+      [eventId],
+    );
+    return row?.id ?? null;
+  }
+
   async findAll(status?: EventStatus): Promise<Event[]> {
     if (status) {
       return this.db.getAllAsync<Event>(
-        'SELECT * FROM events WHERE status = ? ORDER BY event_date DESC',
+        'SELECT * FROM event_summaries WHERE status = ? ORDER BY event_date DESC',
         [status]
       );
     }
     return this.db.getAllAsync<Event>(
-      'SELECT * FROM events ORDER BY event_date DESC'
+      'SELECT * FROM event_summaries ORDER BY event_date DESC'
     );
   }
 
   async findById(id: string): Promise<Event | null> {
     return this.db.getFirstAsync<Event>(
-      'SELECT * FROM events WHERE id = ?',
+      'SELECT * FROM event_summaries WHERE id = ?',
       [id]
     );
   }
@@ -122,7 +202,12 @@ export class EventRepository {
   async reconcileExpiredPlanned(today: string): Promise<number> {
     const result = await this.db.runAsync(
       `UPDATE events SET status = 'completed', updated_at = ?
-       WHERE status = 'planned' AND event_date < ?`,
+       WHERE status = 'planned'
+         AND NOT EXISTS (
+           SELECT 1 FROM event_sessions s
+           WHERE s.event_id = events.id
+             AND COALESCE(s.end_date, s.session_date) >= ?
+         )`,
       [new Date().toISOString(), today],
     );
     if (result.changes > 0) this.notifyChanges();
@@ -131,7 +216,7 @@ export class EventRepository {
 
   async findUpcoming(limit?: number): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      `SELECT * FROM events
+      `SELECT * FROM event_summaries
        WHERE status = 'planned'
        ORDER BY event_date ASC, event_time ASC
        ${limit != null ? `LIMIT ${limit}` : ''}`
@@ -140,21 +225,21 @@ export class EventRepository {
 
   async findByYear(year: number): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      `SELECT * FROM events WHERE event_date LIKE ? || '-%' ORDER BY event_date ASC`,
+      `SELECT * FROM event_first_summaries WHERE event_date LIKE ? || '-%' ORDER BY event_date ASC`,
       [String(year)]
     );
   }
 
   async findByTripId(tripId: string): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      'SELECT * FROM events WHERE trip_id = ? ORDER BY event_date ASC',
+      'SELECT * FROM event_summaries WHERE trip_id = ? ORDER BY event_date ASC',
       [tripId]
     );
   }
 
   async findRecent(limit?: number | null): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      `SELECT * FROM events
+      `SELECT * FROM event_summaries
        WHERE status = 'completed'
        ORDER BY event_date DESC
        ${limit == null ? '' : 'LIMIT ?'}`,
@@ -168,12 +253,12 @@ export class EventRepository {
 
     const rows = await this.db.getAllAsync<{ venue: string }>(
       `SELECT venue
-       FROM events
+       FROM event_sessions
        WHERE venue IS NOT NULL
          AND TRIM(venue) != ''
          AND venue LIKE '%' || ? || '%'
        GROUP BY venue
-       ORDER BY MAX(event_date) DESC, COUNT(*) DESC, venue ASC
+       ORDER BY MAX(session_date) DESC, COUNT(*) DESC, venue ASC
        LIMIT ?`,
       [trimmed, limit]
     );
@@ -187,7 +272,7 @@ export class EventRepository {
         `SELECT a.name, COUNT(ea.event_id) AS count
          FROM artists a
          JOIN event_artists ea ON ea.artist_id = a.id
-         JOIN events e ON e.id = ea.event_id
+         JOIN event_first_summaries e ON e.id = ea.event_id
          WHERE e.status = 'completed' AND e.event_date LIKE ? || '-%'
          GROUP BY a.id, a.name
          ORDER BY count DESC`,
@@ -198,7 +283,7 @@ export class EventRepository {
       `SELECT a.name, COUNT(ea.event_id) AS count
        FROM artists a
        JOIN event_artists ea ON ea.artist_id = a.id
-       JOIN events e ON e.id = ea.event_id
+       JOIN event_first_summaries e ON e.id = ea.event_id
        WHERE e.status = 'completed'
        GROUP BY a.id, a.name
        ORDER BY count DESC`
@@ -219,7 +304,7 @@ export class EventRepository {
          COUNT(DISTINCT e.id) AS count
        FROM artists a
        JOIN event_artists ea ON ea.artist_id = a.id
-       JOIN events e ON e.id = ea.event_id
+       JOIN event_first_summaries e ON e.id = ea.event_id
        WHERE a.parent_id IS NULL
          AND e.status = 'completed'
          ${period.sql}
@@ -244,7 +329,7 @@ export class EventRepository {
          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
          SUM(CASE WHEN status = 'planned' THEN 1 ELSE 0 END) AS planned,
          SUM(CASE WHEN status = 'wishlist' THEN 1 ELSE 0 END) AS wishlist
-       FROM events
+       FROM event_first_summaries
        WHERE 1 = 1${period.sql}`,
       period.params
     );
@@ -259,7 +344,7 @@ export class EventRepository {
   async getMonthlyCountsByYear(year: number): Promise<number[]> {
     const rows = await this.db.getAllAsync<MonthlyCountRow>(
       `SELECT substr(event_date, 6, 2) AS month, COUNT(*) AS count
-       FROM events
+       FROM event_first_summaries
        WHERE event_date LIKE ? || '-%'
          AND status IN ('completed', 'planned', 'wishlist')
        GROUP BY substr(event_date, 6, 2)`,
@@ -275,14 +360,15 @@ export class EventRepository {
   async findTopCityByYear(year?: number, month?: number): Promise<{ name: string; count: number } | null> {
     const period = eventPeriodClause(year, month);
     const row = await this.db.getFirstAsync<LabelCountRow>(
-      `SELECT city AS label, COUNT(*) AS count
-       FROM events
-       WHERE status IN ('completed', 'planned', 'wishlist')
+      `SELECT s.city AS label, COUNT(DISTINCT s.event_id) AS count
+       FROM event_sessions s
+       JOIN event_first_summaries e ON e.id = s.event_id
+       WHERE e.status IN ('completed', 'planned', 'wishlist')
          ${period.sql}
-         AND city IS NOT NULL
-         AND TRIM(city) != ''
-       GROUP BY city
-       ORDER BY count DESC, MAX(event_date) DESC, city ASC
+         AND s.city IS NOT NULL
+         AND TRIM(s.city) != ''
+       GROUP BY s.city
+       ORDER BY count DESC, MAX(s.session_date) DESC, s.city ASC
        LIMIT 1`,
       period.params
     );
@@ -293,14 +379,15 @@ export class EventRepository {
   async findTopVenueByYear(year?: number, month?: number): Promise<{ name: string; count: number } | null> {
     const period = eventPeriodClause(year, month);
     const row = await this.db.getFirstAsync<LabelCountRow>(
-      `SELECT venue AS label, COUNT(*) AS count
-       FROM events
-       WHERE status IN ('completed', 'planned', 'wishlist')
+      `SELECT s.venue AS label, COUNT(DISTINCT s.event_id) AS count
+       FROM event_sessions s
+       JOIN event_first_summaries e ON e.id = s.event_id
+       WHERE e.status IN ('completed', 'planned', 'wishlist')
          ${period.sql}
-         AND venue IS NOT NULL
-         AND TRIM(venue) != ''
-       GROUP BY venue
-       ORDER BY count DESC, MAX(event_date) DESC, venue ASC
+         AND s.venue IS NOT NULL
+         AND TRIM(s.venue) != ''
+       GROUP BY s.venue
+       ORDER BY count DESC, MAX(s.session_date) DESC, s.venue ASC
        LIMIT 1`,
       period.params
     );
@@ -312,7 +399,7 @@ export class EventRepository {
     const period = eventPeriodClause(year, month);
     return this.db.getAllAsync<Event>(
       `SELECT *
-       FROM events
+       FROM event_first_summaries
        WHERE status = 'completed'
          ${period.sql}
          AND review_score = 5
@@ -327,7 +414,7 @@ export class EventRepository {
     const row = await this.db.getFirstAsync<OshiArtistCountRow>(
       `${ARTIST_LINEAGE_CTE}
        SELECT COUNT(DISTINCT e.id) AS count
-       FROM events e
+       FROM event_first_summaries e
        JOIN event_artists ea ON ea.event_id = e.id
        WHERE e.status = 'completed'
          ${period.sql}
@@ -342,7 +429,7 @@ export class EventRepository {
     return this.db.getFirstAsync<Event>(
       `${ARTIST_LINEAGE_CTE}
        SELECT DISTINCT e.*
-       FROM events e
+       FROM event_first_summaries e
        JOIN event_artists ea ON ea.event_id = e.id
        WHERE e.status = 'completed'
          ${period.sql}
@@ -357,7 +444,7 @@ export class EventRepository {
     return this.db.getFirstAsync<Event>(
       `${ARTIST_LINEAGE_CTE}
        SELECT DISTINCT e.*
-       FROM events e
+       FROM event_summaries e
        JOIN event_artists ea ON ea.event_id = e.id
        WHERE e.status = 'planned'
          AND ea.artist_id IN (SELECT aid FROM artist_lineage)
@@ -371,7 +458,7 @@ export class EventRepository {
     const rows = await this.db.getAllAsync<MonthlyCountRow>(
       `${ARTIST_LINEAGE_CTE}
        SELECT substr(e.event_date, 6, 2) AS month, COUNT(DISTINCT e.id) AS count
-       FROM events e
+       FROM event_first_summaries e
        JOIN event_artists ea ON ea.event_id = e.id
        WHERE e.status = 'completed'
          AND e.event_date LIKE ? || '-%'
@@ -389,8 +476,8 @@ export class EventRepository {
   async sumCompletedTicketPriceByYear(year?: number, month?: number): Promise<number> {
     const period = eventPeriodClause(year, month);
     const row = await this.db.getFirstAsync<{ total: number }>(
-      `SELECT COALESCE(SUM(ticket_price), 0) AS total
-       FROM events
+      `SELECT COALESCE(SUM(actual_expense), 0) AS total
+       FROM event_first_summaries
        WHERE status = 'completed'${period.sql}`,
       period.params
     );
@@ -406,10 +493,10 @@ export class EventRepository {
     const rows = await this.db.getAllAsync<EventSpendRow>(
       `SELECT
          e.*,
-         COALESCE(e.ticket_price, 0) AS ticket_total,
+         COALESCE(e.actual_expense, 0) AS ticket_total,
          COALESCE(c.cheki_total, 0) AS cheki_total,
-         COALESCE(e.ticket_price, 0) + COALESCE(c.cheki_total, 0) AS total_spend
-       FROM events e
+         COALESCE(e.actual_expense, 0) + COALESCE(c.cheki_total, 0) AS total_spend
+       FROM event_first_summaries e
        LEFT JOIN (
          SELECT r.event_id, COALESCE(SUM(i.unit_price), 0) AS cheki_total
          FROM cheki_records r
@@ -431,6 +518,7 @@ export class EventRepository {
         id: row.id,
         title: row.title,
         event_type: row.event_type,
+        actual_expense: row.actual_expense,
         event_date: row.event_date,
         event_time: row.event_time,
         city: row.city,
@@ -459,9 +547,9 @@ export class EventRepository {
        FROM (
          SELECT
            e.id,
-           COALESCE(e.ticket_price, 0) AS ticket_total,
+           COALESCE(e.actual_expense, 0) AS ticket_total,
            COALESCE(c.cheki_total, 0) AS cheki_total
-         FROM events e
+         FROM event_first_summaries e
          LEFT JOIN (
            SELECT r.event_id, COALESCE(SUM(i.unit_price), 0) AS cheki_total
            FROM cheki_records r
@@ -490,15 +578,22 @@ export class EventRepository {
         // 以及出演艺人名称；不含内部 id、状态枚举、时间戳等
         conditions.push(`((
           COALESCE(e.title, '') || ' ' ||
-          COALESCE(e.event_date, '') || ' ' ||
-          COALESCE(e.event_time, '') || ' ' ||
-          COALESCE(e.city, '') || ' ' ||
-          COALESCE(e.venue, '') || ' ' ||
           COALESCE(e.notes, '') || ' ' ||
           COALESCE(e.details, '') || ' ' ||
           COALESCE(e.url, '') || ' ' ||
           COALESCE(e.setlist_text, '')
         ) LIKE '%' || ? || '%'
+        OR EXISTS (
+          SELECT 1
+          FROM event_sessions keyword_session
+          WHERE keyword_session.event_id = e.id
+            AND (
+              COALESCE(keyword_session.session_date, '') || ' ' ||
+              COALESCE(keyword_session.start_time, '') || ' ' ||
+              COALESCE(keyword_session.city, '') || ' ' ||
+              COALESCE(keyword_session.venue, '')
+            ) LIKE '%' || ? || '%'
+        )
         OR EXISTS (
           SELECT 1
           FROM event_artists keyword_ea
@@ -509,7 +604,7 @@ export class EventRepository {
               OR keyword_artist.short_name LIKE '%' || ? || '%'
             )
         ))`);
-        params.push(token, token, token);
+        params.push(token, token, token, token);
       }
     }
     const artistIds = filter.artistIds?.length ? [...new Set(filter.artistIds)] : filter.artistId ? [filter.artistId] : [];
@@ -524,11 +619,19 @@ export class EventRepository {
     }
     if (filter.city != null) {
       // 支持用户自由输入，按包含匹配（精确值仍命中）
-      conditions.push(`e.city LIKE '%' || ? || '%'`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM event_sessions city_session
+        WHERE city_session.event_id = e.id
+          AND city_session.city LIKE '%' || ? || '%'
+      )`);
       params.push(filter.city);
     }
     if (filter.venue != null) {
-      conditions.push(`e.venue LIKE '%' || ? || '%'`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM event_sessions venue_session
+        WHERE venue_session.event_id = e.id
+          AND venue_session.venue LIKE '%' || ? || '%'
+      )`);
       params.push(filter.venue);
     }
     if (filter.status) {
@@ -567,14 +670,18 @@ export class EventRepository {
       )`);
     }
     if (filter.year != null) {
-      conditions.push(`e.event_date LIKE ? || '-%'`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM event_first_summaries period_event
+        WHERE period_event.id = e.id
+          AND period_event.event_date LIKE ? || '-%'
+      )`);
       params.push(eventDateLikeParam(filter.year, filter.month));
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const withPrefix = withClauses.length > 0 ? `WITH RECURSIVE ${withClauses.join(', ')} ` : '';
     return this.db.getAllAsync<Event>(
-      `${withPrefix}SELECT e.* FROM events e
+      `${withPrefix}SELECT e.* FROM event_summaries e
        ${where}
        ORDER BY e.event_date DESC, e.event_time DESC`,
       params
@@ -584,7 +691,7 @@ export class EventRepository {
   async findDistinctYears(): Promise<number[]> {
     const rows = await this.db.getAllAsync<{ year: string }>(
       `SELECT DISTINCT substr(event_date, 1, 4) AS year
-       FROM events
+       FROM event_first_summaries
        WHERE event_date IS NOT NULL AND length(event_date) >= 4
        ORDER BY year DESC`
     );
@@ -596,7 +703,7 @@ export class EventRepository {
   async findDistinctCities(): Promise<string[]> {
     const rows = await this.db.getAllAsync<{ city: string }>(
       `SELECT city
-       FROM events
+       FROM event_sessions
        WHERE city IS NOT NULL AND TRIM(city) != ''
        GROUP BY city
        ORDER BY COUNT(*) DESC, city ASC`
@@ -607,7 +714,7 @@ export class EventRepository {
   async findDistinctVenues(): Promise<string[]> {
     const rows = await this.db.getAllAsync<{ venue: string }>(
       `SELECT venue
-       FROM events
+       FROM event_sessions
        WHERE venue IS NOT NULL AND TRIM(venue) != ''
        GROUP BY venue
        ORDER BY COUNT(*) DESC, venue ASC`
@@ -633,68 +740,225 @@ export class EventRepository {
   }
 
   async create(input: CreateEventInput): Promise<Event> {
-    const now = toISODateTime();
-    const event: Event = {
-      id: generateId(),
+    return this.createWithSessions({
       title: input.title,
       event_type: input.event_type,
-      event_date: input.event_date,
-      event_time: input.event_time ?? null,
-      city: input.city ?? null,
-      venue: input.venue ?? null,
-      ticket_price: input.ticket_price ?? null,
       status: input.status,
-      review_score: input.review_score ?? null,
-      notes: input.notes ?? null,
-      details: input.details ?? null,
-      url: input.url ?? null,
-      setlist_text: input.setlist_text ?? null,
-      trip_id: input.trip_id ?? null,
-      created_at: now,
-      updated_at: now,
-    };
-    await this.db.runAsync(
-      `INSERT INTO events
-         (id, title, event_type, event_date, event_time, city, venue,
-          ticket_price, status, review_score, notes, details, url, setlist_text,
-          trip_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        event.id, event.title, event.event_type, event.event_date,
-        event.event_time, event.city, event.venue, event.ticket_price,
-        event.status, event.review_score, event.notes, event.details, event.url,
-        event.setlist_text, event.trip_id, event.created_at, event.updated_at,
-      ]
-    );
+      review_score: input.review_score,
+      notes: input.notes,
+      details: input.details,
+      url: input.url,
+      setlist_text: input.setlist_text,
+      actual_expense: input.actual_expense ?? input.ticket_price ?? null,
+      trip_id: input.trip_id,
+      sessions: [{
+        session_date: input.event_date,
+        start_time: input.event_time,
+        city: input.city,
+        venue: input.venue,
+      }],
+    });
+  }
+
+  async createWithSessions(input: CreateEventWithSessionsInput): Promise<Event> {
+    return this.createWithSchedule({
+      ...input,
+      artist_ids: [],
+      sessions: input.sessions.map((session) => ({ ...session, timetable: [] })),
+    });
+  }
+
+  async createWithSchedule(input: CreateEventWithScheduleInput): Promise<Event> {
+    this.validateScheduleSessions(input.sessions);
+    const now = toISODateTime();
+    const eventId = generateId();
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `INSERT INTO events
+           (id, title, event_type, status, review_score, notes, details, url,
+            setlist_text, actual_expense, trip_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          eventId, input.title, input.event_type, input.status,
+          input.review_score ?? null, input.notes ?? null, input.details ?? null,
+          input.url ?? null, input.setlist_text ?? null, input.actual_expense ?? null,
+          input.trip_id ?? null, now, now,
+        ],
+      );
+      for (const [index, session] of input.sessions.entries()) {
+        const sessionId = generateId();
+        await this.db.runAsync(
+          `INSERT INTO event_sessions
+             (id, event_id, title, session_date, end_date, open_time, start_time,
+              end_time, city, venue, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sessionId, eventId, session.title ?? null, session.session_date,
+            session.end_date ?? null, session.open_time ?? null,
+            session.start_time ?? null, session.end_time ?? null,
+            session.city ?? null, session.venue ?? null,
+            session.sort_order ?? index, now, now,
+          ],
+        );
+        await this.insertTimetableRows(sessionId, session.timetable, now);
+      }
+      await this.replaceArtistRows(eventId, input.artist_ids);
+    });
     this.notifyChanges();
+    const event = await this.findById(eventId);
+    if (!event) throw new Error('Created activity could not be loaded');
     return event;
   }
 
-  async update(id: string, input: Partial<CreateEventInput>): Promise<void> {
-    const fields: string[] = [];
-    const values: unknown[] = [];
+  async updateWithSchedule(id: string, input: UpdateEventWithScheduleInput): Promise<void> {
+    this.validateScheduleSessions(input.sessions);
+    const requestedIds = input.sessions.flatMap((session) => session.id ? [session.id] : []);
+    if (new Set(requestedIds).size !== requestedIds.length) {
+      throw new Error('Session ids must be unique');
+    }
+    const now = toISODateTime();
 
-    const mappable: (keyof CreateEventInput)[] = [
-      'title', 'event_type', 'event_date', 'event_time', 'city', 'venue',
-      'ticket_price', 'status', 'review_score', 'notes', 'details', 'url', 'setlist_text',
-      'trip_id',
+    await this.db.withTransactionAsync(async () => {
+      const existing = await this.db.getAllAsync<{ id: string; sort_order: number }>(
+        'SELECT id, sort_order FROM event_sessions WHERE event_id = ?',
+        [id],
+      );
+      const existingIds = new Set(existing.map((session) => session.id));
+      if (requestedIds.some((sessionId) => !existingIds.has(sessionId))) {
+        throw new Error('Session does not belong to this activity');
+      }
+
+      await this.db.runAsync(
+        `UPDATE events SET
+           title = ?, status = ?, review_score = ?, notes = ?, details = ?,
+           url = ?, setlist_text = ?, actual_expense = ?, trip_id = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          input.title, input.status, input.review_score ?? null, input.notes ?? null,
+          input.details ?? null, input.url ?? null, input.setlist_text ?? null,
+          input.actual_expense ?? null, input.trip_id ?? null, now, id,
+        ],
+      );
+
+      const retainedIds = new Set(requestedIds);
+      const temporaryBase = existing.reduce(
+        (max, session) => Math.max(max, session.sort_order),
+        -1,
+      ) + existing.length + input.sessions.length + 1;
+      for (const [index, session] of existing.entries()) {
+        await this.db.runAsync(
+          'UPDATE event_sessions SET sort_order = ?, updated_at = ? WHERE id = ?',
+          [temporaryBase + index, now, session.id],
+        );
+      }
+      for (const session of existing) {
+        if (!retainedIds.has(session.id)) {
+          await this.db.runAsync('DELETE FROM event_sessions WHERE id = ?', [session.id]);
+        }
+      }
+
+      for (const [index, session] of input.sessions.entries()) {
+        const sessionId = session.id ?? generateId();
+        if (session.id) {
+          await this.db.runAsync(
+            `UPDATE event_sessions SET
+               title = ?, session_date = ?, end_date = ?, open_time = ?,
+               start_time = ?, end_time = ?, city = ?, venue = ?, sort_order = ?,
+               updated_at = ?
+             WHERE id = ? AND event_id = ?`,
+            [
+              session.title ?? null, session.session_date, session.end_date ?? null,
+              session.open_time ?? null, session.start_time ?? null,
+              session.end_time ?? null, session.city ?? null, session.venue ?? null,
+              index, now, sessionId, id,
+            ],
+          );
+          await this.db.runAsync(
+            'DELETE FROM event_timetable_entries WHERE session_id = ?',
+            [sessionId],
+          );
+        } else {
+          await this.db.runAsync(
+            `INSERT INTO event_sessions
+               (id, event_id, title, session_date, end_date, open_time, start_time,
+                end_time, city, venue, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              sessionId, id, session.title ?? null, session.session_date,
+              session.end_date ?? null, session.open_time ?? null,
+              session.start_time ?? null, session.end_time ?? null,
+              session.city ?? null, session.venue ?? null, index, now, now,
+            ],
+          );
+        }
+        await this.insertTimetableRows(sessionId, session.timetable, now);
+      }
+
+      await this.replaceArtistRows(id, input.artist_ids);
+    });
+    this.notifyChanges();
+  }
+
+  async update(id: string, input: Partial<CreateEventInput>): Promise<void> {
+    const eventFields: string[] = [];
+    const eventValues: unknown[] = [];
+    const eventKeys: (keyof CreateEventInput)[] = [
+      'title', 'event_type', 'status', 'review_score', 'notes', 'details', 'url',
+      'setlist_text', 'trip_id',
     ];
-    for (const key of mappable) {
+    for (const key of eventKeys) {
       if (key in input) {
-        fields.push(`${key} = ?`);
-        values.push(input[key] ?? null);
+        eventFields.push(`${key} = ?`);
+        eventValues.push(input[key] ?? null);
       }
     }
-    if (fields.length === 0) return;
+    if ('actual_expense' in input || 'ticket_price' in input) {
+      eventFields.push('actual_expense = ?');
+      eventValues.push(
+        'actual_expense' in input ? input.actual_expense ?? null : input.ticket_price ?? null,
+      );
+    }
 
-    fields.push('updated_at = ?');
-    values.push(toISODateTime());
-    values.push(id);
+    const sessionFieldMap: Array<[keyof CreateEventInput, string]> = [
+      ['event_date', 'session_date'],
+      ['event_time', 'start_time'],
+      ['city', 'city'],
+      ['venue', 'venue'],
+    ];
+    const sessionFields: string[] = [];
+    const sessionValues: unknown[] = [];
+    for (const [inputKey, column] of sessionFieldMap) {
+      if (inputKey in input) {
+        sessionFields.push(`${column} = ?`);
+        sessionValues.push(input[inputKey] ?? null);
+      }
+    }
+    if (eventFields.length === 0 && sessionFields.length === 0) return;
 
-    await this.db.runAsync(
-      `UPDATE events SET ${fields.join(', ')} WHERE id = ?`,
-      values as string[]
-    );
+    const now = toISODateTime();
+    await this.db.withTransactionAsync(async () => {
+      if (eventFields.length > 0) {
+        eventFields.push('updated_at = ?');
+        eventValues.push(now, id);
+        await this.db.runAsync(
+          `UPDATE events SET ${eventFields.join(', ')} WHERE id = ?`,
+          eventValues as Array<string | number | null>,
+        );
+      } else {
+        await this.db.runAsync('UPDATE events SET updated_at = ? WHERE id = ?', [now, id]);
+      }
+
+      if (sessionFields.length > 0) {
+        const sessionId = await this.findRepresentativeSessionId(id);
+        if (!sessionId) throw new Error('Activity has no dated session');
+        sessionFields.push('updated_at = ?');
+        sessionValues.push(now, sessionId);
+        await this.db.runAsync(
+          `UPDATE event_sessions SET ${sessionFields.join(', ')} WHERE id = ?`,
+          sessionValues as Array<string | number | null>,
+        );
+      }
+    });
     this.notifyChanges();
   }
 
@@ -712,7 +976,7 @@ export class EventRepository {
 
   async findByArtistId(artistId: string): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      `SELECT e.* FROM events e
+      `SELECT e.* FROM event_summaries e
        JOIN event_artists ea ON ea.event_id = e.id
        WHERE ea.artist_id = ?
        ORDER BY e.event_date DESC`,
@@ -725,22 +989,25 @@ export class EventRepository {
       `SELECT a.* FROM artists a
        JOIN event_artists ea ON ea.artist_id = a.id
        WHERE ea.event_id = ?
-       ORDER BY a.name ASC`,
+       ORDER BY ea.sort_order ASC, a.name ASC`,
       [eventId]
     );
   }
 
   async setArtists(eventId: string, artistIds: string[]): Promise<void> {
-    await this.db.runAsync(
-      'DELETE FROM event_artists WHERE event_id = ?',
-      [eventId]
-    );
     const uniqueIds = [...new Set(artistIds)];
-    for (const artistId of uniqueIds) {
+    await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(
-        'INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)',
-        [eventId, artistId]
+        'DELETE FROM event_artists WHERE event_id = ?',
+        [eventId],
       );
-    }
+      for (const [sortOrder, artistId] of uniqueIds.entries()) {
+        await this.db.runAsync(
+          `INSERT INTO event_artists (event_id, artist_id, sort_order)
+           VALUES (?, ?, ?)`,
+          [eventId, artistId, sortOrder],
+        );
+      }
+    });
   }
 }

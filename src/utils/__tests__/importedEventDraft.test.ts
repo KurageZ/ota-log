@@ -35,7 +35,6 @@ describe('prepareImportedEventDraft', () => {
           event_time: '11:00',
           city: '上海',
           venue: '世界树剧场一号馆',
-          ticket_price: '93',
           details: '开场：10:30\n开演：11:00',
           url: 'https://ievent.life/event/10365',
         },

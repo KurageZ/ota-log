@@ -14,7 +14,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
-import { EventFormValues } from '../../src/components/EventForm';
+import type { EventFormPrefill } from '../../src/components/EventForm';
 import { useDB } from '../../src/context/DBContext';
 import {
   parseAnnouncement,
@@ -506,7 +506,7 @@ export default function NewEventScreen() {
   const [artistConfirmVisible, setArtistConfirmVisible] = useState(false);
   const [artistConfirmInteractive, setArtistConfirmInteractive] = useState(false);
   const [pendingMatchedIds, setPendingMatchedIds] = useState<string[]>([]);
-  const [pendingFields, setPendingFields] = useState<Partial<EventFormValues> | null>(null);
+  const [pendingFields, setPendingFields] = useState<EventFormPrefill | null>(null);
   const confirmVisibilityTaskRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
   const confirmInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -523,7 +523,7 @@ export default function NewEventScreen() {
   }, []);
 
   const openCreateForm = (
-    prefill: Partial<EventFormValues> | null,
+    prefill: EventFormPrefill | null,
     showPrefillNotice: boolean,
     photoUris: string[] = pendingPhotoUris,
   ) => {
@@ -542,7 +542,7 @@ export default function NewEventScreen() {
   const applyParsedResult = (
     announcementText: string,
     parsed: ParsedAnnouncement,
-    extraFields: Partial<EventFormValues> = {},
+    extraFields: EventFormPrefill = {},
     photoUris: string[] = pendingPhotoUris,
   ) => {
     const hasUsefulFields = Boolean(
@@ -551,7 +551,6 @@ export default function NewEventScreen() {
       parsed.event_time ||
       parsed.city ||
       parsed.venue ||
-      parsed.ticket_price != null ||
       parsed.artist_mentions.length > 0
     );
 
@@ -608,7 +607,7 @@ export default function NewEventScreen() {
 
   const applyParsedText = (
     announcementText: string,
-    extraFields: Partial<EventFormValues> = {},
+    extraFields: EventFormPrefill = {},
     photoUris: string[] = pendingPhotoUris,
   ) => {
     applyParsedResult(

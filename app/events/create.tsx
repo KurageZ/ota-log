@@ -3,11 +3,13 @@ import { Platform, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
 import { EventForm, defaultFormValues } from '../../src/components/EventForm';
+import { toTimetableReplacementInput } from '../../src/components/EventTimetableEditor';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import type { EventFormHandle, EventFormValues } from '../../src/components/EventForm';
 import { useDB } from '../../src/context/DBContext';
 import { consumeEventDraft } from '../../src/utils/eventDraftStore';
 import { useAppTheme } from '../../src/theme/appTheme';
+import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 
 export default function CreateEventScreen() {
   const db = useDB();
@@ -18,26 +20,45 @@ export default function CreateEventScreen() {
   const [prefillNoticeVisible, setPrefillNoticeVisible] = useState(Boolean(draft?.showPrefillNotice));
 
   const handleSubmit = async (values: EventFormValues) => {
-    const event = await db.events.create({
+    const event = await db.events.createWithSchedule({
       title: values.title,
       event_type: 'livehouse',
-      event_date: values.event_date,
-      event_time: values.event_time || null,
-      city: values.city || null,
-      venue: values.venue || null,
+      sessions: values.sessions.map((session, index) => ({
+        title: session.title || null,
+        session_date: session.session_date,
+        end_date: session.end_date || null,
+        open_time: session.open_time || null,
+        start_time: session.start_time || null,
+        end_time: session.end_time || null,
+        city: session.city || null,
+        venue: session.venue || null,
+        sort_order: index,
+        timetable: toTimetableReplacementInput(session.timetable),
+      })),
+      artist_ids: [...new Set(values.artist_ids)],
       status: values.status,
       trip_id: values.trip_id,
-      ticket_price: values.ticket_price ? parseFloat(values.ticket_price) : null,
+      actual_expense: values.actual_expense ? parseFloat(values.actual_expense) : null,
       notes: values.notes || null,
       details: values.details || null,
       url: values.url || null,
       setlist_text: values.setlist_text || null,
       review_score: values.review_score,
     });
-    const uniqueArtistIds = [...new Set(values.artist_ids)];
-    await db.events.setArtists(event.id, uniqueArtistIds);
+    let photoSaveError: unknown = null;
     for (const uri of pendingPhotoUris) {
-      await db.photos.create(uri, event.id);
+      try {
+        await db.photos.create(uri, event.id);
+      } catch (error) {
+        photoSaveError ??= error;
+      }
+    }
+    if (photoSaveError) {
+      showOperationFailedAlert(
+        '活动已保存，但部分资料图未能添加。',
+        '可以稍后编辑活动重新添加。',
+        photoSaveError,
+      );
     }
     router.back();
   };

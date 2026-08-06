@@ -1,7 +1,9 @@
 # iEvent 轻量活动导入规格
 
-状态：已实现（2026-07-24）  
-范围：在不修改当前 SQLite 数据结构的前提下，从 `ievent.life` 活动详情页生成一次性活动草稿  
+状态：旧版单场导入已实现（2026-07-24）；Migration v18 多场次适配待实现
+
+范围：从 `ievent.life` 活动详情页和其子活动生成一次性、可编辑的活动草稿
+
 参考调查：[iEvent 活动 10365 一手数据调查](../research/ievent-event-10365.md)
 
 ## Problem Statement
@@ -12,7 +14,7 @@
 
 iEvent 页面本身包含比可见文本更完整的结构化活动数据，包括标题、日期、开场与开演时间、结构化地点、票种、附加费用、标签、官方链接、封面和出演对象。用户需要一个轻量、一次性的专用导入器，将这些数据尽可能准确地投影到当前活动模型，同时沿用已有微博导入、草稿确认、未知艺人处理和图片保存体验。
 
-本功能不试图解决外部活动同步或公开活动事实的完整建模。当前数据库只能保存一个活动时间、一个代表票价、文本地点、单一 URL 和无序出演关系；无法结构化保存的有用信息将进入活动详情文本。
+本功能不试图解决外部活动同步或公开活动事实的完整建模。当前活动模型只保存 Activity → Session 两层、活动级单一入场支出、文本地点、单一 URL 和扁平时间表；无法结构化保存的有用信息进入活动详情或时间表备注。
 
 ## Solution
 
@@ -20,9 +22,20 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 
 解析器先产生与数据库无关的 iEvent 活动数据，再将其投影为现有活动草稿。投影结果继续进入现有的艺人匹配、未知艺人确认、活动表单和保存流程。解析器不直接写数据库。
 
-活动时间优先保存开演时间。开演时间缺失时依次使用 JSON-LD 的活动开始时间和开场时间兜底。票价保存最低用户实际支出，即最低有效基础票价加明确的强制附加费用。来源 URL 保存 iEvent 活动页；官方链接以及当前 schema 无法表达的其他信息进入固定格式的活动详情。
+活动或子活动的日期、开场、开演和结束时间投影到 Session。票价按最低有效基础票价加明确强制附加费用，直接预填为可编辑的 `actual_expense`。来源 URL 保存 iEvent 活动页；官方链接以及当前 schema 无法表达的其他信息进入固定格式的活动详情。
 
 导入是一次性操作。系统不保存外部同步状态、不检查重复导入，也不在未来自动刷新已经创建的活动。每次导入都可以创建一条新的本地活动记录。
+
+## Migration v18 适配原则
+
+- 导入目标是方便用户查看活动信息和回顾，不追求还原 iEvent 或现实活动的全部层级。
+- 普通页面创建一个默认 Session；父活动页面中的子活动（参考 `https://ievent.life/event/10022`）可各自投影为 Session。结果始终是可编辑草稿，用户也可以自行拆成多个 Activity。
+- 不为多场馆、多舞台继续增加模型层级。时间表直接写入对应 Session，每条只保留演出内容文本、开始 / 结束时间和备注。
+- 演出内容始终保留原始文本。可匹配本地艺人时沿用现有匹配；未知艺人不自动创建，继续弹出确认框，只有用户选择后才添加；未关联内容仍正常显示。
+- 最低可靠入场成本直接预填 `actual_expense`，不显示额外提示；用户可在活动表单中修改。
+- 来源详情继续保留。时间表原图作为普通活动资料图导入，不以图片替代扁平时间表。
+- 某个子活动详情抓取失败时，用父页摘要创建对应 Session，继续导入其他内容，并报告“部分内容未完整导入”。
+- 不读取或投影 iEvent 的取消状态。
 
 ## User Stories
 
@@ -81,17 +94,17 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Avoid executing page scripts or evaluating page-provided JavaScript. Extract serialized data as text and parse only valid JSON structures.
 - Apply request timeout, response-status validation, content-type tolerance suitable for server-rendered HTML, a bounded response size and redirect validation that remains on the expected iEvent domain.
 - Treat the import as successful only when the fallback data contains enough identity to form a meaningful editable draft. The required fallback identity is title, date and location.
-- Do not display additional iEvent-specific warnings. Partial successful imports proceed directly to the existing activity form.
-- Set `event_time` from the original performance start time when present.
+- Do not display additional iEvent-specific warnings for ordinary field fallback. A child-page fetch failure is the exception: continue with the parent summary and show one partial-import warning.
+- Set Session `start_time` from the original performance start time when present.
 - If the original performance start is absent, use the JSON-LD activity start time.
 - If neither is present, use the original opening time.
-- If all time sources are absent, leave `event_time` empty.
+- If all time sources are absent, leave Session `start_time` empty.
 - Retain both opening and performance-start labels in the generated details whenever they are available. When only opening time exists, describe it as opening time rather than claiming that the source supplied a performance start.
-- Calculate `ticket_price` as the minimum valid base ticket price plus mandatory per-entry charges explicitly associated with that option.
+- Calculate `actual_expense` as the minimum valid base ticket price plus mandatory per-entry charges explicitly associated with that option, and prefill it without a separate warning.
 - Treat source language such as `+1D`, `另加` and `入场需` as a mandatory addition only when the syntax provides an amount and clearly expresses an additional entry cost.
 - Do not include optional upgrades, VIP premiums, merchandise, benefits without a price, or ambiguous amounts in the minimum actual spend.
 - Preserve the complete available ticket breakdown in generated details even though only one numeric price is stored.
-- For the reference activity, project the ¥78 advance ticket plus the mandatory ¥15 drink charge to `ticket_price = 93`.
+- For the reference activity, project the ¥78 advance ticket plus the mandatory ¥15 drink charge to `actual_expense = 93`.
 - Save the normalized iEvent activity URL in the existing activity URL field.
 - Save the official URL in generated details because the current activity model has only one URL field.
 - Generate details from known fields in a stable, readable order: source description, opening and performance times, ticket breakdown, mandatory additions, minimum actual spend, venue address, source tags and official link.
@@ -103,14 +116,16 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Convert source performers into the existing artist-mention input and preserve source order until the existing matching and confirmation step.
 - Trim leading and trailing whitespace from source performer names before matching.
 - Reuse all existing name normalization, exact matching, alias matching, ambiguous suggestion and unknown-artist creation behavior.
+- Never create an Artist automatically. Unknown names remain text unless the user explicitly chooses creation or matching in the existing confirmation dialog.
 - Do not persist iEvent person IDs, source performer order, source aliases, remote artist covers or source matching evidence because the schema has no fields for them.
 - Automatically download the event cover using the existing import media behavior and permanent local-file rules.
 - Treat cover download failure as non-blocking, consistent with the existing Weibo import flow.
 - Do not store the remote cover URL as a photo URI.
 - Do not set activity status.
+- Ignore external cancellation status.
 - Do not set or infer activity type. Source tags appear only in details.
 - Do not check whether the source URL was imported previously. Every confirmed import may create a new activity.
-- Do not introduce new tables, columns, migrations or repository persistence models.
+- Use the Migration v18 Activity / Session / flat timetable persistence model; the importer adaptation itself introduces no additional migration.
 - Do not create an external-source synchronization contract. The resulting activity is an ordinary local activity after creation.
 
 ## Testing Decisions
@@ -135,6 +150,10 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Test full venue preservation without the generic announcement parser’s venue cleanup.
 - Test source performer trimming, ordering and conversion into the existing artist-matching seam.
 - Rely on existing artist-matching and parsed-draft tests for exact matches, ambiguous suggestions, unknown-artist creation defaults and candidate confirmation behavior.
+- Test a parent activity with child activities, including projection to multiple Sessions and retention of parent/child details.
+- Test flat timetable projection, unmatched performer text, optional confirmed Artist association and timetable image import as a normal activity photo.
+- Test that one failed child fetch keeps its summary Session, imports successful siblings and produces a partial-import warning.
+- Test that external cancellation status is ignored.
 - Test that the source URL is stored in the draft while the official URL is written to details.
 - Test deterministic details formatting and exclusion of page chrome.
 - Test successful parsing with no cover.
@@ -152,8 +171,8 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Field-level source tracking or user override tracking.
 - Duplicate detection or duplicate prevention.
 - Updating an existing activity from the same source URL.
-- Multiple structured event sessions.
-- Separate structured opening, performance-start and ending time fields.
+- Persisted source parent/child relationships beyond their one-time projection to Activity / Session.
+- Stage, area or venue-group hierarchy beneath Session.
 - Structured ticket types, currencies, eligibility conditions or mandatory-fee tables.
 - Structured locations, addresses or administrative regions.
 - Multiple activity URLs or typed links.
@@ -161,7 +180,7 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Persisted performer ordering, roles, source aliases or source covers.
 - Importing iEvent setlists, Repo entries, participants or editor history.
 - Trusting or persisting JSON-LD inferred end times.
-- Adding a dedicated iEvent preview or warning interface.
+- Adding a dedicated iEvent preview interface or ordinary field-fallback warnings; only partial child-fetch failure adds a warning to the shared flow.
 - Changing the existing activity-status or activity-type form behavior.
 - Fetching location detail pages as a secondary request.
 - Live-network tests against iEvent.
@@ -171,8 +190,9 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 ## Further Notes
 
 - The reference activity is `https://ievent.life/event/10365`.
+- The parent/child reference activity is `https://ievent.life/event/10022`.
 - Its expected projected values are title `YGG IDOL Fes -麻乐栖&猫猫虫生日SP-`, date `2026-07-25`, event time `11:00`, city `上海`, venue `世界树剧场一号馆`, minimum actual price `93`, and source URL equal to the iEvent activity page.
 - Its source contains an advance ticket of ¥78, a same-day ticket of ¥98 and an explicit additional 1D charge of ¥15.
 - Its source contains 23 performer objects. The source data includes at least one leading-whitespace name that must be trimmed before entering existing artist matching.
 - Its original activity object does not contain an ending time, while JSON-LD exposes `13:00`. This is the motivating example for ignoring JSON-LD `endDate`.
-- The current activity schema remains intentionally lossy for this feature. The longer-term activity data design continues to own questions about canonical metadata, sessions, structured places, ticket types and external-source synchronization.
+- The current activity schema remains intentionally lossy for this feature. Activity / Session granularity belongs to the user; canonical metadata, structured places, ticket types, timetable grouping and external-source synchronization remain out of scope.

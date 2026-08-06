@@ -78,7 +78,7 @@ describe('buildParsedEventDraft', () => {
     });
   });
 
-  test('keeps zero ticket price when the parsed event is free', () => {
+  test('does not treat public ticket price as the user actual expense', () => {
     const result = buildParsedEventDraft(
       '公告正文',
       {
@@ -88,6 +88,6 @@ describe('buildParsedEventDraft', () => {
       [],
     );
 
-    expect(result.fields.ticket_price).toBe('0');
+    expect(result.fields).not.toHaveProperty('actual_expense');
   });
 });

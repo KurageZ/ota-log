@@ -4,6 +4,7 @@ import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
 import { DateItemRepository } from '../../repositories/DateItemRepository';
 import { getDateItemRelativeCopy } from '../../utils/dateItems';
 import { generateId } from '../../utils/uuid';
+import { installLegacyEventFixture } from './fixtures/installLegacyEventFixture';
 
 jest.mock('../../utils/uuid', () => ({
   generateId: jest.fn(),
@@ -25,6 +26,7 @@ describe('DateItemRepository', () => {
     for (const statement of SCHEMA_STATEMENTS) {
       rawDb.exec(statement);
     }
+    installLegacyEventFixture(rawDb);
 
     rawDb.prepare(
       `INSERT INTO artists
@@ -37,7 +39,7 @@ describe('DateItemRepository', () => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('artist-2', '小夏', null, null, null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO events
+      `INSERT INTO fixture_events
          (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(

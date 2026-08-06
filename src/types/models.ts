@@ -38,10 +38,13 @@ export interface Event {
   id: string;
   title: string;
   event_type: EventType;
+  actual_expense: number | null;
+  /** Compatibility projection from the representative session. */
   event_date: string;
   event_time: string | null;
   city: string | null;
   venue: string | null;
+  /** Compatibility alias of actual_expense until the activity UI is migrated. */
   ticket_price: number | null;
   status: EventStatus;
   review_score: number | null;
@@ -50,6 +53,35 @@ export interface Event {
   url: string | null;
   setlist_text: string | null;
   trip_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventSession {
+  id: string;
+  event_id: string;
+  title: string | null;
+  session_date: string;
+  end_date: string | null;
+  open_time: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  city: string | null;
+  venue: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventTimetableEntry {
+  id: string;
+  session_id: string;
+  title: string;
+  artist_id: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -193,6 +225,7 @@ export interface CreateEventInput {
   city?: string | null;
   venue?: string | null;
   ticket_price?: number | null;
+  actual_expense?: number | null;
   status: EventStatus;
   review_score?: number | null;
   notes?: string | null;
@@ -201,6 +234,49 @@ export interface CreateEventInput {
   setlist_text?: string | null;
   trip_id?: string | null;
 }
+
+export interface CreateEventSessionInput {
+  title?: string | null;
+  session_date: string;
+  end_date?: string | null;
+  open_time?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  city?: string | null;
+  venue?: string | null;
+  sort_order?: number;
+}
+
+export interface ReplaceEventSessionInput extends CreateEventSessionInput {
+  id?: string;
+}
+
+export type CreateEventWithSessionsInput = Omit<
+  CreateEventInput,
+  'event_date' | 'event_time' | 'city' | 'venue' | 'ticket_price'
+> & {
+  sessions: CreateEventSessionInput[];
+};
+
+export interface CreateEventTimetableEntryInput {
+  title: string;
+  artist_id?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string | null;
+  sort_order?: number;
+}
+
+export interface EventSessionScheduleInput extends ReplaceEventSessionInput {
+  timetable: CreateEventTimetableEntryInput[];
+}
+
+export type CreateEventWithScheduleInput = Omit<CreateEventWithSessionsInput, 'sessions'> & {
+  sessions: EventSessionScheduleInput[];
+  artist_ids: string[];
+};
+
+export type UpdateEventWithScheduleInput = Omit<CreateEventWithScheduleInput, 'event_type'>;
 
 export interface CreateArtistInput {
   name: string;

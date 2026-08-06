@@ -108,9 +108,9 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
          GROUP BY artist_id`
       ),
       db.rawDb.getAllAsync<FirstDateRow>(
-        `SELECT ea.artist_id, MIN(e.event_date) AS first_date
-         FROM event_artists ea
-         JOIN events e ON e.id = ea.event_id
+      `SELECT ea.artist_id, MIN(e.event_date) AS first_date
+       FROM event_artists ea
+       JOIN event_first_summaries e ON e.id = ea.event_id
          WHERE e.status = 'completed'
          GROUP BY ea.artist_id`
       ),

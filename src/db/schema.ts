@@ -1,4 +1,9 @@
 import { CHEKI_V2_SCHEMA_STATEMENTS } from './chekiV2Schema';
+import {
+  ACTIVITY_V2_SCHEMA_STATEMENTS,
+  createEventArtistsV2TableSql,
+  createEventsV2TableSql,
+} from './activityV2Schema';
 
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS artists (
@@ -26,31 +31,11 @@ export const SCHEMA_STATEMENTS = [
     updated_at  TEXT NOT NULL
   )`,
 
-  `CREATE TABLE IF NOT EXISTS events (
-    id           TEXT PRIMARY KEY,
-    title        TEXT NOT NULL,
-    event_type   TEXT NOT NULL DEFAULT 'livehouse',
-    event_date   TEXT NOT NULL,
-    event_time   TEXT,
-    city         TEXT,
-    venue        TEXT,
-    ticket_price REAL,
-    status       TEXT NOT NULL,
-    review_score INTEGER,
-    notes        TEXT,
-    details      TEXT,
-    url          TEXT,
-    setlist_text TEXT,
-    trip_id      TEXT REFERENCES trips(id) ON DELETE SET NULL,
-    created_at   TEXT NOT NULL,
-    updated_at   TEXT NOT NULL
-  )`,
+  createEventsV2TableSql(),
 
-  `CREATE TABLE IF NOT EXISTS event_artists (
-    event_id  TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    artist_id TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-    PRIMARY KEY (event_id, artist_id)
-  )`,
+  createEventArtistsV2TableSql(),
+
+  ...ACTIVITY_V2_SCHEMA_STATEMENTS,
 
   `CREATE TABLE IF NOT EXISTS photos (
     id         TEXT PRIMARY KEY,

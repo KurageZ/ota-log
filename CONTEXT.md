@@ -4,6 +4,26 @@ This glossary defines product-domain language for ota_log. It keeps overloaded u
 
 ## Language
 
+**Activity**:
+A user-owned local record for viewing event information and later review. It is intentionally a useful, lossy representation rather than a canonical mirror of the real-world event. Every Activity has at least one dated Activity Session; manually created and imported activities share the same lifecycle, and an imported activity does not continue following its external source after creation.
+_Avoid_: Canonical activity metadata, public activity record, user activity record
+
+**Activity Import**:
+A one-time creation method that uses an external source to prefill a new Activity. It does not establish an ongoing synchronization relationship with that source.
+_Avoid_: Activity sync, source subscription
+
+**Activity Session**:
+A user-chosen dated subdivision within an Activity. It may represent a day, daytime/evening show, stage, venue, or another division useful for viewing and review. Users may instead record those parts as separate Activities; an undated Session is not valid.
+_Avoid_: Optional activity date, placeholder session, timetable entry
+
+**Activity Timetable**:
+The flat ordered schedule within an Activity Session. Each entry preserves content text, an optional local Artist association, a time range, and notes; stages or areas do not create another persisted level.
+_Avoid_: Activity Session, timetable image
+
+**Activity Actual Expense**:
+The optional, user-editable amount recorded as the Activity's entry cost. Manual records normally use the amount actually paid; imports may prefill the lowest reliably calculated admission cost. It excludes cheki, merchandise, transport, and accommodation.
+_Avoid_: Ticket price, published price, total activity expense
+
 **Activity Countdown**:
 A countdown display derived from an existing activity in the `events` table. Its title and target date follow the source activity instead of becoming an independent user-owned important date.
 _Avoid_: Independent event countdown, copied event countdown

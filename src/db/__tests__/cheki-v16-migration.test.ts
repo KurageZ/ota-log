@@ -17,10 +17,35 @@ function createV16Database(): Database.Database {
       name TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE trips (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
     CREATE TABLE events (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      event_date TEXT NOT NULL
+      event_type TEXT NOT NULL DEFAULT 'livehouse',
+      event_date TEXT NOT NULL,
+      event_time TEXT,
+      city TEXT,
+      venue TEXT,
+      ticket_price REAL,
+      status TEXT NOT NULL,
+      review_score INTEGER,
+      notes TEXT,
+      details TEXT,
+      url TEXT,
+      setlist_text TEXT,
+      trip_id TEXT REFERENCES trips(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE event_artists (
+      event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      artist_id TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+      PRIMARY KEY (event_id, artist_id)
     );
     CREATE TABLE cheki (
       id TEXT PRIMARY KEY,
@@ -43,7 +68,11 @@ function createV16Database(): Database.Database {
       updated_at TEXT NOT NULL
     );
     INSERT INTO artists VALUES ('artist', 'Artist', '2026-01-01T00:00:00.000Z');
-    INSERT INTO events VALUES ('event', 'Event', '2026-06-01');
+    INSERT INTO events VALUES (
+      'event', 'Event', 'livehouse', '2026-06-01', NULL, NULL, NULL, NULL,
+      'completed', NULL, NULL, NULL, NULL, NULL, NULL,
+      '2026-06-01T00:00:00.000Z', '2026-06-01T00:00:00.000Z'
+    );
     INSERT INTO cheki VALUES
       ('photo-2', 'event', 'artist', 'file:///2.jpg', NULL, 12.4, 'second', '2026-06-01T11:00:00.000Z'),
       ('photo-1', 'event', 'artist', 'file:///1.jpg', NULL, NULL, 'first', '2026-06-01T10:00:00.000Z');
@@ -54,12 +83,12 @@ function createV16Database(): Database.Database {
   return db;
 }
 
-describe('v16 to v17 cheki migration', () => {
+describe('v16 through v18 migration', () => {
   test('merges rows, preserves media and timestamps, and passes foreign key checks', async () => {
     const db = createV16Database();
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(17);
+    expect(db.pragma('user_version', { simple: true })).toBe(18);
     expect(db.prepare('SELECT quantity, date, created_at, updated_at FROM cheki_records').get())
       .toEqual({
         quantity: 5,

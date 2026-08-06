@@ -3,7 +3,7 @@ import type { Event } from '../../types/models';
 
 const base: Event = {
   id: 'event-1', title: '夏日演出', event_type: 'livehouse', event_date: '2026-07-26', event_time: null,
-  city: '上海', venue: 'MAO', ticket_price: null, status: 'planned', review_score: null,
+  city: '上海', venue: 'MAO', ticket_price: null, actual_expense: null, status: 'planned', review_score: null,
   notes: null, details: null, url: null, setlist_text: null, trip_id: null,
   created_at: '2026-07-01T00:00:00.000Z', updated_at: '2026-07-01T00:00:00.000Z',
 };
