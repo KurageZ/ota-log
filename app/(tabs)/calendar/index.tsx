@@ -261,7 +261,7 @@ export default function CalendarScreen() {
 
   const loadData = useCallback(async () => {
     const [events, summaries, chekis, noPhotoEntries, artists, monthDateItems, selectedDateItems, config] = await Promise.all([
-      db.events.findAll(),
+      db.events.findCalendarEvents(),
       db.cheki.findCalendarSummariesByMonth(selectedMonth.year, selectedMonth.month),
       db.cheki.findByDate(selectedDate),
       db.chekiManualEntries.findByDate(selectedDate),
@@ -918,7 +918,7 @@ export default function CalendarScreen() {
         </Text>
         <View style={{ marginLeft: 7, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
           <Text style={{ fontSize: 11, fontWeight: '900', color: colors.accent }}>
-            {dayEvents.length}场
+            {dayEvents.length}个
           </Text>
         </View>
       </View>
@@ -1041,7 +1041,7 @@ export default function CalendarScreen() {
       ) : (
         <SectionList
           sections={timelineSections}
-          keyExtractor={(item) => item.data.id}
+          keyExtractor={(item) => `${item.data.id}-${item.data.event_date}`}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,

@@ -187,6 +187,36 @@ export class EventRepository {
     );
   }
 
+  /**
+   * Projects activities onto calendar dates. Sessions from the same activity on
+   * the same date collapse into one activity card; sessions on different dates
+   * produce one card per date.
+   */
+  async findCalendarEvents(): Promise<Event[]> {
+    return this.db.getAllAsync<Event>(
+      `SELECT
+         e.*,
+         s.session_date AS event_date,
+         s.start_time AS event_time,
+         s.city AS city,
+         s.venue AS venue,
+         e.actual_expense AS ticket_price
+       FROM events e
+       JOIN event_sessions s ON s.event_id = e.id
+       WHERE s.id = (
+         SELECT candidate.id
+         FROM event_sessions candidate
+         WHERE candidate.event_id = e.id
+           AND candidate.session_date = s.session_date
+         ORDER BY candidate.start_time ASC,
+                  candidate.sort_order ASC,
+                  candidate.id ASC
+         LIMIT 1
+       )
+       ORDER BY s.session_date DESC, s.start_time DESC, e.created_at DESC`,
+    );
+  }
+
   async findById(id: string): Promise<Event | null> {
     return this.db.getFirstAsync<Event>(
       'SELECT * FROM event_summaries WHERE id = ?',

@@ -383,6 +383,57 @@ describe('Cheki repositories', () => {
       .toEqual({ count: 0 });
   });
 
+  test('projects calendar activities once per date and separates multi-day sessions', async () => {
+    const created = await eventRepository.createWithSessions({
+      title: 'Calendar Festival',
+      event_type: 'festival',
+      status: 'planned',
+      sessions: [
+        {
+          title: '昼场',
+          session_date: '2099-08-08',
+          start_time: '12:00',
+          city: '上海',
+          venue: '昼场馆',
+        },
+        {
+          title: '夜场',
+          session_date: '2099-08-08',
+          start_time: '18:00',
+          city: '上海',
+          venue: '夜场馆',
+        },
+        {
+          title: 'DAY 2',
+          session_date: '2099-08-09',
+          start_time: '11:00',
+          city: '杭州',
+          venue: '次日场馆',
+        },
+      ],
+    });
+
+    const calendarEvents = (await eventRepository.findCalendarEvents())
+      .filter((event) => event.id === created.id);
+
+    expect(calendarEvents).toEqual([
+      expect.objectContaining({
+        id: created.id,
+        event_date: '2099-08-09',
+        event_time: '11:00',
+        city: '杭州',
+        venue: '次日场馆',
+      }),
+      expect.objectContaining({
+        id: created.id,
+        event_date: '2099-08-08',
+        event_time: '12:00',
+        city: '上海',
+        venue: '昼场馆',
+      }),
+    ]);
+  });
+
   test('creates and updates the complete activity schedule atomically', async () => {
     const created = await eventRepository.createWithSchedule({
       title: 'Atomic Festival',
