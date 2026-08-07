@@ -71,6 +71,14 @@ function createV12DbWithManualEntries(): Database.Database {
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
   )`);
+  db.exec(`CREATE TABLE user_config (
+    id             TEXT PRIMARY KEY,
+    name           TEXT NOT NULL DEFAULT 'Otaku',
+    avatar_uri     TEXT,
+    avatar_emoji   TEXT NOT NULL DEFAULT '🎤',
+    oshi_artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL,
+    updated_at     TEXT NOT NULL
+  )`);
   db.exec(
     'CREATE INDEX idx_cheki_manual_artist_sort ON cheki_manual_entries (artist_id, COALESCE(date, created_at) DESC, created_at DESC)'
   );
@@ -105,7 +113,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(18);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(19);
     expect(getScalar<number>(db, 'SELECT COUNT(*) FROM artists')).toBe(0);
     expect(getScalar<number>(db, "SELECT COUNT(*) FROM artists WHERE avatar_uri LIKE 'preset://%'"))
       .toBe(0);
@@ -124,12 +132,14 @@ describe('Forward migrations from v11', () => {
     db.close();
   });
 
-  test('upgrades v11 fixture through v18 and preserves representative data', async () => {
+  test('upgrades v11 fixture through v19 and preserves representative data', async () => {
     const db = createV11Db();
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(18);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(19);
+    expect(getScalar<string>(db, "SELECT artist_confirmation_mode FROM user_config WHERE id = 'default'"))
+      .toBe('always');
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cheki_records'")).toBe('cheki_records');
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'important_dates'")).toBe('important_dates');
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'important_date_anniversary_rules'")).toBe('important_date_anniversary_rules');
@@ -145,12 +155,12 @@ describe('Forward migrations from v11', () => {
     db.close();
   });
 
-  test('upgrades v12 manual entries through v18 and normalizes invalid legacy values', async () => {
+  test('upgrades v12 manual entries through v19 and normalizes invalid legacy values', async () => {
     const db = createV12DbWithManualEntries();
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(18);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(19);
     expect(getScalar<number>(db, 'SELECT SUM(quantity) FROM cheki_records')).toBe(4);
     expect(getScalar<number>(db, 'SELECT SUM(unit_price) FROM cheki_items')).toBe(60);
     expect(getScalar<number>(db, 'SELECT COUNT(*) FROM cheki_items')).toBe(4);
@@ -265,7 +275,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(18);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(19);
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'artists'")).toBe('artists');
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_uri'")).toBe('background_uri');
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_color'")).toBe('background_color');
@@ -395,7 +405,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(18);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(19);
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_color'")).toBe('background_color');
     expect(getScalar<string>(db, "SELECT background_uri FROM artists WHERE id = 'artist-v14'")).toBe('file:///artist-background-v14.jpg');
     expect(getScalar<null>(db, "SELECT background_color FROM artists WHERE id = 'artist-v14'")).toBeNull();

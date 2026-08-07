@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Platform, ScrollView, Text, TouchableOpacity,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useDB } from '../../src/context/DBContext';
-import { Artist, UserConfig } from '../../src/types/models';
+import { Artist, ArtistConfirmationMode, UserConfig } from '../../src/types/models';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { cleanupUnreferencedLocalMedia, scanUnreferencedLocalMedia } from '../../src/utils/localMedia';
 import { exportFullBackup, importBackup, shareBackupFile } from '../../src/utils/backup';
@@ -22,6 +22,12 @@ import {
   APP_THEME_LABELS,
 } from '../../src/theme/config';
 import { loadChekiPhotoWidgetPreferences } from '../../src/widgets/chekiPhotoWidgetPreferences';
+import {
+  ARTIST_CONFIRMATION_MODE_DESCRIPTIONS,
+  ARTIST_CONFIRMATION_MODE_LABELS,
+  ARTIST_CONFIRMATION_MODE_SUMMARIES,
+  DEFAULT_ARTIST_CONFIRMATION_MODE,
+} from '../../src/utils/artistConfirmation';
 
 type BackupExportState =
   | { status: 'idle' }
@@ -32,6 +38,7 @@ type BackupExportState =
 const APPEARANCE_OPTIONS: AppAppearance[] = ['system', 'light', 'dark'];
 const THEME_OPTIONS: AppThemeId[] = ['monoChrome', 'classicViolet', 'nightNeon'];
 const CALENDAR_VIEW_OPTIONS: AppCalendarDefaultView[] = ['month', 'timeline'];
+const ARTIST_CONFIRMATION_OPTIONS: ArtistConfirmationMode[] = ['always', 'matches_only', 'never'];
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -68,9 +75,11 @@ export default function SettingsScreen() {
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCalendarDefaultViewOpen, setIsCalendarDefaultViewOpen] = useState(false);
+  const [isArtistConfirmationOpen, setIsArtistConfirmationOpen] = useState(false);
   const [pendingAppearance, setPendingAppearance] = useState<AppAppearance | null>(null);
   const [pendingThemeId, setPendingThemeId] = useState<AppThemeId | null>(null);
   const [pendingCalendarDefaultView, setPendingCalendarDefaultView] = useState<AppCalendarDefaultView | null>(null);
+  const [pendingArtistConfirmationMode, setPendingArtistConfirmationMode] = useState<ArtistConfirmationMode | null>(null);
 
   const reloadSettingsContext = useCallback(async () => {
     const [config, artists, photoArtistIds, widgetPreferences] = await Promise.all([
@@ -263,6 +272,25 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSelectArtistConfirmationMode = async (nextMode: ArtistConfirmationMode) => {
+    const currentMode = userConfig?.artist_confirmation_mode ?? DEFAULT_ARTIST_CONFIRMATION_MODE;
+    if (nextMode === currentMode || pendingArtistConfirmationMode) return;
+
+    setPendingArtistConfirmationMode(nextMode);
+    try {
+      await db.userConfig.updateConfig({ artist_confirmation_mode: nextMode });
+      setUserConfig((current) => current ? { ...current, artist_confirmation_mode: nextMode } : current);
+    } catch (error) {
+      showOperationFailedAlert(
+        '无法保存出演者确认设置。',
+        '请稍后再试一次。',
+        error,
+      );
+    } finally {
+      setPendingArtistConfirmationMode(null);
+    }
+  };
+
   const backupMenuBadge: MenuBadge | undefined = (() => {
     if (backupExportState.status === 'exporting') return 'spinner';
     if (backupExportState.status === 'ready') return '已完成';
@@ -286,6 +314,7 @@ export default function SettingsScreen() {
   const oshiTint = settingsTints.oshi;
   const appearanceTint = settingsTints.appearance;
   const calendarControlTint = settingsTints.calendar;
+  const artistConfirmationTint = settingsTints.calendar;
   const importTint = settingsTints.backupExport;
   const saveTint = settingsTints.backupSave;
   const restoreTint = settingsTints.backupRestore;
@@ -334,6 +363,7 @@ export default function SettingsScreen() {
                 onPress={() => {
                   setIsThemeOpen(false);
                   setIsCalendarDefaultViewOpen(false);
+                  setIsArtistConfirmationOpen(false);
                   setIsAppearanceOpen((open) => !open);
                 }}
                 style={{
@@ -449,6 +479,7 @@ export default function SettingsScreen() {
                 onPress={() => {
                   setIsAppearanceOpen(false);
                   setIsCalendarDefaultViewOpen(false);
+                  setIsArtistConfirmationOpen(false);
                   setIsThemeOpen((open) => !open);
                 }}
                 style={{
@@ -564,6 +595,7 @@ export default function SettingsScreen() {
                 onPress={() => {
                   setIsAppearanceOpen(false);
                   setIsThemeOpen(false);
+                  setIsArtistConfirmationOpen(false);
                   setIsCalendarDefaultViewOpen((open) => !open);
                 }}
                 style={{
@@ -663,6 +695,141 @@ export default function SettingsScreen() {
                             variant={selected ? 'selected' : 'unselected'}
                             size={18}
                             color={selected ? calendarControlTint : rowChevronColor}
+                            secondaryColor={colors.onAccent}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          </MenuCard>
+        </View>
+
+        <View style={{ marginBottom: 16 }}>
+          <SectionLabel label="活动" />
+          <MenuCard>
+            <View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isArtistConfirmationOpen }}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsAppearanceOpen(false);
+                  setIsThemeOpen(false);
+                  setIsCalendarDefaultViewOpen(false);
+                  setIsArtistConfirmationOpen((open) => !open);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderBottomWidth: isArtistConfirmationOpen ? 1 : 0,
+                  borderBottomColor: rowDividerColor,
+                }}
+              >
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: withAlpha(artistConfirmationTint, 0.13),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <AppIcon name="artists" size={18} color={artistConfirmationTint} />
+                </View>
+
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
+                    出演者确认
+                  </Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    marginLeft: 12,
+                    marginRight: 8,
+                    maxWidth: 110,
+                    fontSize: 14,
+                    color: rowSubtitleColor,
+                    fontWeight: '500',
+                    textAlign: 'right',
+                  }}
+                >
+                  {ARTIST_CONFIRMATION_MODE_SUMMARIES[
+                    pendingArtistConfirmationMode
+                      ?? userConfig?.artist_confirmation_mode
+                      ?? DEFAULT_ARTIST_CONFIRMATION_MODE
+                  ]}
+                </Text>
+                {pendingArtistConfirmationMode ? (
+                  <View style={{ marginRight: 8 }}>
+                    <ActivityIndicator size="small" color={artistConfirmationTint} />
+                  </View>
+                ) : null}
+                <AppIcon
+                  name="disclosure"
+                  variant={isArtistConfirmationOpen ? 'up' : 'down'}
+                  size={16}
+                  color={rowChevronColor}
+                />
+              </TouchableOpacity>
+
+              {isArtistConfirmationOpen ? (
+                <View style={{ backgroundColor: expandedPanelColor }}>
+                  {ARTIST_CONFIRMATION_OPTIONS.map((option, index) => {
+                    const selected = (
+                      pendingArtistConfirmationMode
+                      ?? userConfig?.artist_confirmation_mode
+                      ?? DEFAULT_ARTIST_CONFIRMATION_MODE
+                    ) === option;
+                    const isLast = index === ARTIST_CONFIRMATION_OPTIONS.length - 1;
+
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected, disabled: pendingArtistConfirmationMode !== null }}
+                        activeOpacity={0.7}
+                        disabled={pendingArtistConfirmationMode !== null}
+                        onPress={() => handleSelectArtistConfirmationMode(option)}
+                        style={{
+                          minHeight: 56,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 11,
+                          borderBottomWidth: isLast ? 0 : 1,
+                          borderBottomColor: rowDividerColor,
+                          opacity: pendingArtistConfirmationMode ? 0.7 : 1,
+                        }}
+                      >
+                        <View style={{ width: 46 }} />
+                        <View style={{ flex: 1, paddingRight: 12 }}>
+                          <Text style={{
+                            fontSize: 14,
+                            color: selected ? artistConfirmationTint : rowTextColor,
+                            fontWeight: selected ? '700' : '500',
+                          }}>
+                            {ARTIST_CONFIRMATION_MODE_LABELS[option]}
+                          </Text>
+                          <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: rowSubtitleColor }}>
+                            {ARTIST_CONFIRMATION_MODE_DESCRIPTIONS[option]}
+                          </Text>
+                        </View>
+                        {pendingArtistConfirmationMode === option ? (
+                          <ActivityIndicator size="small" color={artistConfirmationTint} />
+                        ) : (
+                          <AppIcon
+                            name="radio"
+                            variant={selected ? 'selected' : 'unselected'}
+                            size={18}
+                            color={selected ? artistConfirmationTint : rowChevronColor}
                             secondaryColor={colors.onAccent}
                           />
                         )}

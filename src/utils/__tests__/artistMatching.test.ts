@@ -120,7 +120,7 @@ describe('artist matching', () => {
       name: 'NewFace',
       short_name: '青星',
       editName: '青星NewFace',
-      resolution: 'create',
+      resolution: 'skip',
       suggestions: [],
     });
   });

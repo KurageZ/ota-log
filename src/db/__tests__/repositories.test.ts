@@ -1155,6 +1155,7 @@ describe('UserConfigRepository', () => {
         avatar_uri: null,
         avatar_emoji: DEFAULT_PROFILE_EMOJI,
         oshi_artist_id: null,
+        artist_confirmation_mode: 'always',
       }),
     );
   });
@@ -1190,5 +1191,17 @@ describe('UserConfigRepository', () => {
       avatar_uri: null,
       avatar_emoji: '🎸',
     });
+  });
+
+  test('updates the artist confirmation preference without changing profile fields', async () => {
+    const initial = await userConfigRepository.getConfig();
+
+    await userConfigRepository.updateConfig({ artist_confirmation_mode: 'matches_only' });
+
+    await expect(userConfigRepository.getConfig()).resolves.toEqual(expect.objectContaining({
+      name: initial.name,
+      avatar_emoji: initial.avatar_emoji,
+      artist_confirmation_mode: 'matches_only',
+    }));
   });
 });

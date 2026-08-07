@@ -9,6 +9,7 @@ import { copyToDocuments } from './copyToDocuments';
 import { materializePresetArtistAvatars } from './presetArtistMedia';
 import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
 import { generateId } from './uuid';
+import { normalizeArtistConfirmationMode } from './artistConfirmation';
 
 const BACKUP_VERSION = 6;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
@@ -713,14 +714,16 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
 
       if (user_config) {
         await db.rawDb.runAsync(
-          `INSERT OR REPLACE INTO user_config (id, name, avatar_uri, avatar_emoji, oshi_artist_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT OR REPLACE INTO user_config
+             (id, name, avatar_uri, avatar_emoji, oshi_artist_id, artist_confirmation_mode, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             String(user_config.id ?? 'default'),
             String(user_config.name ?? 'Otaku'),
             user_config.avatar_uri ?? null,
             String(user_config.avatar_emoji ?? '🎤'),
             user_config.oshi_artist_id ?? null,
+            normalizeArtistConfirmationMode(user_config.artist_confirmation_mode),
             String(user_config.updated_at ?? new Date().toISOString()),
           ]
         );

@@ -67,6 +67,14 @@ function createV16Database(): Database.Database {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE user_config (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT 'Otaku',
+      avatar_uri TEXT,
+      avatar_emoji TEXT NOT NULL DEFAULT '🎤',
+      oshi_artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL
+    );
     INSERT INTO artists VALUES ('artist', 'Artist', '2026-01-01T00:00:00.000Z');
     INSERT INTO events VALUES (
       'event', 'Event', 'livehouse', '2026-06-01', NULL, NULL, NULL, NULL,
@@ -83,12 +91,12 @@ function createV16Database(): Database.Database {
   return db;
 }
 
-describe('v16 through v18 migration', () => {
+describe('v16 through v19 migration', () => {
   test('merges rows, preserves media and timestamps, and passes foreign key checks', async () => {
     const db = createV16Database();
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(18);
+    expect(db.pragma('user_version', { simple: true })).toBe(19);
     expect(db.prepare('SELECT quantity, date, created_at, updated_at FROM cheki_records').get())
       .toEqual({
         quantity: 5,

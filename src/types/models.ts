@@ -305,12 +305,15 @@ export interface CreateExpenseInput {
   notes?: string | null;
 }
 
+export type ArtistConfirmationMode = 'always' | 'matches_only' | 'never';
+
 export interface UserConfig {
   id: string;
   name: string;
   avatar_uri: string | null;
   avatar_emoji: string;
   oshi_artist_id: string | null;
+  artist_confirmation_mode: ArtistConfirmationMode;
   updated_at: string;
 }
 
@@ -319,6 +322,7 @@ export interface CreateUserConfigInput {
   avatar_uri?: string | null;
   avatar_emoji?: string;
   oshi_artist_id?: string | null;
+  artist_confirmation_mode?: ArtistConfirmationMode;
 }
 
 export interface DateItem {

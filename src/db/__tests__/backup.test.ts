@@ -127,6 +127,24 @@ describe('backup artist background metadata support', () => {
     ]);
   });
 
+  test('backs up and restores the artist confirmation preference', async () => {
+    await repositories.userConfig.getConfig();
+    await repositories.userConfig.updateConfig({ artist_confirmation_mode: 'never' });
+
+    const data = await buildBackupData(repositories);
+    expect(data.user_config.artist_confirmation_mode).toBe('never');
+
+    await repositories.userConfig.updateConfig({ artist_confirmation_mode: 'always' });
+    await restoreBackupData(
+      repositories,
+      data as unknown as Parameters<typeof restoreBackupData>[1],
+    );
+
+    await expect(repositories.userConfig.getConfig()).resolves.toEqual(expect.objectContaining({
+      artist_confirmation_mode: 'never',
+    }));
+  });
+
   test('backs up and restores cheki v2 records, items, and both image sides', async () => {
     const now = '2026-01-01T00:00:00.000Z';
     rawDb.prepare(`INSERT INTO cheki_records

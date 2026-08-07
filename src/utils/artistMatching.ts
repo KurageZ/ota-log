@@ -120,7 +120,7 @@ function buildCandidate(rawName: string, suggestions: ScoredArtist[]): ArtistCan
     name,
     short_name,
     editName: rawName,
-    resolution: suggestions.length > 0 ? 'skip' : 'create',
+    resolution: 'skip',
     suggestions: suggestions.map(({ artist, confidence, matchedField }) => ({
       artistId: artist.id,
       name: artist.name,

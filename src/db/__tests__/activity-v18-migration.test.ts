@@ -74,6 +74,14 @@ function createV17ActivityDb(): Database.Database {
       id TEXT PRIMARY KEY,
       linked_event_id TEXT REFERENCES events(id) ON DELETE SET NULL
     );
+    CREATE TABLE user_config (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT 'Otaku',
+      avatar_uri TEXT,
+      avatar_emoji TEXT NOT NULL DEFAULT '🎤',
+      oshi_artist_id TEXT,
+      updated_at TEXT NOT NULL
+    );
   `);
   db.prepare(`INSERT INTO artists (id, name, created_at) VALUES (?, ?, ?)`).run(
     'artist-b', 'Artist B', '2026-01-01T00:00:00.000Z',
@@ -129,7 +137,7 @@ describe('Activity v18 migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(18);
+    expect(db.pragma('user_version', { simple: true })).toBe(19);
     expect(columns(db, 'events')).toEqual([
       'id', 'title', 'event_type', 'status', 'review_score', 'notes', 'details',
       'url', 'setlist_text', 'actual_expense', 'trip_id', 'created_at', 'updated_at',

@@ -62,6 +62,8 @@ export const SCHEMA_STATEMENTS = [
     avatar_uri    TEXT,
     avatar_emoji  TEXT NOT NULL DEFAULT '🎤',
     oshi_artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL,
+    artist_confirmation_mode TEXT NOT NULL DEFAULT 'always'
+      CHECK (artist_confirmation_mode IN ('always', 'matches_only', 'never')),
     updated_at    TEXT NOT NULL
   )`,
 

@@ -14,7 +14,7 @@ import {
   createEventsV2TableSql,
 } from './activityV2Schema';
 
-export const CURRENT_VERSION = 18;
+export const CURRENT_VERSION = 19;
 
 interface LegacyEventV17Row {
   id: string;
@@ -396,6 +396,13 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 18) {
       await migrateActivityV2(db);
+    }
+    if (version < 19) {
+      await db.runAsync(
+        `ALTER TABLE user_config
+         ADD COLUMN artist_confirmation_mode TEXT NOT NULL DEFAULT 'always'
+         CHECK (artist_confirmation_mode IN ('always', 'matches_only', 'never'))`,
+      );
     }
     // Future versions: add more `if (version < N)` blocks here
   }

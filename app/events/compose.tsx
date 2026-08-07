@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
 import type { EventFormPrefill } from '../../src/components/EventForm';
@@ -40,6 +40,11 @@ import {
   prepareImportedEventDraft,
 } from '../../src/utils/importedEventDraft';
 import type { ParsedEventDraftResult } from '../../src/utils/parsedEventDraft';
+import {
+  DEFAULT_ARTIST_CONFIRMATION_MODE,
+  getArtistCandidatesForConfirmation,
+  selectAllArtistCandidates,
+} from '../../src/utils/artistConfirmation';
 
 // ── ParseModal ────────────────────────────────────────────────────────────────
 // Owns its own text state so typing never re-renders the parent screen
@@ -49,12 +54,23 @@ interface ParseModalProps {
   visible: boolean;
   isDark: boolean;
   loading: boolean;
+  artistContextStatus: 'loading' | 'ready' | 'error';
   onClose: () => void;
   onManual: () => void;
+  onRetryArtistContext: () => void;
   onSubmit: (text: string) => Promise<void>;
 }
 
-function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: ParseModalProps) {
+function ParseModal({
+  visible,
+  isDark,
+  loading,
+  artistContextStatus,
+  onClose,
+  onManual,
+  onRetryArtistContext,
+  onSubmit,
+}: ParseModalProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -99,6 +115,8 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
   };
 
   const hasInput = urlValue.trim().length > 0 || textValue.trim().length > 0;
+  const isArtistContextLoading = artistContextStatus === 'loading';
+  const isPrimaryDisabled = loading || isArtistContextLoading;
 
   const handlePasteAndSubmit = async () => {
     const clipboardText = (await Clipboard.getString()).trim();
@@ -250,19 +268,23 @@ function ParseModal({ visible, isDark, loading, onClose, onManual, onSubmit }: P
               backgroundColor: colors.screen,
             }}>
               <TouchableOpacity
-                onPress={hasInput ? handleSubmit : () => { void handlePasteAndSubmit(); }}
-                disabled={loading}
+                onPress={artistContextStatus === 'error'
+                  ? onRetryArtistContext
+                  : hasInput ? handleSubmit : () => { void handlePasteAndSubmit(); }}
+                disabled={isPrimaryDisabled}
                 style={{
                   backgroundColor: colors.accent, borderRadius: 14,
                   paddingVertical: 14, alignItems: 'center',
-                  opacity: loading ? 0.5 : 1,
+                  opacity: isPrimaryDisabled ? 0.5 : 1,
                 }}
               >
-                {loading
+                {loading || isArtistContextLoading
                   ? <ActivityIndicator color={colors.onAccent} />
                   : (
                     <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>
-                      {hasInput ? '解析并创建草稿' : '粘贴并识别'}
+                      {artistContextStatus === 'error'
+                        ? '载入失败，点击重试'
+                        : hasInput ? '解析并创建草稿' : '粘贴并识别'}
                     </Text>
                   )
                 }
@@ -318,9 +340,10 @@ function NewArtistConfirmModal({
     setCandidates((prev) => prev.map((c, idx) => idx === i ? { ...c, editName: text } : c));
 
   const selectedCount = candidates.filter((c) => c.resolution !== 'skip').length;
+  const allSelected = candidates.length > 0 && selectedCount === candidates.length;
   const cardBg = colors.card;
   const sheetMaxHeight = Math.min(screenHeight - insets.top - 24, 720);
-  const actionBottomPadding = Math.max(insets.bottom - 28, 4);
+  const actionBottomPadding = Math.max(insets.bottom, 16);
 
   if (!visible) return null;
 
@@ -339,14 +362,12 @@ function NewArtistConfirmModal({
         onPress={() => {}}
         style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
       />
-      <SafeAreaView style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <View style={{
           maxHeight: sheetMaxHeight,
           backgroundColor: colors.screen,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
-          borderBottomRightRadius: 24,
-          borderBottomLeftRadius: 24,
           overflow: 'hidden',
         }}>
           <View style={{
@@ -357,6 +378,22 @@ function NewArtistConfirmModal({
             <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: colors.heading }}>
               确认出演者
             </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={allSelected ? '取消全选出演者' : '全选出演者'}
+              disabled={!interactive}
+              activeOpacity={0.7}
+              onPress={() => setCandidates((current) => (
+                allSelected
+                  ? current.map((candidate) => ({ ...candidate, resolution: 'skip' }))
+                  : selectAllArtistCandidates(current)
+              ))}
+              style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 16 }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>
+                {allSelected ? '取消全选' : '全选'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView
@@ -364,7 +401,7 @@ function NewArtistConfirmModal({
             keyboardShouldPersistTaps="handled"
           >
             <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 }}>
-              以下艺人未能精准匹配，请手动选择或新建。
+              选择要添加的出演者；也可以将其匹配到艺人库中的已有艺人。
             </Text>
 
             <View style={{
@@ -382,6 +419,9 @@ function NewArtistConfirmModal({
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <TouchableOpacity
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`${c.editName || c.rawName}，${c.resolution === 'skip' ? '未选择' : '已选择'}`}
+                      accessibilityState={{ checked: c.resolution !== 'skip', disabled: !interactive }}
                       disabled={!interactive}
                       onPress={() => setResolution(i, c.resolution === 'skip' ? 'create' : 'skip')}
                       style={{ marginRight: 12 }}
@@ -484,12 +524,12 @@ function NewArtistConfirmModal({
               }}
             >
               <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>
-                {selectedCount > 0 ? `确认 ${selectedCount} 位出演者` : '忽略这些艺人'}
+                {selectedCount > 0 ? `确认 ${selectedCount} 位出演者` : '不添加并继续'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -503,6 +543,9 @@ export default function NewEventScreen() {
   const [pendingPhotoUris, setPendingPhotoUris] = useState<string[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [weiboCookie, setWeiboCookie] = useState<string>('');
+  const [artistConfirmationMode, setArtistConfirmationMode] = useState(DEFAULT_ARTIST_CONFIRMATION_MODE);
+  const [artistContextStatus, setArtistContextStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [artistContextReloadKey, setArtistContextReloadKey] = useState(0);
 
   // State for the artist confirmation flow
   const [artistCandidates, setArtistCandidates] = useState<ArtistCandidate[]>([]);
@@ -515,9 +558,28 @@ export default function NewEventScreen() {
   const confirmInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    db.artists.findAll().then(setAllArtists);
-    loadWeiboCookie().then(setWeiboCookie);
-  }, [db]);
+    let cancelled = false;
+    setArtistContextStatus('loading');
+    void Promise.all([
+      db.artists.findAll(),
+      db.userConfig.getConfig(),
+    ]).then(([artists, config]) => {
+      if (cancelled) return;
+      setAllArtists(artists);
+      setArtistConfirmationMode(config.artist_confirmation_mode);
+      setArtistContextStatus('ready');
+    }).catch(() => {
+      if (!cancelled) setArtistContextStatus('error');
+    });
+
+    void loadWeiboCookie().then((cookie) => {
+      if (!cancelled) setWeiboCookie(cookie);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artistContextReloadKey, db]);
 
   useEffect(() => () => {
     confirmVisibilityTaskRef.current?.cancel();
@@ -583,12 +645,16 @@ export default function NewEventScreen() {
     photoUris: string[] = pendingPhotoUris,
     prefillWarning: string | null = null,
   ) => {
-    const { matchedIds, candidates, fields, shouldConfirmArtists } = draft;
-    if (shouldConfirmArtists) {
+    const { matchedIds, candidates, fields } = draft;
+    const confirmationCandidates = getArtistCandidatesForConfirmation(
+      candidates,
+      artistConfirmationMode,
+    );
+    if (confirmationCandidates.length > 0) {
       setPendingMatchedIds(matchedIds);
       setPendingFields(fields);
       setPendingPrefillWarning(prefillWarning);
-      setArtistCandidates(candidates);
+      setArtistCandidates(confirmationCandidates);
       setArtistConfirmInteractive(false);
       confirmVisibilityTaskRef.current?.cancel();
       if (confirmInteractionTimerRef.current) {
@@ -764,8 +830,10 @@ export default function NewEventScreen() {
         visible={!artistConfirmVisible}
         isDark={isDark}
         loading={parseLoading}
+        artistContextStatus={artistContextStatus}
         onClose={closeParseModal}
         onManual={enterManualForm}
+        onRetryArtistContext={() => setArtistContextReloadKey((key) => key + 1)}
         onSubmit={handleParse}
       />
 

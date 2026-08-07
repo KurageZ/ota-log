@@ -3,6 +3,10 @@ import { UserConfig, CreateUserConfigInput } from '../types/models';
 import { toISODateTime } from '../utils/date';
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 import { DEFAULT_PROFILE_EMOJI } from '../utils/profile';
+import {
+  DEFAULT_ARTIST_CONFIRMATION_MODE,
+  normalizeArtistConfirmationMode,
+} from '../utils/artistConfirmation';
 
 export class UserConfigRepository {
   constructor(private db: SQLiteDatabase) {}
@@ -22,24 +26,31 @@ export class UserConfigRepository {
           avatar_uri: null,
           avatar_emoji: DEFAULT_PROFILE_EMOJI,
           oshi_artist_id: null,
+          artist_confirmation_mode: DEFAULT_ARTIST_CONFIRMATION_MODE,
           updated_at: now,
         };
         await this.db.runAsync(
-          `INSERT INTO user_config (id, name, avatar_uri, avatar_emoji, oshi_artist_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO user_config
+             (id, name, avatar_uri, avatar_emoji, oshi_artist_id, artist_confirmation_mode, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             defaultConfig.id,
             defaultConfig.name,
             defaultConfig.avatar_uri,
             defaultConfig.avatar_emoji,
             defaultConfig.oshi_artist_id,
+            defaultConfig.artist_confirmation_mode,
             defaultConfig.updated_at,
           ]
         );
         return defaultConfig;
       }
 
-      return { ...config, oshi_artist_id: config.oshi_artist_id ?? null };
+      return {
+        ...config,
+        oshi_artist_id: config.oshi_artist_id ?? null,
+        artist_confirmation_mode: normalizeArtistConfirmationMode(config.artist_confirmation_mode),
+      };
     } catch (error) {
       // Fallback if table doesn't exist
       const now = toISODateTime();
@@ -49,6 +60,7 @@ export class UserConfigRepository {
         avatar_uri: null,
         avatar_emoji: DEFAULT_PROFILE_EMOJI,
         oshi_artist_id: null,
+        artist_confirmation_mode: DEFAULT_ARTIST_CONFIRMATION_MODE,
         updated_at: now,
       };
     }
@@ -68,6 +80,10 @@ export class UserConfigRepository {
     if (input.avatar_uri !== undefined) { fields.push('avatar_uri = ?'); values.push(input.avatar_uri); }
     if (input.avatar_emoji !== undefined) { fields.push('avatar_emoji = ?'); values.push(input.avatar_emoji); }
     if (input.oshi_artist_id !== undefined) { fields.push('oshi_artist_id = ?'); values.push(input.oshi_artist_id); }
+    if (input.artist_confirmation_mode !== undefined) {
+      fields.push('artist_confirmation_mode = ?');
+      values.push(input.artist_confirmation_mode);
+    }
 
     if (fields.length === 0) return;
 
