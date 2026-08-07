@@ -25,6 +25,66 @@ export function createEventArtistsV2TableSql(tableName = 'event_artists'): strin
   )`;
 }
 
+export const ACTIVITY_V2_TIME_INDEX_STATEMENTS = [
+  `CREATE INDEX IF NOT EXISTS idx_event_sessions_event_sort
+    ON event_sessions (event_id, session_date, open_time, start_time, sort_order)`,
+
+  `CREATE INDEX IF NOT EXISTS idx_event_sessions_date
+    ON event_sessions (session_date, open_time, start_time)`,
+];
+
+export const ACTIVITY_V2_SUMMARY_VIEW_STATEMENTS = [
+  `CREATE VIEW IF NOT EXISTS event_first_summaries AS
+    SELECT
+      e.*,
+      s.session_date AS event_date,
+      COALESCE(s.open_time, s.start_time) AS event_time,
+      s.open_time AS open_time,
+      s.start_time AS start_time,
+      s.end_time AS end_time,
+      s.city AS city,
+      s.venue AS venue,
+      e.actual_expense AS ticket_price
+    FROM events e
+    JOIN event_sessions s ON s.id = (
+      SELECT candidate.id
+      FROM event_sessions candidate
+      WHERE candidate.event_id = e.id
+      ORDER BY candidate.session_date ASC,
+               COALESCE(candidate.open_time, candidate.start_time) ASC,
+               candidate.sort_order ASC,
+               candidate.id ASC
+      LIMIT 1
+    )`,
+
+  `CREATE VIEW IF NOT EXISTS event_summaries AS
+    SELECT
+      e.*,
+      s.session_date AS event_date,
+      COALESCE(s.open_time, s.start_time) AS event_time,
+      s.open_time AS open_time,
+      s.start_time AS start_time,
+      s.end_time AS end_time,
+      s.city AS city,
+      s.venue AS venue,
+      e.actual_expense AS ticket_price
+    FROM events e
+    JOIN event_sessions s ON s.id = (
+      SELECT candidate.id
+      FROM event_sessions candidate
+      WHERE candidate.event_id = e.id
+      ORDER BY
+        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN 0 ELSE 1 END ASC,
+        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN candidate.session_date END ASC,
+        CASE WHEN candidate.session_date < date('now', 'localtime') THEN candidate.session_date END DESC,
+        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN COALESCE(candidate.open_time, candidate.start_time) END ASC,
+        CASE WHEN candidate.session_date < date('now', 'localtime') THEN COALESCE(candidate.open_time, candidate.start_time) END DESC,
+        candidate.sort_order ASC,
+        candidate.id ASC
+      LIMIT 1
+    )`,
+];
+
 export const ACTIVITY_V2_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS event_sessions (
     id           TEXT PRIMARY KEY,
@@ -57,11 +117,7 @@ export const ACTIVITY_V2_SCHEMA_STATEMENTS = [
     UNIQUE (session_id, sort_order)
   )`,
 
-  `CREATE INDEX IF NOT EXISTS idx_event_sessions_event_sort
-    ON event_sessions (event_id, session_date, start_time, sort_order)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_event_sessions_date
-    ON event_sessions (session_date, start_time)`,
+  ...ACTIVITY_V2_TIME_INDEX_STATEMENTS,
 
   `CREATE INDEX IF NOT EXISTS idx_event_sessions_city_date
     ON event_sessions (city, session_date)`,
@@ -75,47 +131,5 @@ export const ACTIVITY_V2_SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_event_timetable_entries_artist
     ON event_timetable_entries (artist_id)`,
 
-  `CREATE VIEW IF NOT EXISTS event_first_summaries AS
-    SELECT
-      e.*,
-      s.session_date AS event_date,
-      s.start_time AS event_time,
-      s.city AS city,
-      s.venue AS venue,
-      e.actual_expense AS ticket_price
-    FROM events e
-    JOIN event_sessions s ON s.id = (
-      SELECT candidate.id
-      FROM event_sessions candidate
-      WHERE candidate.event_id = e.id
-      ORDER BY candidate.session_date ASC,
-               candidate.start_time ASC,
-               candidate.sort_order ASC,
-               candidate.id ASC
-      LIMIT 1
-    )`,
-
-  `CREATE VIEW IF NOT EXISTS event_summaries AS
-    SELECT
-      e.*,
-      s.session_date AS event_date,
-      s.start_time AS event_time,
-      s.city AS city,
-      s.venue AS venue,
-      e.actual_expense AS ticket_price
-    FROM events e
-    JOIN event_sessions s ON s.id = (
-      SELECT candidate.id
-      FROM event_sessions candidate
-      WHERE candidate.event_id = e.id
-      ORDER BY
-        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN 0 ELSE 1 END ASC,
-        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN candidate.session_date END ASC,
-        CASE WHEN candidate.session_date < date('now', 'localtime') THEN candidate.session_date END DESC,
-        CASE WHEN candidate.session_date >= date('now', 'localtime') THEN candidate.start_time END ASC,
-        CASE WHEN candidate.session_date < date('now', 'localtime') THEN candidate.start_time END DESC,
-        candidate.sort_order ASC,
-        candidate.id ASC
-      LIMIT 1
-    )`,
+  ...ACTIVITY_V2_SUMMARY_VIEW_STATEMENTS,
 ];

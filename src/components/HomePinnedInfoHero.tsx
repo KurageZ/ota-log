@@ -6,6 +6,7 @@ import { AppIcon } from './AppIcon';
 import { resolveAvatarSource } from '../utils/avatarSource';
 import { HomeFeaturedArtistData, HomeMonthOverviewData } from './HomeDashboardCards';
 import { daysUntil } from '../utils/date';
+import { formatEventTimes } from './EventPrimitives';
 
 export function HomePinnedNextEventEmptyHero({ onCreatePress }: { onCreatePress: () => void }) {
   const { colors, isDark } = useAppTheme();
@@ -339,7 +340,11 @@ function formatShortDate(isoDate: string) {
 }
 
 function formatEventMeta(event: Event) {
-  const parts = [formatShortDate(event.event_date), event.event_time || '全天', event.venue]
+  const parts = [
+    formatShortDate(event.event_date),
+    formatEventTimes(event.open_time, event.start_time) || '全天',
+    event.venue,
+  ]
     .filter(Boolean);
   return parts.join(' · ') || '时间地点待确认';
 }

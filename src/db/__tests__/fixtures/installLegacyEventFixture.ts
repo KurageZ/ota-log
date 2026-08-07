@@ -27,8 +27,8 @@ export function installLegacyEventFixture(db: Database.Database): void {
         (id, event_id, title, session_date, end_date, open_time, start_time,
          end_time, city, venue, sort_order, created_at, updated_at)
       VALUES
-        ('fixture-session-' || NEW.id, NEW.id, NULL, NEW.event_date, NULL, NULL,
-         NEW.event_time, NULL, NEW.city, NEW.venue, 0, NEW.created_at, NEW.updated_at);
+        ('fixture-session-' || NEW.id, NEW.id, NULL, NEW.event_date, NULL,
+         NEW.event_time, NULL, NULL, NEW.city, NEW.venue, 0, NEW.created_at, NEW.updated_at);
     END;
   `);
 }

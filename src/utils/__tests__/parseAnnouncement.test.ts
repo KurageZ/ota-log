@@ -82,6 +82,19 @@ describe('parseAnnouncement branch coverage', () => {
 
     expect(parsed.event_date).toBe('2026-02-27');
     expect(parsed.event_time).toBe('19:30');
+    expect(parsed.open_time).toBe('19:00');
+    expect(parsed.start_time).toBe('19:30');
+  });
+
+  test('keeps opening, performance, and ending times separate', () => {
+    const parsed = parseAnnouncement(
+      '2026/2/27\nOPEN 17:30 START 18:30 END 20:00',
+      { referenceYear: 2026 },
+    );
+
+    expect(parsed.open_time).toBe('17:30');
+    expect(parsed.start_time).toBe('18:30');
+    expect(parsed.end_time).toBe('20:00');
   });
 
   test('falls back to the first standalone time when no label exists', () => {

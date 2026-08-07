@@ -5,6 +5,7 @@ import { daysUntil } from '../utils/date';
 import { useAppTheme } from '../theme/appTheme';
 import { OshiAvatar, OshiBadge } from './Oshi';
 import { resolveAvatarSource } from '../utils/avatarSource';
+import { formatEventTimes } from './EventPrimitives';
 
 export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
   const router = useRouter();
@@ -12,7 +13,11 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
   const { event, isOshiMatch, oshiArtist } = item;
   const countdown = getCountdownCopy(event.event_date, event.event_time);
   const oshiName = oshiArtist?.short_name || oshiArtist?.name || '你的单推';
-  const metaParts = [formatShortDate(event.event_date), event.event_time || '全天', event.venue]
+  const metaParts = [
+    formatShortDate(event.event_date),
+    formatEventTimes(event.open_time, event.start_time) || '全天',
+    event.venue,
+  ]
     .filter(Boolean);
 
   return (

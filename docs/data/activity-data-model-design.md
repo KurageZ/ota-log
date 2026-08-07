@@ -3,7 +3,7 @@
 状态：数据层已在 Migration v18 实现；创建、编辑和详情页已接入多场次与扁平时间表，其余入口待后续提交。
 最近更新：2026-08-06。
 
-本文档描述 ota-log 下一代活动数据结构。当前数据库基线是 Migration v19；活动结构仍在 Migration v18 定型，已实现 schema 的事实来源仍为：
+本文档描述 ota-log 下一代活动数据结构。当前数据库基线是 Migration v20；活动结构在 Migration v18 定型，并在 v20 统一时间语义。已实现 schema 的事实来源仍为：
 
 - `src/db/schema.ts`
 - `src/db/migrations.ts`
@@ -123,7 +123,7 @@ CHECK (actual_expense IS NULL OR actual_expense >= 0)
 | `session_date` | TEXT | NOT NULL | 场次当地日期。 |
 | `end_date` | TEXT | NULL | 跨午夜时的结束日期；普通场次为空。 |
 | `open_time` | TEXT | NULL | 开场或入场时间。 |
-| `start_time` | TEXT | NULL | 正式开始时间。 |
+| `start_time` | TEXT | NULL | 开演时间。 |
 | `end_time` | TEXT | NULL | 结束时间。 |
 | `city` | TEXT | NULL | 城市文本，保持现有语义。 |
 | `venue` | TEXT | NULL | 场馆文本，保持现有语义。 |
@@ -136,8 +136,8 @@ CHECK (actual_expense IS NULL OR actual_expense >= 0)
 - `end_date` 为空或不早于 `session_date`。
 - `sort_order >= 0`。
 - `UNIQUE(event_id, sort_order)`。
-- 索引 `(event_id, session_date, start_time, sort_order)`。
-- 索引 `(session_date, start_time)`，用于首页、列表、日历和小组件。
+- 索引 `(event_id, session_date, open_time, start_time, sort_order)`。
+- 索引 `(session_date, open_time, start_time)`，用于首页、列表、日历和小组件。
 - 索引 `(city, session_date)` 与 `(venue, session_date)`，用于筛选和统计。
 
 SQLite 无法在创建活动根记录的同一时刻用普通外键保证“至少一个场次”。该规则由 Repository 事务保证：
@@ -230,7 +230,7 @@ SQLite 无法在创建活动根记录的同一时刻用普通外键保证“至�
 
 1. 存在今天或未来场次时，选择最早的今天或未来场次。
 2. 所有场次都已结束时，选择最后一个场次。
-3. 同日多个场次按 `start_time`、`sort_order` 排序；无开始时间时仅使用 `sort_order`。
+3. 同日多个场次按 `open_time ?? start_time`、`sort_order` 排序；开场和开演时间都为空时仅使用 `sort_order`。
 
 首页下一场、活动列表摘要、活动倒数和小组件应共享同一个代表场次选择工具，避免口径漂移。
 
@@ -306,7 +306,7 @@ SQLite 无法在创建活动根记录的同一时刻用普通外键保证“至�
 1. Migration v18 创建 `event_sessions` 和直接归属场次的 `event_timetable_entries`；不创建时间表分组表。
 2. 为每条旧 `events` 创建一个默认场次：
    - `event_date -> session_date`
-   - `event_time -> start_time`
+   - `event_time -> open_time`
    - `city -> city`
    - `venue -> venue`
 3. 为 `event_artists` 增加或通过表重建加入 `sort_order`，旧数据按稳定顺序赋值。
@@ -314,7 +314,9 @@ SQLite 无法在创建活动根记录的同一时刻用普通外键保证“至�
 5. 提供 `event_summaries` 与 `event_first_summaries` 兼容视图；首页、列表和小组件等尚未改版的入口继续读取代表场次投影。
 6. Repository 与统计查询切换到场次事实，并新增多场次及结构化时间表 Repository。
 7. `photos`、`cheki_records`、`important_dates`、历史 `expenses` 和 `trip_id` 继续引用原 `events.id`，不迁移到第二层记录。
-8. 完整备份升级为 v6，保存新活动根表、场次和扁平时间表；恢复旧版备份时自动创建默认场次。
+8. 完整备份 v6 开始保存新活动根表、场次和扁平时间表；v20 同步将备份格式升级为 v7，恢复 v6 及更早备份时把旧单时间归为开场时间。
+
+Migration v20 统一活动时间语义：只有 `start_time`、没有 `open_time` 的既有场次将原时间迁入 `open_time`，作为开场时间显示；已经同时保存开场和开演时间的场次保持不变。活动摘要视图同时投影 `open_time`、`start_time` 和 `end_time`，兼容字段 `event_time` 取 `open_time ?? start_time`。
 
 迁移至少覆盖：
 
@@ -329,7 +331,7 @@ SQLite 无法在创建活动根记录的同一时刻用普通外键保证“至�
 
 ## 11. 后续实现顺序
 
-数据层已完成 schema、v18 migration、Repository、查询口径、备份 v6 和自动化测试。创建、编辑和详情页已经支持多场次、实际支出与扁平时间表的编辑和展示；iEvent 导入器已能生成多场次、开场时间、扁平时间表和资料图。后续提交继续完成：
+数据层已完成 schema、v18/v20 migration、Repository、查询口径、备份 v7 和自动化测试。创建、编辑和详情页已经支持多场次、实际支出与扁平时间表的编辑和展示；iEvent 导入器已能生成多场次、开场时间、扁平时间表和资料图。后续提交继续完成：
 
 1. 首页、列表、日历、小组件和重要日期直接使用共享的代表场次能力。
 2. 完成 iOS / Android、浅色 / 深色与迁移数据的人工验收后，移除 TypeScript 和 Repository 中仅供旧 UI 使用的兼容字段。

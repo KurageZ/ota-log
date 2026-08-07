@@ -1,11 +1,14 @@
 import Database from 'better-sqlite3';
 import { runMigrations } from '../migrations';
+import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
 
 describe('User config v19 migration', () => {
   test('adds the artist confirmation preference and preserves the existing profile', async () => {
     const db = new Database(':memory:');
+    for (const statement of SCHEMA_STATEMENTS) db.exec(statement);
     db.exec(`
+      DROP TABLE user_config;
       CREATE TABLE user_config (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL DEFAULT 'Otaku',
@@ -23,7 +26,7 @@ describe('User config v19 migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(19);
+    expect(db.pragma('user_version', { simple: true })).toBe(20);
     expect(db.prepare(`SELECT name, avatar_uri, avatar_emoji, oshi_artist_id,
       artist_confirmation_mode, updated_at FROM user_config WHERE id = 'default'`).get())
       .toEqual({

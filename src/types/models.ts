@@ -42,6 +42,9 @@ export interface Event {
   /** Compatibility projection from the representative session. */
   event_date: string;
   event_time: string | null;
+  open_time: string | null;
+  start_time: string | null;
+  end_time: string | null;
   city: string | null;
   venue: string | null;
   /** Compatibility alias of actual_expense until the activity UI is migrated. */

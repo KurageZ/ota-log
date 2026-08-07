@@ -11,6 +11,7 @@ import { AnimatedPressable } from './AnimatedPressable';
 import { getDateItemPresetKind } from '../utils/dateItemDisplay';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { PresetDateItemTitle } from './PresetDateItemTitle';
+import { formatEventTimes } from './EventPrimitives';
 
 export interface HomeFeaturedArtistData {
   artist: Artist | null;
@@ -549,7 +550,11 @@ function formatShortDate(isoDate: string) {
 }
 
 function formatEventMeta(event: Event) {
-  const parts = [formatShortDate(event.event_date), event.event_time || '全天', event.venue]
+  const parts = [
+    formatShortDate(event.event_date),
+    formatEventTimes(event.open_time, event.start_time) || '全天',
+    event.venue,
+  ]
     .filter(Boolean);
   return parts.join(' · ') || '时间地点待确认';
 }

@@ -6,7 +6,7 @@
 
 - 产品：本地优先的 Otaku 演出记录 App，面向日系 / 国内偶像、团体活动爱好者。
 - 平台：iOS + Android，Expo SDK 56 + Expo Router v6。
-- 数据：本地 SQLite，当前 migration 版本 v19；`trip` 表仍保留为历史遗留，前台功能已下线。
+- 数据：本地 SQLite，当前 migration 版本 v20；`trip` 表仍保留为历史遗留，前台功能已下线。
 - 主要模块：活动、艺人、切册、统计、个人资料、设置、小工具。
 
 ## Documentation Map

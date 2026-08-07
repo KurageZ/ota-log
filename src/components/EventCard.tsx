@@ -128,7 +128,13 @@ export function EventCard({
                 : <OshiMatchBadge oshiArtistName={oshiBadge.artistName} />
             )}
 
-            <EventDateTimeRow eventDate={event.event_date} eventTime={event.event_time} size={isCompact ? 'sm' : 'md'} tone={tone} />
+            <EventDateTimeRow
+              eventDate={event.event_date}
+              openTime={event.open_time}
+              startTime={event.start_time}
+              size={isCompact ? 'sm' : 'md'}
+              tone={tone}
+            />
             <EventVenueRow city={event.city} venue={event.venue} size={isCompact ? 'sm' : 'md'} tone={tone} />
           </View>
 

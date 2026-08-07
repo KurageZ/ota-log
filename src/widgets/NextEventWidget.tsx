@@ -20,7 +20,8 @@ export interface NextEventWidgetProps {
   eventId?: string;
   title?: string;
   eventDate?: string;
-  eventTime?: string | null;
+  openTime?: string | null;
+  startTime?: string | null;
   city?: string | null;
   venue?: string | null;
   countdown?: string;
@@ -34,6 +35,10 @@ const NextEventWidgetView = (props: NextEventWidgetProps, environment: WidgetEnv
   const hasEvent = Boolean(props.eventId && props.title);
   const isMedium = environment.widgetFamily === 'systemMedium';
   const location = [props.city, props.venue].filter(Boolean).join(' · ');
+  const time = [
+    props.openTime ? `开场 ${props.openTime}` : null,
+    props.startTime ? `开演 ${props.startTime}` : null,
+  ].filter(Boolean).join(' · ') || '全天';
   const dateParts = props.eventDate?.split('-');
   const formattedDate = dateParts?.length === 3
     ? `${Number(dateParts[1])}月${Number(dateParts[2])}日`
@@ -68,7 +73,7 @@ const NextEventWidgetView = (props: NextEventWidgetProps, environment: WidgetEnv
             )}
             <VStack alignment="leading" spacing={6} modifiers={[frame({ maxWidth: 10000, maxHeight: 120 })]}>
               <Text modifiers={[font({ size: 18, weight: 'black' }), foregroundStyle('#4F3028'), lineLimit(2)]}>{props.title}</Text>
-              <Text modifiers={[font({ size: 11, weight: 'medium' }), foregroundStyle('#8C6B5B'), lineLimit(1)]}>{formattedDate}{' · '}{props.eventTime || '全天'}</Text>
+              <Text modifiers={[font({ size: 11, weight: 'medium' }), foregroundStyle('#8C6B5B'), lineLimit(2)]}>{formattedDate}{' · '}{time}</Text>
               {location ? <Text modifiers={[font({ size: 11, weight: 'medium' }), foregroundStyle('#8C6B5B'), lineLimit(2)]}>{location}</Text> : null}
             </VStack>
           </HStack>
@@ -82,7 +87,7 @@ const NextEventWidgetView = (props: NextEventWidgetProps, environment: WidgetEnv
               <VStack spacing={4} modifiers={[frame({ maxWidth: 10000 })]}>
                 <Text modifiers={[font({ size: 10, weight: 'bold' }), foregroundStyle('#A36A4C')]}>{'下一场活动'}</Text>
                 <Text modifiers={[font({ size: 15, weight: 'bold' }), foregroundStyle('#4F3028'), lineLimit(2)]}>{props.title}</Text>
-                <Text modifiers={[font({ size: 11, weight: 'medium' }), foregroundStyle('#8C6B5B')]}>{formattedDate}{' · '}{props.eventTime || '全天'}</Text>
+                <Text modifiers={[font({ size: 11, weight: 'medium' }), foregroundStyle('#8C6B5B'), lineLimit(2)]}>{formattedDate}{' · '}{time}</Text>
               </VStack>
             </HStack>
           </VStack>

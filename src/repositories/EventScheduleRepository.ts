@@ -70,7 +70,7 @@ export class EventScheduleRepository {
     return this.db.getAllAsync<EventSession>(
       `SELECT * FROM event_sessions
        WHERE event_id = ?
-       ORDER BY sort_order ASC, session_date ASC, start_time ASC, id ASC`,
+       ORDER BY sort_order ASC, session_date ASC, COALESCE(open_time, start_time) ASC, id ASC`,
       [eventId],
     );
   }

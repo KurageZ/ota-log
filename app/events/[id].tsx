@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Calendar from 'expo-calendar/legacy';
 import Clipboard from '@react-native-clipboard/clipboard';
-import * as ImagePicker from 'expo-image-picker';
 import { useDB } from '../../src/context/DBContext';
 import {
   Event, Artist, Cheki, ChekiManualEntry, Photo, EventStatus,
@@ -17,7 +16,6 @@ import { formatDate, daysUntil } from '../../src/utils/date';
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
-import { copyToDocuments } from '../../src/utils/copyToDocuments';
 import { buildChekiViewerItems, getChekiManualCount } from '../../src/utils/cheki';
 import { ChekiViewerModal } from '../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../src/types/chekiViewer';
@@ -26,28 +24,29 @@ import {
   FullscreenImageViewer,
 } from '../../src/components/FullscreenImageViewer';
 import { OshiAvatar, OshiBadge, OshiMatchBadge } from '../../src/components/Oshi';
-import { EventRatingStars } from '../../src/components/EventPrimitives';
-import { showDeleteFailedAlert, showOperationFailedAlert, showPhotoLibraryPermissionAlert } from '../../src/utils/failureAlert';
+import {
+  EventRatingStars,
+  EventStatusChip,
+  formatEventTimes,
+} from '../../src/components/EventPrimitives';
+import { showDeleteFailedAlert, showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
 import { withAlpha } from '../../src/utils/color';
-import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { AppIcon } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
-import { addEventToSystemCalendar } from '../../src/utils/systemCalendar';
+import {
+  addEventToSystemCalendar,
+  buildEventSessionCalendarPayload,
+} from '../../src/utils/systemCalendar';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
 const TOAST_DURATION_MS = 1600;
 const TIMETABLE_TIME_COLUMN_WIDTH = 102;
-
-const STATUS_ACTION_META: Record<EventStatus, { icon: AppIconName }> = {
-  planned: { icon: 'statusPlanned' },
-  wishlist: { icon: 'statusWishlist' },
-  completed: { icon: 'statusCompleted' },
-  cancelled: { icon: 'statusCancelled' },
-};
+const DETAIL_LIST_ITEM_MIN_HEIGHT = 56;
 
 function InfoPhotoThumb({ photo, isDark, onPress }: {
   photo: Photo; isDark: boolean; onPress: () => void;
@@ -75,25 +74,6 @@ function InfoPhotoThumb({ photo, isDark, onPress }: {
   );
 }
 
-function InfoRow({ icon, text, isDark }: { icon: AppIconName; text: string; isDark: boolean }) {
-  const { colors } = useAppTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-      <AppIcon name={icon} size={15} color={colors.textSecondary} style={{ marginRight: 8 }} />
-      <Text style={{ fontSize: 14, color: colors.textSecondary, flex: 1 }}>{text}</Text>
-    </View>
-  );
-}
-
-function formatSessionTime(session: EventSession): string | null {
-  const parts = [
-    session.open_time ? `开场 ${session.open_time}` : null,
-    session.start_time ? `开始 ${session.start_time}` : null,
-    session.end_time ? `结束 ${session.end_time}` : null,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
 function SessionSummaryRow({
   session,
   index,
@@ -112,8 +92,8 @@ function SessionSummaryRow({
   onAddToCalendar: (session: EventSession) => void;
 }) {
   const { colors } = useAppTheme();
-  const sessionTime = formatSessionTime(session);
   const location = [session.venue, session.city].filter(Boolean).join(' · ');
+  const timeSummary = formatEventTimes(session.open_time, session.start_time) || '时间待定';
   const displayTitle = session.title || (embedded ? null : `场次 ${index + 1}`);
   const calendarSubject = session.title || (embedded ? '活动' : `场次 ${index + 1}`);
 
@@ -121,10 +101,10 @@ function SessionSummaryRow({
     <View
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 12,
-        paddingTop: embedded ? 15 : 11,
-        paddingBottom: 11,
-        marginTop: embedded ? 10 : 0,
-        borderTopWidth: embedded ? 1 : 0,
+        paddingTop: embedded ? 0 : 11,
+        paddingBottom: embedded ? 0 : 11,
+        marginTop: 0,
+        borderTopWidth: 0,
         borderTopColor: colors.divider,
         borderBottomWidth: !embedded && !isLast ? 1 : 0,
         borderBottomColor: colors.divider,
@@ -136,24 +116,28 @@ function SessionSummaryRow({
             {displayTitle}
           </Text>
         ) : null}
-        <Text style={{
-          marginTop: displayTitle ? 4 : 0,
-          fontSize: displayTitle ? 13 : 15,
-          fontWeight: displayTitle ? '400' : '700',
-          color: displayTitle ? colors.textSecondary : colors.text,
-        }}>
-          {formatDate(session.session_date)}
-          {session.end_date ? ` – ${formatDate(session.end_date)}` : ''}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.88}
+          style={{
+            marginTop: displayTitle ? 8 : 0,
+            fontSize: 16,
+            lineHeight: 23,
+            fontWeight: '700',
+            fontVariant: ['tabular-nums'],
+            color: colors.text,
+          }}
+        >
+          {session.session_date}  {timeSummary}
         </Text>
-        {sessionTime ? (
-          <Text style={{ marginTop: 3, fontSize: 12.5, color: colors.textMuted }}>
-            {sessionTime}
-          </Text>
-        ) : null}
         {location ? (
-          <Text style={{ marginTop: 3, fontSize: 12.5, color: colors.textMuted }}>
-            {location}
-          </Text>
+          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <AppIcon name="eventLocation" size={14} color={colors.textSecondary} />
+            <Text style={{ flex: 1, fontSize: 14.5, lineHeight: 20, fontWeight: '500', color: colors.textSecondary }}>
+              {location}
+            </Text>
+          </View>
         ) : null}
       </View>
       {eventStatus !== 'cancelled' ? (
@@ -219,57 +203,45 @@ function SectionTitle({ label }: { label: string }) {
   );
 }
 
-function CollapsibleSectionTitle({
-  label,
-  count,
+function ExpansionToggle({
   expanded,
+  collapsedLabel,
+  expandedLabel,
+  accessibilityLabel,
   onPress,
+  style,
 }: {
-  label: string;
-  count: number;
   expanded: boolean;
+  collapsedLabel: string;
+  expandedLabel: string;
+  accessibilityLabel: string;
   onPress: () => void;
+  style?: object;
 }) {
   const { colors } = useAppTheme();
   return (
     <TouchableOpacity
       accessibilityRole="button"
-      accessibilityLabel={`${label}，${count} 条`}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ expanded }}
       activeOpacity={0.7}
       onPress={onPress}
       style={{
+        minHeight: 44,
+        marginTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: colors.divider,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        minHeight: 44,
-        marginBottom: 8,
+        justifyContent: 'center',
+        gap: 6,
+        ...style,
       }}
     >
-      <View style={{
-        width: 3,
-        height: 16,
-        borderRadius: 999,
-        backgroundColor: colors.accent,
-      }} />
-      <Text style={{
-        flex: 1,
-        fontSize: 17,
-        lineHeight: 35,
-        fontWeight: '500',
-        color: colors.heading,
-      }}>
-        {label}
+      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
+        {expanded ? expandedLabel : collapsedLabel}
       </Text>
-      <Text style={{ fontSize: 12, color: colors.textMuted }}>
-        {count} 条
-      </Text>
-      <AppIcon
-        name="chevron"
-        variant={expanded ? 'up' : 'down'}
-        size={16}
-        color={colors.chevron}
-      />
+      <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={15} color={colors.accent} />
     </TouchableOpacity>
   );
 }
@@ -314,116 +286,6 @@ function CardHeader({
   );
 }
 
-function InlineAction({
-  icon,
-  label,
-  onPress,
-  onLongPress,
-  isDark,
-  disabled = false,
-  tint,
-  backgroundColor,
-  borderColor,
-  trailingIcon,
-  buttonRef,
-}: {
-  icon: AppIconName;
-  label: string;
-  onPress: () => void;
-  onLongPress?: () => void;
-  isDark: boolean;
-  disabled?: boolean;
-  tint?: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  trailingIcon?: AppIconName;
-  buttonRef?: React.RefObject<View | null>;
-}) {
-  const { colors } = useAppTheme();
-  const resolvedTint = tint ?? colors.accent;
-  return (
-    <TouchableOpacity
-      ref={buttonRef}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        backgroundColor: backgroundColor ?? (isDark ? colors.input : colors.cardAlt),
-        borderWidth: 1,
-        borderColor: borderColor ?? colors.inputBorder,
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      <AppIcon name={icon} size={14} color={resolvedTint} />
-      <Text style={{ fontSize: 12.5, fontWeight: '700', color: resolvedTint }}>
-        {label}
-      </Text>
-      {trailingIcon ? <AppIcon name={trailingIcon} variant="down" size={13} color={resolvedTint} /> : null}
-    </TouchableOpacity>
-  );
-}
-
-function parseLocalDate(date: string, time?: string | null) {
-  const [year, month, day] = date.split('-').map(Number);
-  if (time && /^\d{2}:\d{2}$/.test(time)) {
-    const [hours, minutes] = time.split(':').map(Number);
-    return new Date(year, month - 1, day, hours, minutes);
-  }
-  return new Date(year, month - 1, day);
-}
-
-function buildCalendarEventPayload(event: Event, session: EventSession) {
-  const hasTime = typeof session.start_time === 'string' && /^\d{2}:\d{2}$/.test(session.start_time);
-  const location = [session.venue, session.city].filter(Boolean).join(' · ') || undefined;
-  const notes = [
-    event.notes ? `备注：${event.notes}` : null,
-    event.url ? `链接：${event.url}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  if (!hasTime) {
-    const startDate = parseLocalDate(session.session_date);
-    const endDate = parseLocalDate(session.end_date ?? session.session_date);
-    endDate.setDate(endDate.getDate() + 1);
-    return {
-      title: session.title ? `${event.title} · ${session.title}` : event.title,
-      startDate,
-      endDate,
-      allDay: true,
-      location,
-      notes,
-      url: event.url ?? undefined,
-    };
-  }
-
-  const startDate = parseLocalDate(session.session_date, session.start_time);
-  let endDate = session.end_time
-    ? parseLocalDate(session.end_date ?? session.session_date, session.end_time)
-    : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-  if (session.end_time && !session.end_date && endDate <= startDate) {
-    endDate = new Date(endDate);
-    endDate.setDate(endDate.getDate() + 1);
-  }
-
-  return {
-    title: session.title ? `${event.title} · ${session.title}` : event.title,
-    startDate,
-    endDate,
-    allDay: false,
-    location,
-    notes,
-    url: event.url ?? undefined,
-  };
-}
-
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useDB();
@@ -442,7 +304,10 @@ export default function EventDetailScreen() {
   const [infoPhotos, setInfoPhotos] = useState<Photo[]>([]);
   const [sessions, setSessions] = useState<EventSession[]>([]);
   const [timetables, setTimetables] = useState<Record<string, EventTimetableEntry[]>>({});
-  const [timetableExpanded, setTimetableExpanded] = useState(false);
+  const [collapsedTimetableSessionIds, setCollapsedTimetableSessionIds] = useState<Set<string>>(() => new Set());
+  const [artistsExpanded, setArtistsExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
   const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -452,10 +317,43 @@ export default function EventDetailScreen() {
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextLinkPressRef = useRef(false);
   const allArtistsMap = useMemo(() => new Map(allArtists.map(a => [a.id, a])), [allArtists]);
-  const timetableEntryCount = useMemo(
-    () => Object.values(timetables).reduce((total, entries) => total + entries.length, 0),
-    [timetables],
+  const prioritizedArtists = useMemo(() => {
+    const oshiArtist = oshiArtistId ? allArtistsMap.get(oshiArtistId) : null;
+    const oshiParentId = oshiArtist?.parent_id ?? null;
+    const favoriteIds = new Set(
+      allArtists.filter((artist) => artist.is_favorite === 1).map((artist) => artist.id),
+    );
+    const favoriteParentIds = new Set(
+      allArtists.flatMap((artist) => (
+        artist.is_favorite === 1 && artist.parent_id ? [artist.parent_id] : []
+      )),
+    );
+    const priority = (artist: Artist) => {
+      if (artist.id === oshiArtistId) return 0;
+      if (artist.id === oshiParentId) return 1;
+      if (favoriteIds.has(artist.id)) return 2;
+      if (favoriteParentIds.has(artist.id)) return 3;
+      return 4;
+    };
+    return artists
+      .map((artist, index) => ({ artist, index }))
+      .sort((a, b) => priority(a.artist) - priority(b.artist) || a.index - b.index)
+      .map(({ artist }) => artist);
+  }, [allArtists, allArtistsMap, artists, oshiArtistId]);
+  const timetableSessions = useMemo(
+    () => sessions.filter((session) => (timetables[session.id]?.length ?? 0) > 0),
+    [sessions, timetables],
   );
+  const hasMultipleTimetables = timetableSessions.length > 1;
+
+  const toggleTimetableSession = useCallback((sessionId: string) => {
+    setCollapsedTimetableSessionIds((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -534,7 +432,7 @@ export default function EventDetailScreen() {
 
     try {
       setAddingSessionId(session.id);
-      await addEventToSystemCalendar(buildCalendarEventPayload(event, session), Calendar);
+      await addEventToSystemCalendar(buildEventSessionCalendarPayload(event, session), Calendar);
     } catch (error) {
       showOperationFailedAlert(
         '无法打开系统日历。',
@@ -590,22 +488,6 @@ export default function EventDetailScreen() {
     }
     Linking.openURL(event.url);
   }, [event?.url]);
-
-  const handleAddInfoPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { showPhotoLibraryPermissionAlert(); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsMultipleSelection: true,
-      quality: 0.85,
-    });
-    if (result.canceled) return;
-    for (const asset of result.assets) {
-      const permanentUri = await copyToDocuments(asset.uri);
-      await db.photos.create(permanentUri, id!);
-    }
-    load();
-  };
 
   const handleDeleteInfoPhoto = (photo: Photo) => {
     Alert.alert('删除资料图', '确认删除这张资料图？', [
@@ -679,6 +561,17 @@ export default function EventDetailScreen() {
   const previewChekiList = useMemo(() => chekiList.slice(0, CHEKI_PREVIEW_LIMIT), [chekiList]);
   const hasMoreCheki = chekiList.length > CHEKI_PREVIEW_LIMIT;
   const totalChekiCount = chekiList.length + getChekiManualCount(manualEntries);
+  const visibleArtists = artistsExpanded ? prioritizedArtists : prioritizedArtists.slice(0, 8);
+  const hiddenArtistCount = Math.max(0, prioritizedArtists.length - 8);
+  const chekiExpense = useMemo(() => (
+    chekiList.reduce((total, cheki) => total + (cheki.price ?? 0), 0)
+    + manualEntries.reduce((total, entry) => total + (entry.total_price ?? 0), 0)
+  ), [chekiList, manualEntries]);
+  const ticketExpense = event?.actual_expense ?? 0;
+  const totalEventExpense = ticketExpense + chekiExpense;
+  const advancedItemCount = sessions.reduce((count, session) => (
+    count + [session.end_time, session.end_date].filter(Boolean).length
+  ), 0) + [event?.url].filter(Boolean).length;
 
   if (!event) {
     return (
@@ -693,7 +586,125 @@ export default function EventDetailScreen() {
   const oshiArtist = oshiArtistId ? (allArtistsMap.get(oshiArtistId) ?? null) : null;
   const oshiMatchSource = oshiArtistId ? getOshiMatchSource(artists, oshiArtistId, oshiArtist) : null;
   const oshiArtistName = oshiArtist?.short_name || oshiArtist?.name || null;
-  const currentStatusColors = colors.status[event.status];
+  const myRecordsSection = (
+    <>
+      <SectionTitle label="我的记录" />
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+        {[
+          { label: '票价', value: ticketExpense },
+          { label: '拍立得支出', value: chekiExpense },
+          { label: '总支出', value: totalEventExpense },
+        ].map((item) => (
+          <View key={item.label} style={{
+            flex: 1, minWidth: 0, paddingHorizontal: 10, paddingVertical: 11,
+            borderRadius: 14, backgroundColor: cardBg,
+          }}>
+            <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.textMuted }}>{item.label}</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={{ marginTop: 3, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'], color: colors.text }}
+            >
+              ¥{item.value.toFixed(2).replace(/\.00$/, '')}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <Card cardBg={cardBg}>
+        <CardHeader
+          label="拍立得"
+          count={totalChekiCount}
+          actionLabel="添加"
+          onActionPress={handleOpenChekiCreate}
+        />
+
+        {chekiList.length > 0 ? (
+          <>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {previewChekiList.map((ck) => (
+                <TouchableOpacity key={ck.id} onPress={() => setViewerSelectedId(ck.id)} activeOpacity={0.8}>
+                  <Image
+                    source={{ uri: ck.photo_uri }}
+                    resizeMethod="resize"
+                    style={{ width: chekiW, height: chekiH, borderRadius: 10,
+                      backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {hasMoreCheki ? (
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/cheki', params: { event_id: id } })}
+                activeOpacity={0.7}
+                style={{
+                  marginTop: 12,
+                  borderRadius: 12,
+                  paddingVertical: 10,
+                  alignItems: 'center',
+                  backgroundColor: withAlpha(colors.accent, 0.1),
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
+                  查看全部 {totalChekiCount} 张
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : manualEntries.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Text style={{ fontSize: 13, color: colors.placeholder, textAlign: 'center' }}>
+              还没有拍立得记录
+            </Text>
+          </View>
+        ) : null}
+        <ChekiManualEntryList
+          entries={manualEntries}
+          eventMap={new Map([[event.id, event]])}
+          isDark={isDark}
+          artistMap={allArtistsMap}
+          oshiArtistId={oshiArtistId}
+          showArtistMeta
+          onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
+        />
+        {!hasMoreCheki && chekiList.length === 0 && manualEntries.length > 0 ? (
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: '/cheki', params: { event_id: id } })}
+            activeOpacity={0.7}
+            style={{
+              marginTop: 12,
+              borderRadius: 12,
+              paddingVertical: 10,
+              alignItems: 'center',
+              backgroundColor: withAlpha(colors.accent, 0.1),
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
+              查看全部 {totalChekiCount} 张
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </Card>
+
+      {event.notes ? (
+        <Card cardBg={cardBg}>
+          <CardHeader label="备注" />
+          <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 22 }}>
+            {event.notes}
+          </Text>
+        </Card>
+      ) : null}
+
+      {event.setlist_text ? (
+        <Card cardBg={cardBg}>
+          <CardHeader label="Setlist" />
+          <Text style={{ fontSize: 14, color: colors.text, lineHeight: 24, fontFamily: 'monospace' }}>
+            {event.setlist_text}
+          </Text>
+        </Card>
+      ) : null}
+    </>
+  );
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
@@ -723,66 +734,61 @@ export default function EventDetailScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero card */}
+        {/* 活动概览 */}
         <Card cardBg={cardBg}>
           <Text style={{ fontSize: 24, fontWeight: '900', color: colors.heading,
             letterSpacing: -0.5, lineHeight: 29, marginBottom: 14 }}>
             {event.title}
           </Text>
-
           {oshiMatchSource && oshiArtistName ? (
-            <OshiMatchBadge oshiArtistName={oshiArtistName} style={{ marginBottom: 12 }} />
-          ) : null}
-
-          {event.actual_expense != null && (
-            <InfoRow icon="ticket" text={`实际支出 ¥${event.actual_expense.toFixed(2).replace(/\.00$/, '')}`} isDark={isDark} />
-          )}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 4 }}>
-            <InlineAction
-              icon={STATUS_ACTION_META[event.status].icon}
-              label={STATUS_LABELS[event.status]}
-              onPress={handleOpenStatusPicker}
-              isDark={isDark}
-              tint={currentStatusColors.accent}
-              backgroundColor={currentStatusColors.bg}
-              borderColor={withAlpha(currentStatusColors.accent, isDark ? 0.4 : 0.2)}
-              trailingIcon="disclosure"
-              buttonRef={statusPillRef}
-            />
-            {event.url ? (
-              <InlineAction
-                icon="link"
-                label="链接"
-                onPress={handleOpenEventUrl}
-                onLongPress={handleCopyEventUrl}
-                isDark={isDark}
-              />
-            ) : null}
-          </View>
-          {event.status === 'completed' ? (
-            <View style={{ marginTop: 14 }}>
-              <CardHeader label="回顾评分" />
-              <EventRatingStars score={event.review_score} size="lg" onChange={handleScoreChange} />
-              {event.review_score == null && (
-                <Text style={{ fontSize: 12, color: colors.placeholder, marginTop: 6 }}>
-                  点击星星评分
-                </Text>
-              )}
+            <View style={{ alignItems: 'flex-start', marginBottom: 12 }}>
+              <OshiMatchBadge oshiArtistName={oshiArtistName} outerHeight={32} />
             </View>
           ) : null}
-          {sessions.length === 1 ? (
-            <SessionSummaryRow
-              session={sessions[0]}
-              index={0}
-              isLast
-              embedded
-              eventStatus={event.status}
-              addingSessionId={addingSessionId}
-              onAddToCalendar={handleAddToSystemCalendar}
+          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
+            <EventStatusChip
+              status={event.status}
+              size="detail"
+              onPress={handleOpenStatusPicker}
+              trailingIcon="disclosure"
+              trailingIconVariant="down"
+              buttonRef={statusPillRef}
             />
+            {event.status === 'completed' ? (
+              <EventRatingStars score={event.review_score} size="detail" onChange={handleScoreChange} />
+            ) : null}
+          </View>
+          {event.status !== 'completed' && event.status !== 'cancelled' && (() => {
+            const d = daysUntil(event.event_date);
+            if (d < 0) return null;
+            return (
+              <View style={{
+                backgroundColor: colors.heroBg, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
+                marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.heroEyebrow }}>距演出</Text>
+                <Text style={{ color: colors.heroText, fontSize: 20, fontWeight: '900' }}>
+                  {d === 0 ? '就是今天！' : `${d} 天`}
+                </Text>
+              </View>
+            );
+          })()}
+          {sessions.length === 1 ? (
+            <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.divider }}>
+              <SessionSummaryRow
+                session={sessions[0]}
+                index={0}
+                isLast
+                embedded
+                eventStatus={event.status}
+                addingSessionId={addingSessionId}
+                onAddToCalendar={handleAddToSystemCalendar}
+              />
+            </View>
           ) : null}
         </Card>
 
+        {/* 多场活动的时间与地点 */}
         {sessions.length > 1 ? (
           <>
             <SectionTitle label="场次" />
@@ -802,305 +808,254 @@ export default function EventDetailScreen() {
           </>
         ) : null}
 
-        {/* Mini countdown banner */}
-        {event.status !== 'completed' && event.status !== 'cancelled' && (() => {
-          const d = daysUntil(event.event_date);
-          if (d < 0) return null;
-          return (
-            <View style={{
-              backgroundColor: colors.heroBg, borderRadius: 20, padding: 18,
-              marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              overflow: 'hidden',
-            }}>
-              <View>
-                <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: colors.heroEyebrow }}>
-                  距演出
-                </Text>
-                <Text style={{ fontSize: 13, color: colors.heroEyebrow, marginTop: 6 }}>还有</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                {d === 0 ? (
-                  <Text style={{ color: colors.heroText, fontSize: 32, fontWeight: '900', lineHeight: 32 }}>就是今天！</Text>
-                ) : (
-                  <>
-                    <Text style={{ color: colors.heroText, fontSize: 56, fontWeight: '900', lineHeight: 56 }}>{d}</Text>
-                    <Text style={{ color: colors.heroSubtext, fontSize: 16, fontWeight: '600', marginLeft: 6, marginBottom: 6 }}>天</Text>
-                  </>
-                )}
-              </View>
-            </View>
-          );
-        })()}
+        {event.status === 'completed' ? myRecordsSection : null}
 
-        {timetableEntryCount > 0 ? (
+        {/* 详情 */}
+        {(infoPhotos.length > 0 || event.details) ? (
           <>
-            <CollapsibleSectionTitle
-              label="时间表"
-              count={timetableEntryCount}
-              expanded={timetableExpanded}
-              onPress={() => setTimetableExpanded((current) => !current)}
-            />
-            {timetableExpanded ? sessions.flatMap((session, sessionIndex) => {
-                const entries = timetables[session.id] ?? [];
-                if (entries.length === 0) return [];
-                return [(
-                  <Card cardBg={cardBg} key={session.id}>
-                    {sessions.length > 1 ? (
-                      <Text style={{ marginBottom: 10, fontSize: 15, fontWeight: '700', color: colors.text }}>
-                        {session.title || `场次 ${sessionIndex + 1}`} · {formatDate(session.session_date)}
-                      </Text>
-                    ) : null}
-                    {entries.map((entry, entryIndex) => {
-                      const artist = entry.artist_id ? allArtistsMap.get(entry.artist_id) : null;
-                      return (
-                        <TouchableOpacity
-                          key={entry.id}
-                          disabled={!artist}
-                          onPress={() => artist && router.push(`/artists/${artist.id}`)}
-                          activeOpacity={0.72}
-                          style={{
-                            flexDirection: 'row', gap: 10, paddingVertical: 8,
-                            borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
-                            borderBottomColor: colors.divider,
-                          }}
-                        >
-                          <View style={{ width: TIMETABLE_TIME_COLUMN_WIDTH, flexShrink: 0, paddingTop: 4 }}>
-                            <Text
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                              minimumFontScale={0.85}
-                              style={{
-                                fontSize: 14,
-                                lineHeight: 18,
-                                fontWeight: '700',
-                                fontVariant: ['tabular-nums'],
-                                color: colors.accent,
-                              }}
-                            >
-                              {formatTimetableTime(entry.start_time, entry.end_time)}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1, minWidth: 0 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                              {artist ? (
-                                <OshiAvatar
-                                  source={resolveAvatarSource(artist.avatar_uri)}
-                                  size={28}
-                                  isOshi={artist.id === oshiArtistId}
-                                />
-                              ) : null}
-                              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.text }}>
-                                {artist ? getArtistPrimaryName(artist) : entry.title}
-                              </Text>
-                            </View>
-                            {entry.notes ? (
-                              <Text numberOfLines={1} style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.textMuted }}>
-                                {entry.notes}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {artist ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </Card>
-                )];
-              }) : null}
+            <SectionTitle label="详情" />
+            <Card cardBg={cardBg}>
+              {infoPhotos.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {infoPhotos.map((photo) => (
+                    <InfoPhotoThumb
+                      key={photo.id}
+                      photo={photo}
+                      isDark={isDark}
+                      onPress={() => setViewingPhotoId(photo.id)}
+                    />
+                  ))}
+                </ScrollView>
+              ) : null}
+              {event.details ? (
+                <View style={{ marginTop: infoPhotos.length > 0 ? 12 : 0 }}>
+                  {detailsExpanded ? (
+                    <Text style={{ marginBottom: 10, fontSize: 14, color: colors.textSecondary, lineHeight: 22 }}>
+                      {event.details}
+                    </Text>
+                  ) : null}
+                  <ExpansionToggle
+                    accessibilityLabel="演出详情"
+                    expanded={detailsExpanded}
+                    collapsedLabel="展开详情"
+                    expandedLabel="收起详情"
+                    onPress={() => setDetailsExpanded((current) => !current)}
+                  />
+                </View>
+              ) : null}
+            </Card>
           </>
         ) : null}
 
-        {/* 详细信息 */}
-        <SectionTitle label="详细信息" />
-        {artists.length > 0 && (
-          <Card cardBg={cardBg}>
-            <CardHeader label="出演者" count={artists.length} />
-            {(() => {
-              const artistBorder = colors.divider;
-              const artistText = colors.text;
-              return artists.map((a, index) => {
-              const isLast = index === artists.length - 1;
-              const isOshi = a.id === oshiArtistId;
+        {/* 时间表 */}
+        {timetableSessions.length > 0 ? (
+          <>
+            <SectionTitle label="时间表" />
+            {timetableSessions.map((session) => {
+              const entries = timetables[session.id] ?? [];
+              const isCollapsed = collapsedTimetableSessionIds.has(session.id);
+              const sessionTitle = session.title?.trim() || '';
+              const collapsibleLabel = sessionTitle
+                ? `${sessionTitle} · ${formatDate(session.session_date)}`
+                : formatDate(session.session_date);
               return (
-                <TouchableOpacity
-                  key={a.id}
-                  activeOpacity={0.72}
-                  onPress={() => router.push(`/artists/${a.id}`)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center',
-                    paddingVertical: 10,
-                    borderBottomWidth: isLast ? 0 : 1,
-                    borderBottomColor: artistBorder,
-                  }}
+                <Card
+                  cardBg={cardBg}
+                  key={session.id}
+                  style={hasMultipleTimetables ? {
+                    paddingTop: 6,
+                    paddingBottom: isCollapsed ? 6 : 16,
+                  } : undefined}
                 >
-                  <View style={{ marginRight: 12 }}>
-                    <OshiAvatar source={resolveAvatarSource(a.avatar_uri)} size={36} isOshi={isOshi} />
-                  </View>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <Text
-                      numberOfLines={1}
+                  {hasMultipleTimetables ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={collapsibleLabel}
+                      accessibilityState={{ expanded: !isCollapsed }}
+                      activeOpacity={0.7}
+                      onPress={() => toggleTimetableSession(session.id)}
                       style={{
-                        flexShrink: 1,
-                        fontSize: 14,
-                        fontWeight: isOshi ? '700' : '600',
-                        color: isOshi ? colors.accent : artistText,
+                        minHeight: 44,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: isCollapsed ? 0 : 4,
+                        borderBottomWidth: isCollapsed ? 0 : 1,
+                        borderBottomColor: colors.divider,
                       }}
                     >
-                      {getArtistPrimaryName(a)}
+                      <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.text }}>
+                        {collapsibleLabel}
+                      </Text>
+                      <AppIcon name="chevron" variant={isCollapsed ? 'down' : 'up'} size={15} color={colors.chevron} />
+                    </TouchableOpacity>
+                  ) : sessionTitle ? (
+                    <Text style={{ marginBottom: 10, fontSize: 15, fontWeight: '700', color: colors.text }}>
+                      {sessionTitle}
                     </Text>
-                    {isOshi ? <OshiBadge /> : null}
-                  </View>
-                  <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} />
-                </TouchableOpacity>
+                  ) : null}
+                  {!isCollapsed ? entries.map((entry, entryIndex) => {
+                    const artist = entry.artist_id ? allArtistsMap.get(entry.artist_id) : null;
+                    const displayName = (artist ? getArtistPrimaryName(artist) : entry.title).trim();
+                    const notes = entry.notes?.trim() || '';
+                    return (
+                      <TouchableOpacity
+                        key={entry.id}
+                        disabled={!artist}
+                        onPress={() => artist && router.push(`/artists/${artist.id}`)}
+                        activeOpacity={0.72}
+                        style={{
+                          minHeight: DETAIL_LIST_ITEM_MIN_HEIGHT,
+                          flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6,
+                          borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
+                          borderBottomColor: colors.divider,
+                        }}
+                      >
+                        <View style={{ width: TIMETABLE_TIME_COLUMN_WIDTH, flexShrink: 0 }}>
+                          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={{
+                            fontSize: 14, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'], color: colors.accent,
+                          }}>
+                            {formatTimetableTime(entry.start_time, entry.end_time)}
+                          </Text>
+                        </View>
+                        {artist ? (
+                          <View style={{ width: 28, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+                            <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={28} isOshi={artist.id === oshiArtistId} />
+                          </View>
+                        ) : null}
+                        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                          {displayName ? (
+                            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
+                              {displayName}
+                            </Text>
+                          ) : null}
+                          {notes ? (
+                            <Text numberOfLines={1} style={{ marginTop: displayName ? 3 : 0, fontSize: 12, lineHeight: 17, color: colors.textMuted }}>
+                              {notes}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {artist ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
+                      </TouchableOpacity>
+                    );
+                  }) : null}
+                </Card>
               );
-            });}
-            )()}
-          </Card>
-        )}
-
-        {event.details ? (
-          <Card cardBg={cardBg}>
-            <CardHeader label="演出详情" />
-            <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 22 }}>
-              {event.details}
-            </Text>
-          </Card>
+            })}
+          </>
         ) : null}
 
-        <Card cardBg={cardBg}>
-          <CardHeader
-            label="资料图"
-            count={infoPhotos.length > 0 ? infoPhotos.length : undefined}
-            actionLabel="添加"
-            onActionPress={handleAddInfoPhoto}
-          />
-
-          {infoPhotos.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {infoPhotos.map((photo) => (
-                <InfoPhotoThumb
-                  key={photo.id}
-                  photo={photo}
-                  isDark={isDark}
-                  onPress={() => setViewingPhotoId(photo.id)}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <TouchableOpacity
-              onPress={handleAddInfoPhoto}
-              activeOpacity={0.7}
-              style={{ paddingVertical: 22, alignItems: 'center',
-                borderWidth: 1.5, borderColor: colors.inputBorder,
-                borderStyle: 'dashed', borderRadius: 10 }}
-            >
-              <Text style={{ fontSize: 13, color: colors.placeholder }}>
-                添加海报、出演阵容等资料图
-              </Text>
-            </TouchableOpacity>
-          )}
-        </Card>
-
-        {/* 我的记录 */}
-        <SectionTitle label="我的记录" />
-        <Card cardBg={cardBg}>
-          <CardHeader
-            label="拍立得"
-            count={totalChekiCount}
-            actionLabel="添加"
-            onActionPress={handleOpenChekiCreate}
-          />
-
-          {chekiList.length > 0 ? (
-            <>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {previewChekiList.map((ck) => (
-                  <TouchableOpacity key={ck.id} onPress={() => setViewerSelectedId(ck.id)} activeOpacity={0.8}>
-                    <Image
-                      source={{ uri: ck.photo_uri }}
-                      resizeMethod="resize"
-                      style={{ width: chekiW, height: chekiH, borderRadius: 10,
-                        backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
-                    />
+        {/* 出演者 */}
+        {artists.length > 0 ? (
+          <>
+            <SectionTitle label="出演者" />
+            <Card cardBg={cardBg}>
+              {visibleArtists.map((artist, index) => {
+                const isLast = index === visibleArtists.length - 1;
+                const isOshi = artist.id === oshiArtistId;
+                return (
+                  <TouchableOpacity
+                    key={artist.id}
+                    activeOpacity={0.72}
+                    onPress={() => router.push(`/artists/${artist.id}`)}
+                    style={{
+                      minHeight: DETAIL_LIST_ITEM_MIN_HEIGHT,
+                      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+                      borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.divider,
+                    }}
+                  >
+                    <View style={{ marginRight: 12 }}>
+                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={36} isOshi={isOshi} />
+                    </View>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={{
+                        flexShrink: 1, fontSize: 14, fontWeight: isOshi ? '700' : '600',
+                        color: isOshi ? colors.accent : colors.text,
+                      }}>
+                        {getArtistPrimaryName(artist)}
+                      </Text>
+                      {isOshi ? <OshiBadge /> : null}
+                    </View>
+                    <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} />
                   </TouchableOpacity>
-                ))}
-              </View>
-              {hasMoreCheki ? (
-                <TouchableOpacity
-                  onPress={() => router.push({ pathname: '/cheki', params: { event_id: id } })}
-                  activeOpacity={0.7}
-                  style={{
-                    marginTop: 12,
-                    borderRadius: 12,
-                    paddingVertical: 10,
-                    alignItems: 'center',
-                    backgroundColor: withAlpha(colors.accent, 0.1),
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
-                    查看全部 {totalChekiCount} 张
-                  </Text>
-                </TouchableOpacity>
+                );
+              })}
+              {hiddenArtistCount > 0 ? (
+                <ExpansionToggle
+                  accessibilityLabel="出演者"
+                  expanded={artistsExpanded}
+                  collapsedLabel={`展开其余 ${hiddenArtistCount} 位`}
+                  expandedLabel="收起出演者"
+                  onPress={() => setArtistsExpanded((current) => !current)}
+                />
               ) : null}
-            </>
-          ) : manualEntries.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-              <Text style={{ fontSize: 13, color: colors.placeholder, textAlign: 'center' }}>
-                还没有拍立得记录
-              </Text>
-              <TouchableOpacity
-                onPress={handleOpenChekiCreate}
-                activeOpacity={0.7}
-                style={{ marginTop: 12, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: withAlpha(colors.accent, 0.1) }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>去添加</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          <ChekiManualEntryList
-            entries={manualEntries}
-            eventMap={new Map(event ? [[event.id, event]] : [])}
-            isDark={isDark}
-            artistMap={allArtistsMap}
-            oshiArtistId={oshiArtistId}
-            showArtistMeta
-            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
-          />
-          {!hasMoreCheki && chekiList.length === 0 && manualEntries.length > 0 ? (
-            <TouchableOpacity
-              onPress={() => router.push({ pathname: '/cheki', params: { event_id: id } })}
-              activeOpacity={0.7}
-              style={{
-                marginTop: 12,
-                borderRadius: 12,
-                paddingVertical: 10,
-                alignItems: 'center',
-                backgroundColor: withAlpha(colors.accent, 0.1),
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
-                查看全部 {totalChekiCount} 张
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </Card>
-
-        {event.notes ? (
-          <Card cardBg={cardBg}>
-            <CardHeader label="备注" />
-            <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 22 }}>
-              {event.notes}
-            </Text>
-          </Card>
+            </Card>
+          </>
         ) : null}
 
-        {event.setlist_text ? (
-          <Card cardBg={cardBg}>
-            <CardHeader label="Setlist" />
-            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 24, fontFamily: 'monospace' }}>
-              {event.setlist_text}
-            </Text>
-          </Card>
+        {event.status !== 'completed' ? myRecordsSection : null}
+
+        {/* 更多 */}
+        {advancedExpanded ? (
+          <>
+            <SectionTitle label="更多" />
+            {sessions.some((session) => session.end_time || session.end_date) ? (
+              <Card cardBg={cardBg}>
+                <CardHeader label="结束信息" />
+                {sessions.map((session, index) => {
+                  if (!session.end_time && !session.end_date) return null;
+                  const endParts = [
+                    session.end_date ? formatDate(session.end_date) : null,
+                    session.end_time,
+                  ].filter(Boolean).join(' ');
+                  return (
+                    <View
+                      key={session.id}
+                      style={{
+                        paddingVertical: 8,
+                        borderBottomWidth: index === sessions.length - 1 ? 0 : 1,
+                        borderBottomColor: colors.divider,
+                      }}
+                    >
+                      {sessions.length > 1 ? (
+                        <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                          {session.title || `场次 ${index + 1}`}
+                        </Text>
+                      ) : null}
+                      <Text style={{ marginTop: sessions.length > 1 ? 3 : 0, fontSize: 14, fontWeight: '600', color: colors.text }}>
+                        结束 {endParts}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </Card>
+            ) : null}
+            {event.url ? (
+              <Card cardBg={cardBg}>
+                <CardHeader label="演出链接" />
+                <TouchableOpacity onPress={handleOpenEventUrl} onLongPress={handleCopyEventUrl} activeOpacity={0.7}>
+                  <Text style={{ fontSize: 14, lineHeight: 21, color: colors.accent }}>{event.url}</Text>
+                </TouchableOpacity>
+              </Card>
+            ) : null}
+            {advancedItemCount === 0 ? (
+              <Card cardBg={cardBg}>
+                <Text style={{ fontSize: 13, color: colors.textMuted }}>还没有更多信息</Text>
+              </Card>
+            ) : null}
+          </>
         ) : null}
+
+        <ExpansionToggle
+          accessibilityLabel="更多"
+          expanded={advancedExpanded}
+          collapsedLabel="展开更多"
+          expandedLabel="收起更多"
+          onPress={() => setAdvancedExpanded((current) => !current)}
+          style={{
+            marginBottom: 12,
+          }}
+        />
 
         {/* Delete */}
         <TouchableOpacity

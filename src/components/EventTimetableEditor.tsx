@@ -162,7 +162,7 @@ export function EventTimetableEditor({
 
   if (entries.length === 0) {
     return (
-      <View style={{ marginTop: 14, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.divider }}>
+      <View>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="添加时间表"
@@ -190,7 +190,7 @@ export function EventTimetableEditor({
   };
 
   return (
-    <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.divider }}>
+    <View>
       <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>时间表</Text>

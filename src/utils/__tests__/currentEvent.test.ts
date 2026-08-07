@@ -4,6 +4,7 @@ import type { Event } from '../../types/models';
 function event(overrides: Partial<Event>): Event {
   return {
     id: 'event', title: '活动', event_type: 'livehouse', event_date: '2026-07-24', event_time: null,
+    open_time: null, start_time: null, end_time: null,
     city: null, venue: null, ticket_price: null, actual_expense: null, status: 'planned', review_score: null,
     notes: null, details: null, url: null, setlist_text: null, trip_id: null,
     created_at: '2026-07-24T00:00:00.000Z', updated_at: '2026-07-24T00:00:00.000Z', ...overrides,

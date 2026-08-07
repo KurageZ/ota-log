@@ -7,6 +7,7 @@ import { OshiAvatar, OshiBadge } from './Oshi';
 import { resolveAvatarSource } from '../utils/avatarSource';
 import { useAppTheme } from '../theme/appTheme';
 import { OshiMatchSource } from '../utils/oshiMatch';
+import { formatEventTimes } from './EventPrimitives';
 
 export interface HeroBannerItem {
   event: Event;
@@ -31,7 +32,11 @@ export function HeroBanner({ item }: Props) {
   const { event, isOshiMatch, oshiArtist } = item;
   const days = daysUntil(event.event_date);
   const heroCenter = getHeroCenterText(days, event.event_time);
-  const detailLine = [formatDate(event.event_date), event.event_time, event.venue].filter(Boolean).join(' · ');
+  const detailLine = [
+    formatDate(event.event_date),
+    formatEventTimes(event.open_time, event.start_time),
+    event.venue,
+  ].filter(Boolean).join(' · ');
   const oshiName = oshiArtist?.short_name || oshiArtist?.name || '你的单推';
 
   return (

@@ -348,6 +348,29 @@ describe('Cheki repositories', () => {
     unsubscribe();
   });
 
+  test('maps compatibility event times to opening times on create and update', async () => {
+    const created = await eventRepository.create({
+      title: 'Compatibility Time',
+      event_type: 'livehouse',
+      event_date: '2099-07-25',
+      event_time: '18:30',
+      status: 'planned',
+    });
+
+    expect(created).toEqual(expect.objectContaining({
+      event_time: '18:30',
+      open_time: '18:30',
+      start_time: null,
+    }));
+
+    await eventRepository.update(created.id, { event_time: '19:00' });
+    await expect(eventRepository.findById(created.id)).resolves.toEqual(expect.objectContaining({
+      event_time: '19:00',
+      open_time: '19:00',
+      start_time: null,
+    }));
+  });
+
   test('creates a multi-session activity atomically', async () => {
     const created = await eventRepository.createWithSessions({
       title: 'Two Day Festival',
@@ -392,7 +415,9 @@ describe('Cheki repositories', () => {
         {
           title: '昼场',
           session_date: '2099-08-08',
+          open_time: '11:30',
           start_time: '12:00',
+          end_time: '14:00',
           city: '上海',
           venue: '昼场馆',
         },
@@ -427,7 +452,10 @@ describe('Cheki repositories', () => {
       expect.objectContaining({
         id: created.id,
         event_date: '2099-08-08',
-        event_time: '12:00',
+        event_time: '11:30',
+        open_time: '11:30',
+        start_time: '12:00',
+        end_time: '14:00',
         city: '上海',
         venue: '昼场馆',
       }),

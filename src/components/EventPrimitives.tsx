@@ -5,7 +5,10 @@ import { formatDate } from '../utils/date';
 import { STATUS_LABELS } from '../utils/labels';
 import { type ThemeColors, useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
-import { AppIcon, type AppIconName } from './AppIcon';
+import { AppIcon, type AppIconName, type AppIconVariant } from './AppIcon';
+import { formatEventTimes } from '../utils/eventTime';
+
+export { formatEventTimes } from '../utils/eventTime';
 
 const statusChipSizes = {
   sm: {
@@ -28,6 +31,16 @@ const statusChipSizes = {
     paddingVertical: 4,
     iconSize: 13,
   },
+  detail: {
+    dot: 6,
+    gap: 6,
+    fontSize: 12.5,
+    lineHeight: 15,
+    paddingLeft: 10,
+    paddingRight: 10,
+    paddingVertical: 0,
+    iconSize: 13,
+  },
 } as const;
 
 const ratingStarSizes = {
@@ -42,6 +55,12 @@ const ratingStarSizes = {
     lineHeight: 18,
     gap: 2,
     hitSlop: { top: 7, bottom: 7, left: 4, right: 4 },
+  },
+  detail: {
+    fontSize: 23,
+    lineHeight: 24,
+    gap: 3,
+    hitSlop: { top: 10, bottom: 10, left: 2, right: 2 },
   },
   lg: {
     fontSize: 28,
@@ -122,6 +141,7 @@ export function EventStatusChip({
   status,
   size = 'md',
   trailingIcon,
+  trailingIconVariant,
   onPress,
   style,
   buttonRef,
@@ -131,6 +151,7 @@ export function EventStatusChip({
   status: EventStatus;
   size?: EventStatusChipSize;
   trailingIcon?: AppIconName;
+  trailingIconVariant?: AppIconVariant;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   buttonRef?: RefObject<View | null>;
@@ -163,7 +184,14 @@ export function EventStatusChip({
       >
         {STATUS_LABELS[status]}
       </Text>
-      {trailingIcon ? <AppIcon name={trailingIcon} size={tokens.iconSize} color={accent} /> : null}
+      {trailingIcon ? (
+        <AppIcon
+          name={trailingIcon}
+          variant={trailingIconVariant}
+          size={tokens.iconSize}
+          color={accent}
+        />
+      ) : null}
     </>
   );
 
@@ -183,10 +211,13 @@ export function EventStatusChip({
     return (
       <TouchableOpacity
         ref={buttonRef}
+        accessibilityRole="button"
+        accessibilityLabel={`活动状态：${STATUS_LABELS[status]}`}
+        accessibilityState={{ disabled }}
         onPress={onPress}
         disabled={disabled}
         activeOpacity={0.7}
-        style={[containerStyle, style]}
+        style={[containerStyle, size === 'detail' ? { height: 32 } : null, style]}
       >
         {content}
       </TouchableOpacity>
@@ -239,6 +270,8 @@ export function EventRatingStars({
         return (
           <TouchableOpacity
             key={index}
+            accessibilityRole="button"
+            accessibilityLabel={`${index + 1} 星`}
             onPress={() => onChange(index + 1)}
             hitSlop={tokens.hitSlop}
             activeOpacity={0.6}
@@ -290,12 +323,14 @@ export function CityBadge({
 
 export function EventDateTimeRow({
   eventDate,
-  eventTime,
+  openTime,
+  startTime,
   size = 'md',
   tone = 'default',
 }: {
   eventDate: string;
-  eventTime?: string | null;
+  openTime?: string | null;
+  startTime?: string | null;
   size?: EventMetaSize;
   tone?: EventPrimitiveTone;
 }) {
@@ -305,9 +340,10 @@ export function EventDateTimeRow({
   const iconColor = spDt ? spDt.iconColor : isDark ? colors.textSecondary : colors.textMuted;
   const primaryTextColor = spDt ? spDt.primaryText : isDark ? colors.text : colors.textSecondary;
   const secondaryTextColor = spDt ? spDt.secondaryText : colors.textSecondary;
+  const timeText = formatEventTimes(openTime, startTime);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, minWidth: 0 }}>
       <AppIcon name="time" size={tokens.iconSize} color={iconColor} />
       <Text
         style={{
@@ -321,10 +357,10 @@ export function EventDateTimeRow({
       >
         {formatDate(eventDate)}
       </Text>
-      {eventTime ? (
+      {timeText ? (
         <Text
           style={{
-            flexShrink: 0,
+            flexShrink: 1,
             fontSize: tokens.timeFontSize,
             lineHeight: tokens.timeLineHeight,
             fontWeight: '600',
@@ -332,7 +368,7 @@ export function EventDateTimeRow({
             fontVariant: ['tabular-nums'],
           }}
         >
-          · {eventTime}
+          · {timeText}
         </Text>
       ) : (
         <Text

@@ -10,11 +10,13 @@ import {
 import { generateId } from '../utils/uuid';
 import {
   ACTIVITY_V2_SCHEMA_STATEMENTS,
+  ACTIVITY_V2_SUMMARY_VIEW_STATEMENTS,
+  ACTIVITY_V2_TIME_INDEX_STATEMENTS,
   createEventArtistsV2TableSql,
   createEventsV2TableSql,
 } from './activityV2Schema';
 
-export const CURRENT_VERSION = 19;
+export const CURRENT_VERSION = 20;
 
 interface LegacyEventV17Row {
   id: string;
@@ -248,7 +250,7 @@ async function migrateActivityV2(db: SQLiteDatabase): Promise<void> {
           `INSERT INTO event_sessions
              (id, event_id, title, session_date, end_date, open_time, start_time,
               end_time, city, venue, sort_order, created_at, updated_at)
-           VALUES (?, ?, NULL, ?, NULL, NULL, ?, NULL, ?, ?, 0, ?, ?)`,
+           VALUES (?, ?, NULL, ?, NULL, ?, NULL, NULL, ?, ?, 0, ?, ?)`,
           [
             generateId(),
             event.id,
@@ -272,6 +274,26 @@ async function migrateActivityV2(db: SQLiteDatabase): Promise<void> {
   if (foreignKeyErrors.length > 0) {
     throw new Error('Activity v2 migration foreign key verification failed');
   }
+}
+
+async function migrateActivityTimeSemantics(db: SQLiteDatabase): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE event_sessions
+       SET open_time = start_time, start_time = NULL
+       WHERE open_time IS NULL AND start_time IS NOT NULL`,
+    );
+    await db.runAsync('DROP VIEW IF EXISTS event_summaries');
+    await db.runAsync('DROP VIEW IF EXISTS event_first_summaries');
+    await db.runAsync('DROP INDEX IF EXISTS idx_event_sessions_event_sort');
+    await db.runAsync('DROP INDEX IF EXISTS idx_event_sessions_date');
+    for (const statement of ACTIVITY_V2_TIME_INDEX_STATEMENTS) {
+      await db.runAsync(statement);
+    }
+    for (const statement of ACTIVITY_V2_SUMMARY_VIEW_STATEMENTS) {
+      await db.runAsync(statement);
+    }
+  });
 }
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
@@ -403,6 +425,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
          ADD COLUMN artist_confirmation_mode TEXT NOT NULL DEFAULT 'always'
          CHECK (artist_confirmation_mode IN ('always', 'matches_only', 'never'))`,
       );
+    }
+    if (version < 20) {
+      await migrateActivityTimeSemantics(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

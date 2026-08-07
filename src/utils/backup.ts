@@ -11,7 +11,7 @@ import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
 import { generateId } from './uuid';
 import { normalizeArtistConfirmationMode } from './artistConfirmation';
 
-const BACKUP_VERSION = 6;
+const BACKUP_VERSION = 7;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -95,6 +95,14 @@ interface ExportFullBackupOptions {
 interface VersionedImportPayload {
   version: number;
   data: ImportDataShape;
+}
+
+export function normalizeLegacyBackupActivitySessions(sessions: Row[]): Row[] {
+  return sessions.map((session) => (
+    session.open_time == null && typeof session.start_time === 'string'
+      ? { ...session, open_time: session.start_time, start_time: null }
+      : session
+  ));
 }
 
 export async function buildBackupData(db: Repositories): Promise<BackupData> {
@@ -508,8 +516,8 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
             title: null,
             session_date: String(event.event_date),
             end_date: null,
-            open_time: null,
-            start_time: event.event_time ?? null,
+            open_time: event.event_time ?? null,
+            start_time: null,
             end_time: null,
             city: event.city ?? null,
             venue: event.venue ?? null,
@@ -776,19 +784,22 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
     return null;
   }
 
+  let normalized: VersionedImportPayload;
   switch (candidate.version) {
     case 1:
-      return upgradeBackupDataV1ToCurrent({
+      normalized = upgradeBackupDataV1ToCurrent({
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       });
+      break;
     case 2:
-      return upgradeBackupDataV2ToCurrent({
+      normalized = upgradeBackupDataV2ToCurrent({
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       });
+      break;
     case 3:
-      return {
+      normalized = {
         version: BACKUP_VERSION,
         data: {
           ...(candidate.data as ImportDataShape),
@@ -798,24 +809,41 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
           scheduled_reminder_state: (candidate.data as ImportDataShape).scheduled_reminder_state ?? [],
         },
       };
+      break;
     case 4:
-      return {
+      normalized = {
         version: BACKUP_VERSION,
         data: candidate.data as ImportDataShape,
       };
+      break;
     case 5:
-      return {
+      normalized = {
         version: BACKUP_VERSION,
         data: candidate.data as ImportDataShape,
       };
+      break;
     case 6:
-      return {
+      normalized = {
+        version: BACKUP_VERSION,
+        data: candidate.data as ImportDataShape,
+      };
+      break;
+    case 7:
+      normalized = {
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       };
+      break;
     default:
       return null;
   }
+
+  if (candidate.version <= 6 && normalized.data.event_sessions) {
+    normalized.data.event_sessions = normalizeLegacyBackupActivitySessions(
+      normalized.data.event_sessions,
+    );
+  }
+  return normalized;
 }
 
 async function importZipBackup(db: Repositories, file: File): Promise<boolean> {

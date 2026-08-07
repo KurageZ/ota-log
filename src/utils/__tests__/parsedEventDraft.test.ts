@@ -90,4 +90,24 @@ describe('buildParsedEventDraft', () => {
 
     expect(result.fields).not.toHaveProperty('actual_expense');
   });
+
+  test('prefills opening, performance, and ending times without collapsing them', () => {
+    const result = buildParsedEventDraft(
+      'OPEN 17:30 START 18:30 END 20:00',
+      {
+        ...baseParsed,
+        open_time: '17:30',
+        start_time: '18:30',
+        end_time: '20:00',
+      },
+      [],
+    );
+
+    expect(result.fields.sessions?.[0]).toMatchObject({
+      session_date: '2026-05-30',
+      open_time: '17:30',
+      start_time: '18:30',
+      end_time: '20:00',
+    });
+  });
 });

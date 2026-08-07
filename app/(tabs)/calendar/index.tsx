@@ -18,6 +18,7 @@ import {
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { EventCard } from '../../../src/components/EventCard';
+import { formatEventTimes } from '../../../src/components/EventPrimitives';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
 import { ChekiStackPreviewCard } from '../../../src/components/ChekiStackPreviewCard';
@@ -205,7 +206,9 @@ function buildMonthCellSignalCards(
     ...sortDayEvents(events).map((event) => ({
       key: `event-${event.id}`,
       kind: 'event' as const,
-      text: event.event_time ? `${event.event_time} ${event.title}` : event.title,
+      text: formatEventTimes(event.open_time, event.start_time)
+        ? `${formatEventTimes(event.open_time, event.start_time)} ${event.title}`
+        : event.title,
     })),
     ...occurrences.map((occurrence) => ({
       key: `date-item-${occurrence.id}`,

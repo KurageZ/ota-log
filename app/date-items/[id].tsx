@@ -17,6 +17,7 @@ import { getDateItemPresetKind } from '../../src/utils/dateItemDisplay';
 import { showDeleteFailedAlert, showSaveFailedAlert } from '../../src/utils/failureAlert';
 import { withAlpha } from '../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+import { formatEventTimes } from '../../src/components/EventPrimitives';
 
 export default function DateItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -163,7 +164,11 @@ export default function DateItemDetailScreen() {
   const heroValue = item.relativeState === 'today' ? '今天' : relativeDays;
   const heroLabel = item.relativeState === 'today' ? '就是今天' : item.relativeState === 'future' ? '天后' : '天前';
   const eventMetaParts = sourceEvent
-    ? [formatShortDate(sourceEvent.event_date), sourceEvent.event_time || '全天', sourceEvent.venue].filter(Boolean)
+    ? [
+        formatShortDate(sourceEvent.event_date),
+        formatEventTimes(sourceEvent.open_time, sourceEvent.start_time) || '全天',
+        sourceEvent.venue,
+      ].filter(Boolean)
     : [item.item.date];
 
   return (

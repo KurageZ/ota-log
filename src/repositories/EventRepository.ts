@@ -165,8 +165,8 @@ export class EventRepository {
          CASE WHEN session_date >= date('now', 'localtime') THEN 0 ELSE 1 END ASC,
          CASE WHEN session_date >= date('now', 'localtime') THEN session_date END ASC,
          CASE WHEN session_date < date('now', 'localtime') THEN session_date END DESC,
-         CASE WHEN session_date >= date('now', 'localtime') THEN start_time END ASC,
-         CASE WHEN session_date < date('now', 'localtime') THEN start_time END DESC,
+         CASE WHEN session_date >= date('now', 'localtime') THEN COALESCE(open_time, start_time) END ASC,
+         CASE WHEN session_date < date('now', 'localtime') THEN COALESCE(open_time, start_time) END DESC,
          sort_order ASC,
          id ASC
        LIMIT 1`,
@@ -197,7 +197,10 @@ export class EventRepository {
       `SELECT
          e.*,
          s.session_date AS event_date,
-         s.start_time AS event_time,
+         COALESCE(s.open_time, s.start_time) AS event_time,
+         s.open_time AS open_time,
+         s.start_time AS start_time,
+         s.end_time AS end_time,
          s.city AS city,
          s.venue AS venue,
          e.actual_expense AS ticket_price
@@ -208,12 +211,12 @@ export class EventRepository {
          FROM event_sessions candidate
          WHERE candidate.event_id = e.id
            AND candidate.session_date = s.session_date
-         ORDER BY candidate.start_time ASC,
+         ORDER BY COALESCE(candidate.open_time, candidate.start_time) ASC,
                   candidate.sort_order ASC,
                   candidate.id ASC
          LIMIT 1
        )
-       ORDER BY s.session_date DESC, s.start_time DESC, e.created_at DESC`,
+       ORDER BY s.session_date DESC, COALESCE(s.open_time, s.start_time) DESC, e.created_at DESC`,
     );
   }
 
@@ -551,6 +554,9 @@ export class EventRepository {
         actual_expense: row.actual_expense,
         event_date: row.event_date,
         event_time: row.event_time,
+        open_time: row.open_time,
+        start_time: row.start_time,
+        end_time: row.end_time,
         city: row.city,
         venue: row.venue,
         ticket_price: row.ticket_price,
@@ -783,7 +789,7 @@ export class EventRepository {
       trip_id: input.trip_id,
       sessions: [{
         session_date: input.event_date,
-        start_time: input.event_time,
+        open_time: input.event_time,
         city: input.city,
         venue: input.venue,
       }],
@@ -951,7 +957,7 @@ export class EventRepository {
 
     const sessionFieldMap: Array<[keyof CreateEventInput, string]> = [
       ['event_date', 'session_date'],
-      ['event_time', 'start_time'],
+      ['event_time', 'open_time'],
       ['city', 'city'],
       ['venue', 'venue'],
     ];

@@ -3,7 +3,13 @@ import { File } from 'expo-file-system';
 import { Alert } from 'react-native';
 import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
-import { buildBackupData, exportFullBackup, importBackup, restoreBackupData } from '../../utils/backup';
+import {
+  buildBackupData,
+  exportFullBackup,
+  importBackup,
+  normalizeLegacyBackupActivitySessions,
+  restoreBackupData,
+} from '../../utils/backup';
 import { ArtistRepository } from '../../repositories/ArtistRepository';
 import { EventRepository } from '../../repositories/EventRepository';
 import { TripRepository } from '../../repositories/TripRepository';
@@ -21,6 +27,18 @@ let mockBackupUuidIndex = 0;
 jest.mock('expo-crypto', () => ({
   randomUUID: () => `20000000-0000-4000-8000-${String(mockBackupUuidIndex++).padStart(12, '0')}`,
 }));
+
+describe('legacy backup activity time semantics', () => {
+  test('moves only single legacy start times to opening times', () => {
+    expect(normalizeLegacyBackupActivitySessions([
+      { id: 'legacy', open_time: null, start_time: '18:30' },
+      { id: 'explicit', open_time: '17:30', start_time: '18:30' },
+    ])).toEqual([
+      { id: 'legacy', open_time: '18:30', start_time: null },
+      { id: 'explicit', open_time: '17:30', start_time: '18:30' },
+    ]);
+  });
+});
 
 jest.mock('expo-file-system', () => ({
   Directory: class {},
@@ -264,11 +282,12 @@ describe('backup artist background metadata support', () => {
     expect(rawDb.prepare("SELECT actual_expense FROM events WHERE id = 'legacy-event'").get())
       .toEqual({ actual_expense: 520 });
     expect(rawDb.prepare(
-      `SELECT session_date, start_time, city, venue, sort_order
+      `SELECT session_date, open_time, start_time, city, venue, sort_order
        FROM event_sessions WHERE event_id = 'legacy-event'`,
     ).get()).toEqual({
       session_date: '2026-03-04',
-      start_time: '19:30',
+      open_time: '19:30',
+      start_time: null,
       city: '东京',
       venue: 'Legacy Hall',
       sort_order: 0,

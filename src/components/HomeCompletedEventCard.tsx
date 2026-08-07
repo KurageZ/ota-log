@@ -41,7 +41,12 @@ export function HomeCompletedEventCard({ event }: { event: Event }) {
 
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 7 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-          <EventDateTimeRow eventDate={event.event_date} eventTime={event.event_time} size="sm" />
+          <EventDateTimeRow
+            eventDate={event.event_date}
+            openTime={event.open_time}
+            startTime={event.start_time}
+            size="sm"
+          />
           <EventVenueRow
             city={event.city}
             venue={event.venue}

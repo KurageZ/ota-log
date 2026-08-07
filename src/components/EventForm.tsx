@@ -27,6 +27,9 @@ import { AppIcon } from './AppIcon';
 import { FormFieldLabel, FormSectionLabel } from './FormPrimitives';
 import { generateId } from '../utils/uuid';
 import {
+  EventRatingStars,
+} from './EventPrimitives';
+import {
   EventTimetableEditor,
   getTimetableValidationError,
   type EventTimetableEntryDraft,
@@ -155,7 +158,7 @@ function normalizeInitialValues(initialValues?: EventFormPrefill): EventFormValu
     ? initialValues.sessions.map((session) => createEmptySession({ ...session, key: session.key || session.id || generateId() }))
     : [createEmptySession({
         session_date: initialValues?.event_date ?? toISODate(new Date()),
-        start_time: initialValues?.event_time ?? '',
+        open_time: initialValues?.event_time ?? '',
         city: initialValues?.city ?? '',
         venue: initialValues?.venue ?? '',
       })];
@@ -341,11 +344,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   const [artistSearch, setArtistSearch] = useState('');
   const [activeVenueKey, setActiveVenueKey] = useState<string | null>(null);
   const [venueSuggestions, setVenueSuggestions] = useState<string[]>([]);
-  const [expandedSessionKeys, setExpandedSessionKeys] = useState<Set<string>>(
-    () => new Set(merged.sessions.filter((session) => (
-      session.end_date || session.open_time || session.end_time
-    )).map((session) => session.key)),
-  );
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
   const [sessionDateTouched, setSessionDateTouched] = useState<Set<string>>(new Set());
@@ -495,6 +494,15 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     if (!query) return false;
     return filteredArtists.length === 0;
   }, [artistSearch, filteredArtists]);
+  const advancedItemCount = useMemo(() => (
+    sessions.reduce((count, session) => count + [
+      session.title,
+      session.end_time,
+      session.end_date,
+    ].filter(Boolean).length, 0)
+    + [url, details].filter(Boolean).length
+    + Math.max(0, sessions.length - 1)
+  ), [details, sessions, url]);
 
   const handlePickInfoPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -515,7 +523,11 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     setDidTrySubmit(true);
     if (titleError) { Alert.alert(titleError); return; }
     const firstSessionError = sessionErrors.find(Boolean);
-    if (firstSessionError) { Alert.alert(firstSessionError); return; }
+    if (firstSessionError) {
+      setAdvancedExpanded(true);
+      Alert.alert(firstSessionError);
+      return;
+    }
     const firstTimetableError = timetableErrors.find(Boolean);
     if (firstTimetableError) { Alert.alert(firstTimetableError); return; }
     if (actualExpenseError) { Alert.alert(actualExpenseError); return; }
@@ -595,55 +607,12 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           <EventStatusChips value={status} onChange={setStatus} isDark={isDark} />
         </View>
 
-        {status === 'completed' && (
-          <View style={{ marginTop: 14 }}>
-            <FormFieldLabel>回顾评分</FormFieldLabel>
-            <View style={{ flexDirection: 'row' }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => setReviewScore(reviewScore === i ? null : i)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                >
-                  <Text style={{ fontSize: 32, color: reviewScore != null && i <= reviewScore ? colors.starActive : colors.inputBorder }}>
-                    ★
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-          <View style={{ flex: 1 }}>
-            <FormFieldLabel>实际支出</FormFieldLabel>
-            <FieldInput
-              value={actualExpense}
-              onChangeText={setActualExpense}
-              placeholder="0"
-              isDark={isDark}
-              keyboardType="decimal-pad"
-              onBlur={() => setActualExpenseTouched(true)}
-              hasError={showActualExpenseError}
-            />
-            {showActualExpenseError ? (
-              <Text style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
-                {actualExpenseError}
-              </Text>
-            ) : null}
-          </View>
-          <View style={{ flex: 2 }}>
-            <FormFieldLabel>演出链接</FormFieldLabel>
-            <FieldInput value={url} onChangeText={setUrl} placeholder="https://..." isDark={isDark} returnKeyType="next" />
-          </View>
-        </View>
       </Card>
 
-      <FormSectionLabel label={sessions.length === 1 ? '时间与地点' : '场次'} />
+      <FormSectionLabel label="时间与地点" />
       {sessions.map((session, sessionIndex) => {
         const sessionError = sessionErrors[sessionIndex];
         const showSessionError = (sessionDateTouched.has(session.key) || didTrySubmit) && sessionError != null;
-        const expanded = expandedSessionKeys.has(session.key);
         return (
           <Card bg={cardBg} key={session.key}>
             {sessions.length > 1 ? (
@@ -677,15 +646,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
               </View>
             ) : null}
 
-            <FormFieldLabel>{sessions.length === 1 ? '补充名称' : '场次名称'}</FormFieldLabel>
-            <FieldInput
-              value={session.title}
-              onChangeText={(titleValue) => updateSession(session.key, { title: titleValue })}
-              placeholder="如：昼场、夜场、DAY 1（选填）"
-              isDark={isDark}
-            />
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 2 }}>
                 <FormFieldLabel required>日期</FormFieldLabel>
                 <FieldInput
@@ -705,7 +666,18 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <FormFieldLabel>开始时间</FormFieldLabel>
+                <FormFieldLabel>开场</FormFieldLabel>
+                <FieldInput
+                  value={session.open_time}
+                  onChangeText={(value) => updateSession(session.key, { open_time: formatTimeInput(value) })}
+                  placeholder="HH:MM"
+                  isDark={isDark}
+                  keyboardType="numeric"
+                  maxLength={5}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <FormFieldLabel>开演</FormFieldLabel>
                 <FieldInput
                   value={session.start_time}
                   onChangeText={(value) => updateSession(session.key, { start_time: formatTimeInput(value) })}
@@ -766,94 +738,44 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
               </View>
             ) : null}
 
-            <TouchableOpacity
-              onPress={() => setExpandedSessionKeys((current) => {
-                const next = new Set(current);
-                if (next.has(session.key)) next.delete(session.key); else next.add(session.key);
-                return next;
-              })}
-              style={{
-                minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center',
-                justifyContent: 'center', gap: 6,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>
-                {expanded ? '收起更多时间' : '更多时间'}
-              </Text>
-              <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={15} color={colors.accent} />
-            </TouchableOpacity>
-
-            {expanded ? (
-              <>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-                  <View style={{ flex: 1 }}>
-                    <FormFieldLabel>开场时间</FormFieldLabel>
-                    <FieldInput
-                      value={session.open_time}
-                      onChangeText={(value) => updateSession(session.key, { open_time: formatTimeInput(value) })}
-                      placeholder="HH:MM"
-                      isDark={isDark}
-                      keyboardType="numeric"
-                      maxLength={5}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <FormFieldLabel>结束时间</FormFieldLabel>
-                    <FieldInput
-                      value={session.end_time}
-                      onChangeText={(value) => updateSession(session.key, { end_time: formatTimeInput(value) })}
-                      placeholder="HH:MM"
-                      isDark={isDark}
-                      keyboardType="numeric"
-                      maxLength={5}
-                    />
-                  </View>
-                </View>
-                <View style={{ marginTop: 14 }}>
-                  <FormFieldLabel>结束日期</FormFieldLabel>
-                  <FieldInput
-                    value={session.end_date}
-                    onChangeText={(text) => updateSession(session.key, {
-                      end_date: formatDateInput(text, session.end_date),
-                    })}
-                    onBlur={() => updateSession(session.key, { end_date: normalizeDateInput(session.end_date) })}
-                    placeholder="跨日时填写 YYYY-MM-DD"
-                    isDark={isDark}
-                    keyboardType="numeric"
-                    maxLength={10}
-                  />
-                </View>
-              </>
-            ) : null}
-
-            <EventTimetableEditor
-              entries={session.timetable}
-              artists={selectedArtists}
-              onChange={(timetable) => updateSession(session.key, { timetable })}
-            />
           </Card>
         );
       })}
-      <TouchableOpacity
-        onPress={() => setSessions((current) => [...current, createEmptySession()])}
-        activeOpacity={0.7}
-        style={{
-          minHeight: 48, marginBottom: 12, borderRadius: 14, borderWidth: 1,
-          borderStyle: 'dashed', borderColor: colors.accent,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-          backgroundColor: withAlpha(colors.accent, isDark ? 0.1 : 0.05),
-        }}
-      >
-        <AppIcon name="add" size={18} color={colors.accent} />
-        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
-          {sessions.length === 1 ? '添加其他场次' : '添加场次'}
-        </Text>
-      </TouchableOpacity>
 
-      {/* 详细信息 */}
-      <FormSectionLabel label="详细信息" />
+      {/* 资料图 */}
+      <FormSectionLabel label="资料图" />
       <Card bg={cardBg}>
-        <CardHeader label="出演者" />
+        <CardHeader label="活动资料图" actionLabel="添加" onActionPress={handlePickInfoPhoto} />
+
+        {photoUris && photoUris.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {photoUris.map((uri, idx) => (
+              <FormPhotoThumb
+                key={uri + idx}
+                uri={uri}
+                isDark={isDark}
+                onRemove={() => onPhotoRemove?.(uri)}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <TouchableOpacity onPress={handlePickInfoPhoto} activeOpacity={0.7}
+            style={{
+              paddingVertical: 22, alignItems: 'center',
+              borderWidth: 1.5, borderColor: colors.inputBorder,
+              borderStyle: 'dashed', borderRadius: 10
+            }}
+          >
+            <Text style={{ fontSize: 13, color: colors.placeholder }}>
+              添加海报、出演阵容等资料图
+            </Text>
+          </TouchableOpacity>
+        )}
+      </Card>
+
+      {/* 出演者 */}
+      <FormSectionLabel label="出演者" />
+      <Card bg={cardBg}>
         <ArtistSearchPicker
           artists={allArtists}
           selectedArtists={selectedArtists}
@@ -909,51 +831,56 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
         />
       </Card>
 
-      <Card bg={cardBg}>
-        <CardHeader label="演出详情" />
-        <FieldInput
-          value={details}
-          onChangeText={setDetails}
-          placeholder="演出公告原文、详细介绍等"
-          isDark={isDark}
-          multiline
-          numberOfLines={5}
-          returnKeyType="done"
-        />
-      </Card>
-
-      <Card bg={cardBg}>
-        <CardHeader label="资料图" actionLabel="添加" onActionPress={handlePickInfoPhoto} />
-
-        {photoUris && photoUris.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {photoUris.map((uri, idx) => (
-              <FormPhotoThumb
-                key={uri + idx}
-                uri={uri}
-                isDark={isDark}
-                onRemove={() => onPhotoRemove?.(uri)}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <TouchableOpacity onPress={handlePickInfoPhoto} activeOpacity={0.7}
-            style={{
-              paddingVertical: 22, alignItems: 'center',
-              borderWidth: 1.5, borderColor: colors.inputBorder,
-              borderStyle: 'dashed', borderRadius: 10
-            }}
-          >
-            <Text style={{ fontSize: 13, color: colors.placeholder }}>
-              添加海报、出演阵容等资料图
-            </Text>
-          </TouchableOpacity>
-        )}
-      </Card>
+      {/* 时间表 */}
+      <FormSectionLabel label="时间表" />
+      {sessions.map((session, sessionIndex) => (
+        <Card bg={cardBg} key={`timetable-${session.key}`}>
+          {sessions.length > 1 ? (
+            <CardHeader label={session.title.trim() || `场次 ${sessionIndex + 1}`} />
+          ) : null}
+          <EventTimetableEditor
+            entries={session.timetable}
+            artists={selectedArtists}
+            onChange={(timetable) => updateSession(session.key, { timetable })}
+          />
+        </Card>
+      ))}
 
       {/* 我的记录 */}
       <FormSectionLabel label="我的记录" />
       <Card bg={cardBg}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <FormFieldLabel>实际支出</FormFieldLabel>
+            <FieldInput
+              value={actualExpense}
+              onChangeText={setActualExpense}
+              placeholder="0"
+              isDark={isDark}
+              keyboardType="decimal-pad"
+              onBlur={() => setActualExpenseTouched(true)}
+              hasError={showActualExpenseError}
+            />
+          </View>
+          {status === 'completed' ? (
+            <View style={{ flex: 2 }}>
+              <FormFieldLabel>回顾评分</FormFieldLabel>
+              <View style={{ height: 46, flexDirection: 'row', alignItems: 'center' }}>
+                <EventRatingStars
+                  score={reviewScore}
+                  size="lg"
+                  onChange={(nextScore) => setReviewScore(reviewScore === nextScore ? null : nextScore)}
+                />
+              </View>
+            </View>
+          ) : null}
+        </View>
+        {showActualExpenseError ? (
+          <Text style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
+            {actualExpenseError}
+          </Text>
+        ) : null}
+        <View style={{ marginTop: 14 }}>
         <CardHeader label="备注" />
         <FieldInput
           value={notes}
@@ -964,6 +891,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           numberOfLines={3}
           returnKeyType="done"
         />
+        </View>
       </Card>
 
       <Card bg={cardBg}>
@@ -987,6 +915,110 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           blurOnSubmit={false}
         />
       </Card>
+
+      {/* 高级信息 */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="高级信息"
+        accessibilityState={{ expanded: advancedExpanded }}
+        activeOpacity={0.7}
+        onPress={() => setAdvancedExpanded((current) => !current)}
+        style={{
+          minHeight: 52,
+          marginTop: 4,
+          marginBottom: advancedExpanded ? 8 : 12,
+          paddingHorizontal: 4,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        <View style={{ width: 3, height: 16, borderRadius: 999, backgroundColor: colors.accent }} />
+        <Text style={{ flex: 1, fontSize: 17, fontWeight: '500', color: colors.heading }}>
+          高级信息
+        </Text>
+        {advancedItemCount > 0 ? (
+          <Text style={{ fontSize: 12, color: colors.textMuted }}>{advancedItemCount} 项已填写</Text>
+        ) : null}
+        <AppIcon name="chevron" variant={advancedExpanded ? 'up' : 'down'} size={16} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      {advancedExpanded ? (
+        <>
+          {sessions.map((session, sessionIndex) => (
+            <Card bg={cardBg} key={`advanced-${session.key}`}>
+              <CardHeader label={sessions.length > 1 ? `场次 ${sessionIndex + 1}` : '补充时间信息'} />
+              <FormFieldLabel>{sessions.length === 1 ? '补充名称' : '场次名称'}</FormFieldLabel>
+              <FieldInput
+                value={session.title}
+                onChangeText={(titleValue) => updateSession(session.key, { title: titleValue })}
+                placeholder="如：昼场、夜场、DAY 1"
+                isDark={isDark}
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <FormFieldLabel>结束时间</FormFieldLabel>
+                  <FieldInput
+                    value={session.end_time}
+                    onChangeText={(value) => updateSession(session.key, { end_time: formatTimeInput(value) })}
+                    placeholder="HH:MM"
+                    isDark={isDark}
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+                </View>
+                <View style={{ flex: 2 }}>
+                  <FormFieldLabel>结束日期</FormFieldLabel>
+                  <FieldInput
+                    value={session.end_date}
+                    onChangeText={(text) => updateSession(session.key, {
+                      end_date: formatDateInput(text, session.end_date),
+                    })}
+                    onBlur={() => updateSession(session.key, { end_date: normalizeDateInput(session.end_date) })}
+                    placeholder="跨日时填写 YYYY-MM-DD"
+                    isDark={isDark}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+              </View>
+            </Card>
+          ))}
+
+          <TouchableOpacity
+            onPress={() => setSessions((current) => [...current, createEmptySession()])}
+            activeOpacity={0.7}
+            style={{
+              minHeight: 48, marginBottom: 12, borderRadius: 14, borderWidth: 1,
+              borderStyle: 'dashed', borderColor: colors.accent,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+              backgroundColor: withAlpha(colors.accent, isDark ? 0.1 : 0.05),
+            }}
+          >
+            <AppIcon name="add" size={18} color={colors.accent} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>
+              {sessions.length === 1 ? '添加其他场次' : '添加场次'}
+            </Text>
+          </TouchableOpacity>
+
+          <Card bg={cardBg}>
+            <FormFieldLabel>演出链接</FormFieldLabel>
+            <FieldInput value={url} onChangeText={setUrl} placeholder="https://..." isDark={isDark} returnKeyType="next" />
+            <View style={{ marginTop: 14 }}>
+              <CardHeader label="演出详情" />
+              <FieldInput
+                value={details}
+                onChangeText={setDetails}
+                placeholder="演出公告原文、详细介绍等"
+                isDark={isDark}
+                multiline
+                numberOfLines={5}
+                returnKeyType="done"
+              />
+            </View>
+          </Card>
+        </>
+      ) : null}
 
       {/* Save */}
       {!hideSubmitButton && (

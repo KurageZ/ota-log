@@ -96,7 +96,7 @@ describe('v16 through v19 migration', () => {
     const db = createV16Database();
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(19);
+    expect(db.pragma('user_version', { simple: true })).toBe(20);
     expect(db.prepare('SELECT quantity, date, created_at, updated_at FROM cheki_records').get())
       .toEqual({
         quantity: 5,

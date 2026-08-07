@@ -10,6 +10,9 @@ export interface ParsedAnnouncement {
   title: string | null;
   event_date: string | null;
   event_time: string | null;
+  open_time?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   city: string | null;
   venue: string | null;
   artist: string | null;
@@ -92,23 +95,29 @@ function cleanVenue(s: string): string {
   return normalizeVenueName(venueCandidateMatch[1]);
 }
 
-function findLabeledTime(lines: string[], label: 'open' | 'start'): string | null {
-  const labelPattern = label === 'start'
-    ? /(?:START|開演|开演|开始|ST)\b/i
-    : /(?:OPEN|開場|开场|OP)\b/i;
-  const inlinePattern = label === 'start'
-    ? /(?:START|開演|开演|开始|ST)\s*[：:\s]*(\d{1,2})[:：](\d{2})|(\d{1,2})[:：](\d{2})\s*(?:START|開演|开演|开始|ST)/i
-    : /(?:OPEN|開場|开场|OP)\s*[：:\s]*(\d{1,2})[:：](\d{2})|(\d{1,2})[:：](\d{2})\s*(?:OPEN|開場|开场|OP)/i;
+function findLabeledTime(lines: string[], label: 'open' | 'start' | 'end'): string | null {
+  const labelSource = label === 'start'
+    ? '(?:START|開演|开演|开始|ST)'
+    : label === 'end'
+      ? '(?:END|終演|终演|结束)'
+      : '(?:OPEN|開場|开场|OP)';
+  const labelPattern = new RegExp(`${labelSource}\\b`, 'i');
+  const afterPattern = new RegExp(
+    `${labelSource}\\s*[：:\\s]*(\\d{1,2})[:：](\\d{2})`,
+    'i',
+  );
+  const beforePattern = new RegExp(
+    `(\\d{1,2})[:：](\\d{2})\\s*${labelSource}`,
+    'i',
+  );
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index].trim();
     if (!line) continue;
 
-    const inline = line.match(inlinePattern);
-    if (inline) {
-      const hour = inline[1] ?? inline[3];
-      const minute = inline[2] ?? inline[4];
-      if (hour && minute) return `${hour.padStart(2, '0')}:${minute}`;
+    const after = line.match(afterPattern);
+    if (after) {
+      return `${after[1].padStart(2, '0')}:${after[2]}`;
     }
 
     if (!labelPattern.test(line)) continue;
@@ -116,6 +125,11 @@ function findLabeledTime(lines: string[], label: 'open' | 'start'): string | nul
     const nextLine = lines[index + 1]?.trim();
     const nextMatch = nextLine?.match(/^(\d{1,2})[:：](\d{2})$/);
     if (nextMatch) return `${nextMatch[1].padStart(2, '0')}:${nextMatch[2]}`;
+  }
+
+  for (const rawLine of lines) {
+    const before = rawLine.trim().match(beforePattern);
+    if (before) return `${before[1].padStart(2, '0')}:${before[2]}`;
   }
 
   return null;
@@ -502,6 +516,16 @@ export function parseAnnouncement(
     ) {
       result.event_time = openBlockTime;
     }
+  }
+
+  const explicitStartTime = explicitStart
+    ? `${explicitStart[1].padStart(2, '0')}:${explicitStart[2]}`
+    : null;
+  result.open_time = findLabeledTime(scopedRawLines, 'open');
+  result.start_time = explicitStartTime ?? findLabeledTime(scopedRawLines, 'start');
+  result.end_time = findLabeledTime(scopedRawLines, 'end');
+  if (!result.open_time && !result.start_time && result.event_time) {
+    result.open_time = result.event_time;
   }
 
   // ── City ──────────────────────────────────────────────────────────────────

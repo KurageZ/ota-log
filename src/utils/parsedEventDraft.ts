@@ -21,14 +21,30 @@ export function buildParsedEventDraft(
     allArtists,
     { announcementText },
   );
+  const hasStructuredTime = Boolean(parsed.open_time || parsed.start_time || parsed.end_time);
 
   const fields: EventFormPrefill = {
     details: announcementText,
     ...(parsed.title ? { title: parsed.title } : {}),
-    ...(parsed.event_date ? { event_date: parsed.event_date } : {}),
-    ...(parsed.event_time ? { event_time: parsed.event_time } : {}),
-    ...(parsed.city ? { city: parsed.city } : {}),
-    ...(parsed.venue ? { venue: parsed.venue } : {}),
+    ...(hasStructuredTime ? {
+      sessions: [{
+        key: 'parsed-session',
+        title: '',
+        session_date: parsed.event_date ?? '',
+        end_date: '',
+        open_time: parsed.open_time ?? '',
+        start_time: parsed.start_time ?? '',
+        end_time: parsed.end_time ?? '',
+        city: parsed.city ?? '',
+        venue: parsed.venue ?? '',
+        timetable: [],
+      }],
+    } : {
+      ...(parsed.event_date ? { event_date: parsed.event_date } : {}),
+      ...(parsed.event_time ? { event_time: parsed.event_time } : {}),
+      ...(parsed.city ? { city: parsed.city } : {}),
+      ...(parsed.venue ? { venue: parsed.venue } : {}),
+    }),
     ...extraFields,
   };
 

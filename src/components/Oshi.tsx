@@ -34,9 +34,11 @@ export function OshiBadge({ inverted = false }: { inverted?: boolean }) {
 export function OshiMatchBadge({
   oshiArtistName,
   style,
+  outerHeight,
 }: {
   oshiArtistName: string;
   style?: ViewStyle;
+  outerHeight?: number;
 }) {
   const { colors } = useAppTheme();
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -63,7 +65,7 @@ export function OshiMatchBadge({
   // so the full color spectrum is visible across the ring and coverage is
   // guaranteed at any rotation angle.
   const outerW = innerLayout ? innerLayout.w + 3 : 0;
-  const outerH = innerLayout ? innerLayout.h + 3 : 0;
+  const outerH = outerHeight ?? (innerLayout ? innerLayout.h + 3 : 0);
   const sqSide = Math.ceil(Math.sqrt(outerW * outerW + outerH * outerH));
   const gradOffset = (n: number, sq: number) => (n - sq) / 2;
 
@@ -75,7 +77,12 @@ export function OshiMatchBadge({
   };
 
   return (
-    <View style={[{ alignSelf: 'flex-start', borderRadius: 999, overflow: 'hidden' }, style]}>
+    <View style={[{
+      alignSelf: 'flex-start',
+      height: outerHeight,
+      borderRadius: 999,
+      overflow: 'hidden',
+    }, style]}>
       {innerLayout && (
         <Animated.View style={{
           position: 'absolute',
@@ -96,17 +103,16 @@ export function OshiMatchBadge({
       <View
         onLayout={onInnerLayout}
         style={{
+          flex: outerHeight ? 1 : undefined,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
           borderRadius: 999,
           paddingHorizontal: 9,
-          paddingVertical: 5,
+          paddingVertical: outerHeight ? 0 : 5,
           margin: 1.5,
           backgroundColor: colors.card,
         }}
       >
-        <AppIcon name="oshi" size={11} color={colors.oshiBadgeBg} />
         <Text
           style={{ fontSize: 11.5, lineHeight: 13, fontWeight: '700', color: colors.accentText }}
           numberOfLines={1}

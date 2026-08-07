@@ -4,7 +4,7 @@ import { Event } from '../types/models';
 import { EventCardOshiBadge } from '../utils/oshiMatch';
 import { useAppTheme } from '../theme/appTheme';
 import { HomeOshiPill } from './HomeOshiPill';
-import { CityBadge } from './EventPrimitives';
+import { CityBadge, formatEventTimes } from './EventPrimitives';
 import { AppIcon } from './AppIcon';
 import { AnimatedPressable } from './AnimatedPressable';
 
@@ -144,7 +144,7 @@ export function HomeTimelineEventCard({
                     fontVariant: ['tabular-nums'],
                   }}
                 >
-                  {event.event_time || '全天'}
+                  {formatEventTimes(event.open_time, event.start_time) || '全天'}
                 </Text>
                 {event.venue ? (
                   <>
@@ -180,7 +180,7 @@ export function HomeTimelineEventCard({
                     fontVariant: ['tabular-nums'],
                   }}
                 >
-                  {event.event_time || '全天'}
+                  {formatEventTimes(event.open_time, event.start_time) || '全天'}
                 </Text>
               </View>
 
