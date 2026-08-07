@@ -40,6 +40,7 @@ import { addEventToSystemCalendar } from '../../src/utils/systemCalendar';
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
 const TOAST_DURATION_MS = 1600;
+const TIMETABLE_TIME_COLUMN_WIDTH = 102;
 
 const STATUS_ACTION_META: Record<EventStatus, { icon: AppIconName }> = {
   planned: { icon: 'statusPlanned' },
@@ -218,6 +219,61 @@ function SectionTitle({ label }: { label: string }) {
   );
 }
 
+function CollapsibleSectionTitle({
+  label,
+  count,
+  expanded,
+  onPress,
+}: {
+  label: string;
+  count: number;
+  expanded: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`${label}，${count} 条`}
+      accessibilityState={{ expanded }}
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 44,
+        marginBottom: 8,
+      }}
+    >
+      <View style={{
+        width: 3,
+        height: 16,
+        borderRadius: 999,
+        backgroundColor: colors.accent,
+      }} />
+      <Text style={{
+        flex: 1,
+        fontSize: 17,
+        lineHeight: 35,
+        fontWeight: '500',
+        color: colors.heading,
+      }}>
+        {label}
+      </Text>
+      <Text style={{ fontSize: 12, color: colors.textMuted }}>
+        {count} 条
+      </Text>
+      <AppIcon
+        name="chevron"
+        variant={expanded ? 'up' : 'down'}
+        size={16}
+        color={colors.chevron}
+      />
+    </TouchableOpacity>
+  );
+}
+
 function CardHeader({
   label,
   count,
@@ -386,6 +442,7 @@ export default function EventDetailScreen() {
   const [infoPhotos, setInfoPhotos] = useState<Photo[]>([]);
   const [sessions, setSessions] = useState<EventSession[]>([]);
   const [timetables, setTimetables] = useState<Record<string, EventTimetableEntry[]>>({});
+  const [timetableExpanded, setTimetableExpanded] = useState(false);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
   const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -395,6 +452,10 @@ export default function EventDetailScreen() {
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextLinkPressRef = useRef(false);
   const allArtistsMap = useMemo(() => new Map(allArtists.map(a => [a.id, a])), [allArtists]);
+  const timetableEntryCount = useMemo(
+    () => Object.values(timetables).reduce((total, entries) => total + entries.length, 0),
+    [timetables],
+  );
 
   useEffect(() => {
     return () => {
@@ -771,58 +832,80 @@ export default function EventDetailScreen() {
           );
         })()}
 
-        {sessions.some((session) => (timetables[session.id]?.length ?? 0) > 0) ? (
+        {timetableEntryCount > 0 ? (
           <>
-            <SectionTitle label="时间表" />
-            {sessions.flatMap((session, sessionIndex) => {
-              const entries = timetables[session.id] ?? [];
-              if (entries.length === 0) return [];
-              return [(
-                <Card cardBg={cardBg} key={session.id}>
-                  {sessions.length > 1 ? (
-                    <Text style={{ marginBottom: 10, fontSize: 15, fontWeight: '700', color: colors.text }}>
-                      {session.title || `场次 ${sessionIndex + 1}`} · {formatDate(session.session_date)}
-                    </Text>
-                  ) : null}
-                  {entries.map((entry, entryIndex) => {
-                    const artist = entry.artist_id ? allArtistsMap.get(entry.artist_id) : null;
-                    return (
-                      <TouchableOpacity
-                        key={entry.id}
-                        disabled={!artist}
-                        onPress={() => artist && router.push(`/artists/${artist.id}`)}
-                        activeOpacity={0.72}
-                        style={{
-                          flexDirection: 'row', gap: 12, paddingVertical: 9,
-                          borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
-                          borderBottomColor: colors.divider,
-                        }}
-                      >
-                        <Text style={{ width: 82, fontSize: 12.5, fontWeight: '600', color: colors.accent }}>
-                          {formatTimetableTime(entry.start_time, entry.end_time)}
-                        </Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
-                            {entry.title}
-                          </Text>
-                          {artist ? (
-                            <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }}>
-                              {getArtistPrimaryName(artist)}
+            <CollapsibleSectionTitle
+              label="时间表"
+              count={timetableEntryCount}
+              expanded={timetableExpanded}
+              onPress={() => setTimetableExpanded((current) => !current)}
+            />
+            {timetableExpanded ? sessions.flatMap((session, sessionIndex) => {
+                const entries = timetables[session.id] ?? [];
+                if (entries.length === 0) return [];
+                return [(
+                  <Card cardBg={cardBg} key={session.id}>
+                    {sessions.length > 1 ? (
+                      <Text style={{ marginBottom: 10, fontSize: 15, fontWeight: '700', color: colors.text }}>
+                        {session.title || `场次 ${sessionIndex + 1}`} · {formatDate(session.session_date)}
+                      </Text>
+                    ) : null}
+                    {entries.map((entry, entryIndex) => {
+                      const artist = entry.artist_id ? allArtistsMap.get(entry.artist_id) : null;
+                      return (
+                        <TouchableOpacity
+                          key={entry.id}
+                          disabled={!artist}
+                          onPress={() => artist && router.push(`/artists/${artist.id}`)}
+                          activeOpacity={0.72}
+                          style={{
+                            flexDirection: 'row', gap: 10, paddingVertical: 8,
+                            borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
+                            borderBottomColor: colors.divider,
+                          }}
+                        >
+                          <View style={{ width: TIMETABLE_TIME_COLUMN_WIDTH, flexShrink: 0, paddingTop: 4 }}>
+                            <Text
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.85}
+                              style={{
+                                fontSize: 14,
+                                lineHeight: 18,
+                                fontWeight: '700',
+                                fontVariant: ['tabular-nums'],
+                                color: colors.accent,
+                              }}
+                            >
+                              {formatTimetableTime(entry.start_time, entry.end_time)}
                             </Text>
-                          ) : null}
-                          {entry.notes ? (
-                            <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 18, color: colors.textMuted }}>
-                              {entry.notes}
-                            </Text>
-                          ) : null}
-                        </View>
-                        {artist ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </Card>
-              )];
-            })}
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                              {artist ? (
+                                <OshiAvatar
+                                  source={resolveAvatarSource(artist.avatar_uri)}
+                                  size={28}
+                                  isOshi={artist.id === oshiArtistId}
+                                />
+                              ) : null}
+                              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.text }}>
+                                {artist ? getArtistPrimaryName(artist) : entry.title}
+                              </Text>
+                            </View>
+                            {entry.notes ? (
+                              <Text numberOfLines={1} style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.textMuted }}>
+                                {entry.notes}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {artist ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </Card>
+                )];
+              }) : null}
           </>
         ) : null}
 

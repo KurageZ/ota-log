@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { EventForm } from '../EventForm';
 
@@ -68,9 +68,11 @@ describe('EventForm', () => {
       .findAllByType(Text)
       .map((node) => node.props.children)
       .flat(Infinity);
+    const inputPlaceholders = renderer.root
+      .findAllByType(TextInput)
+      .map((node) => node.props.placeholder);
 
     expect(textContent).toContain('时间表');
-    expect(textContent).toContain('条目 ');
-    expect(textContent).toContain('演出内容');
+    expect(inputPlaceholders).toEqual(expect.arrayContaining(['条目 1', '开始', '结束', '备注']));
   });
 });

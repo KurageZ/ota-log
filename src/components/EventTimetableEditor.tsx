@@ -6,7 +6,6 @@ import { formatTimeInput, isValidTime } from '../utils/date';
 import { generateId } from '../utils/uuid';
 import { useAppTheme } from '../theme/appTheme';
 import { AppIcon } from './AppIcon';
-import { FormFieldLabel } from './FormPrimitives';
 
 export interface EventTimetableEntryDraft {
   key: string;
@@ -60,12 +59,14 @@ function EditorInput({
   placeholder,
   multiline = false,
   numeric = false,
+  compact = false,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
   multiline?: boolean;
   numeric?: boolean;
+  compact?: boolean;
 }) {
   const { colors } = useAppTheme();
   return (
@@ -79,16 +80,16 @@ function EditorInput({
       multiline={multiline}
       textAlignVertical={multiline ? 'top' : 'center'}
       style={{
-        height: multiline ? undefined : 46,
-        minHeight: multiline ? 72 : undefined,
-        paddingHorizontal: 14,
-        paddingVertical: multiline ? 10 : 0,
+        height: compact ? 36 : (multiline ? undefined : 46),
+        minHeight: compact ? 36 : (multiline ? 72 : undefined),
+        paddingHorizontal: compact ? 10 : 14,
+        paddingVertical: compact ? 0 : (multiline ? 10 : 0),
         borderWidth: 1,
         borderColor: colors.inputBorder,
-        borderRadius: 12,
+        borderRadius: compact ? 10 : 12,
         backgroundColor: colors.input,
         color: colors.text,
-        fontSize: 15,
+        fontSize: compact ? 13.5 : 15,
       }}
     />
   );
@@ -99,12 +100,14 @@ function ReorderButton({
   icon,
   disabled = false,
   danger = false,
+  compact = false,
   onPress,
 }: {
   label: string;
   icon: 'chevron' | 'trash';
   disabled?: boolean;
   danger?: boolean;
+  compact?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useAppTheme();
@@ -115,9 +118,10 @@ function ReorderButton({
       disabled={disabled}
       onPress={onPress}
       activeOpacity={0.7}
+      hitSlop={compact ? 5 : undefined}
       style={{
-        width: 44,
-        height: 44,
+        width: compact ? 30 : 44,
+        height: compact ? 36 : 44,
         alignItems: 'center',
         justifyContent: 'center',
         opacity: disabled ? 0.3 : 1,
@@ -216,74 +220,72 @@ export function EventTimetableEditor({
         <View
           key={entry.key}
           style={{
-            marginTop: entryIndex === 0 ? 8 : 18,
-            paddingTop: entryIndex === 0 ? 0 : 14,
+            marginTop: entryIndex === 0 ? 8 : 12,
+            paddingTop: entryIndex === 0 ? 0 : 10,
             borderTopWidth: entryIndex === 0 ? 0 : 1,
             borderTopColor: colors.divider,
           }}
         >
-          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textMuted }}>
-              条目 {entryIndex + 1}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <EditorInput
+                value={entry.title}
+                onChangeText={(title) => updateEntry(entry.key, { title })}
+                placeholder={`条目 ${entryIndex + 1}`}
+                compact
+              />
+            </View>
+            <View style={{ width: 58 }}>
+              <EditorInput
+                value={entry.start_time}
+                onChangeText={(start_time) => updateEntry(entry.key, {
+                  start_time: formatTimeInput(start_time),
+                })}
+                placeholder="开始"
+                numeric
+                compact
+              />
+            </View>
+            <View style={{ width: 58 }}>
+              <EditorInput
+                value={entry.end_time}
+                onChangeText={(end_time) => updateEntry(entry.key, {
+                  end_time: formatTimeInput(end_time),
+                })}
+                placeholder="结束"
+                numeric
+                compact
+              />
+            </View>
             <ReorderButton
               label="上移时间表条目"
               icon="chevron"
+              compact
               disabled={entryIndex === 0}
               onPress={() => onChange(moveEntry(entries, entryIndex, -1))}
             />
             <ReorderButton
               label="下移时间表条目"
               icon="chevron"
+              compact
               disabled={entryIndex === entries.length - 1}
               onPress={() => onChange(moveEntry(entries, entryIndex, 1))}
             />
             <ReorderButton
               label="删除时间表条目"
               icon="trash"
+              compact
               danger
               onPress={() => onChange(entries.filter((item) => item.key !== entry.key))}
             />
           </View>
 
-          <FormFieldLabel required>演出内容</FormFieldLabel>
-          <EditorInput
-            value={entry.title}
-            onChangeText={(title) => updateEntry(entry.key, { title })}
-            placeholder="如：Opening、艺人 LIVE、终演后物贩"
-          />
-
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-            <View style={{ flex: 1 }}>
-              <FormFieldLabel>开始</FormFieldLabel>
-              <EditorInput
-                value={entry.start_time}
-                onChangeText={(start_time) => updateEntry(entry.key, {
-                  start_time: formatTimeInput(start_time),
-                })}
-                placeholder="HH:MM"
-                numeric
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <FormFieldLabel>结束</FormFieldLabel>
-              <EditorInput
-                value={entry.end_time}
-                onChangeText={(end_time) => updateEntry(entry.key, {
-                  end_time: formatTimeInput(end_time),
-                })}
-                placeholder="HH:MM"
-                numeric
-              />
-            </View>
-          </View>
-
-          <View style={{ marginTop: 12 }}>
-            <FormFieldLabel>关联出演者</FormFieldLabel>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 }}>
             {artists.length > 0 ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={{ flex: 1, minWidth: 0 }}
                 contentContainerStyle={{ gap: 8 }}
               >
                 {[null, ...artists].map((artist) => {
@@ -298,9 +300,9 @@ export function EventTimetableEditor({
                       activeOpacity={0.7}
                       onPress={() => updateEntry(entry.key, { artist_id: artistId })}
                       style={{
-                        minHeight: 44,
+                        minHeight: 32,
                         justifyContent: 'center',
-                        paddingHorizontal: 12,
+                        paddingHorizontal: 10,
                         borderRadius: 999,
                         borderWidth: 1,
                         borderColor: selected ? colors.accent : colors.inputBorder,
@@ -310,7 +312,7 @@ export function EventTimetableEditor({
                       }}
                     >
                       <Text style={{
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: selected ? '700' : '500',
                         color: selected ? colors.accent : colors.textSecondary,
                       }}>
@@ -321,20 +323,18 @@ export function EventTimetableEditor({
                 })}
               </ScrollView>
             ) : (
-              <Text style={{ fontSize: 12, lineHeight: 18, color: colors.textMuted }}>
+              <Text style={{ flex: 1, fontSize: 11.5, color: colors.textMuted }} numberOfLines={1}>
                 可先在「详细信息」中添加出演者
               </Text>
             )}
-          </View>
-
-          <View style={{ marginTop: 12 }}>
-            <FormFieldLabel>备注</FormFieldLabel>
-            <EditorInput
-              value={entry.notes}
-              onChangeText={(notes) => updateEntry(entry.key, { notes })}
-              placeholder="特典会时间或其他说明"
-              multiline
-            />
+            <View style={{ width: 124, flexShrink: 0 }}>
+              <EditorInput
+                value={entry.notes}
+                onChangeText={(notes) => updateEntry(entry.key, { notes })}
+                placeholder="备注"
+                compact
+              />
+            </View>
           </View>
         </View>
       ))}
