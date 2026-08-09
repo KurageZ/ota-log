@@ -122,7 +122,10 @@ export function BottomSheetDialog({
       enableDismissOnClose
       enablePanDownToClose={enablePanDownToClose}
       maxDynamicContentSize={snapPoints ? undefined : resolvedMaxDynamicContentSize}
-      bottomInset={insets.bottom}
+      // Let the sheet background extend through the system safe area. The
+      // content wrapper below owns the inset padding so the bottom never
+      // becomes a transparent strip.
+      bottomInset={0}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       enableBlurKeyboardOnGesture
@@ -147,13 +150,17 @@ export function BottomSheetDialog({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={contentContainerStyle}
         >
-          {header}
-          {children}
+          <View style={{ paddingBottom: insets.bottom }}>
+            {header}
+            {children}
+          </View>
         </BottomSheetScrollView>
       ) : (
         <BottomSheetView style={contentContainerStyle}>
-          {header}
-          {children}
+          <View style={{ paddingBottom: insets.bottom }}>
+            {header}
+            {children}
+          </View>
         </BottomSheetView>
       )}
     </BottomSheetModal>

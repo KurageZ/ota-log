@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { ColorValue, Platform } from 'react-native';
+import { getAppIconSFSymbol, type AppIconName } from './AppIcon';
 
 type NativeTextToolbarAction = {
   label: string;
@@ -8,6 +9,8 @@ type NativeTextToolbarAction = {
   disabled?: boolean;
   tintColor?: ColorValue;
   variant?: 'plain' | 'done' | 'prominent';
+  icon?: AppIconName;
+  separateBackground?: boolean;
 };
 
 export function NativeTextToolbar({
@@ -15,9 +18,11 @@ export function NativeTextToolbar({
   right,
 }: {
   left?: NativeTextToolbarAction;
-  right?: NativeTextToolbarAction;
+  right?: NativeTextToolbarAction | NativeTextToolbarAction[];
 }) {
   if (Platform.OS !== 'ios') return null;
+
+  const rightActions = right ? (Array.isArray(right) ? right : [right]) : [];
 
   return (
     <>
@@ -36,15 +41,20 @@ export function NativeTextToolbar({
       ) : null}
       {right ? (
         <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            accessibilityLabel={right.accessibilityLabel ?? right.label}
-            disabled={right.disabled}
-            onPress={right.onPress}
-            tintColor={right.tintColor}
-            variant={right.variant}
-          >
-            {right.label}
-          </Stack.Toolbar.Button>
+          {rightActions.map((action) => (
+            <Stack.Toolbar.Button
+              key={`${action.label}-${action.icon ?? 'text'}`}
+              accessibilityLabel={action.accessibilityLabel ?? action.label}
+              disabled={action.disabled}
+              icon={action.icon ? getAppIconSFSymbol(action.icon) : undefined}
+              onPress={action.onPress}
+              separateBackground={action.separateBackground}
+              tintColor={action.tintColor}
+              variant={action.variant}
+            >
+              {action.icon ? undefined : action.label}
+            </Stack.Toolbar.Button>
+          ))}
         </Stack.Toolbar>
       ) : null}
     </>

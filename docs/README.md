@@ -22,6 +22,7 @@
 
 - UI/UX 设计：`product/ui-ux.md`
 - 首页置顶信息功能设计：`product/home-pinned-info.md`
+- 活动详情分享功能设计：`product/event-sharing.md`
 - 活动数据结构设计：`data/activity-data-model-design.md`
 - 拍立得数据结构设计：`data/cheki-data-model-design.md`
 - 重要日期数据结构设计：`data/important-date-data-model.md`

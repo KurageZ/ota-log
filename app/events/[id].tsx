@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
-  Image, Modal, Linking, useWindowDimensions, Platform, Vibration,
+  Image, Modal, Linking, useWindowDimensions, Platform, Vibration, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Calendar from 'expo-calendar/legacy';
+import * as Sharing from 'expo-sharing';
+import { File } from 'expo-file-system';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useDB } from '../../src/context/DBContext';
 import {
   Event, Artist, Cheki, ChekiManualEntry, Photo, EventStatus,
-  EventSession, EventTimetableEntry,
+  EventSession, EventTimetableEntry, UserConfig,
 } from '../../src/types/models';
 import { formatDate, daysUntil } from '../../src/utils/date';
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
@@ -29,18 +31,28 @@ import {
   EventStatusChip,
   formatEventTimes,
 } from '../../src/components/EventPrimitives';
-import { showDeleteFailedAlert, showOperationFailedAlert } from '../../src/utils/failureAlert';
+import {
+  showDeleteFailedAlert,
+  showFailureAlert,
+  showOperationFailedAlert,
+} from '../../src/utils/failureAlert';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
 import { withAlpha } from '../../src/utils/color';
 import { AppIcon } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
+import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   addEventToSystemCalendar,
   buildEventSessionCalendarPayload,
 } from '../../src/utils/systemCalendar';
+import {
+  buildEventShareAction,
+  resolveEventShareSessions,
+} from '../../src/utils/eventShare';
+import { createEventSharePoster } from '../../src/features/event-share/create-event-share-poster';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
@@ -298,6 +310,7 @@ export default function EventDetailScreen() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
+  const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [chekiList, setChekiList] = useState<Cheki[]>([]);
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
@@ -312,7 +325,9 @@ export default function EventDetailScreen() {
   const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
+  const [shareMenuVisible, setShareMenuVisible] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const statusPillRef = useRef<View | null>(null);
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextLinkPressRef = useRef(false);
@@ -345,6 +360,10 @@ export default function EventDetailScreen() {
     [sessions, timetables],
   );
   const hasMultipleTimetables = timetableSessions.length > 1;
+  const simpleShareAction = useMemo(
+    () => event ? buildEventShareAction(event, sessions) : null,
+    [event, sessions],
+  );
 
   const toggleTimetableSession = useCallback((sessionId: string) => {
     setCollapsedTimetableSessionIds((current) => {
@@ -386,6 +405,7 @@ export default function EventDetailScreen() {
     setInfoPhotos(photos);
     setAllArtists(allArs);
     setOshiArtistId(config.oshi_artist_id);
+    setUserConfig(config);
     setSessions(loadedSessions);
     setTimetables(Object.fromEntries(
       loadedSessions.map((session, index) => [session.id, loadedTimetables[index]]),
@@ -463,6 +483,17 @@ export default function EventDetailScreen() {
     router.push({ pathname: '/cheki/new', params: { event_id: id, date: event?.event_date } });
   };
 
+  const showCopyToast = useCallback((message: string) => {
+    setCopyToastMessage(message);
+    if (copyToastTimerRef.current) {
+      clearTimeout(copyToastTimerRef.current);
+    }
+    copyToastTimerRef.current = setTimeout(() => {
+      setCopyToastMessage(null);
+      copyToastTimerRef.current = null;
+    }, TOAST_DURATION_MS);
+  }, []);
+
   const handleCopyEventUrl = useCallback(() => {
     if (!event?.url) return;
     suppressNextLinkPressRef.current = true;
@@ -470,15 +501,88 @@ export default function EventDetailScreen() {
     if (Platform.OS !== 'web') {
       Vibration.vibrate(10);
     }
-    setCopyToastVisible(true);
-    if (copyToastTimerRef.current) {
-      clearTimeout(copyToastTimerRef.current);
+    showCopyToast('活动链接已复制');
+  }, [event?.url, showCopyToast]);
+
+  const handleCopyEventShare = useCallback(() => {
+    if (!simpleShareAction || shareBusy) return;
+    Clipboard.setString(simpleShareAction.text);
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate(10);
     }
-    copyToastTimerRef.current = setTimeout(() => {
-      setCopyToastVisible(false);
-      copyToastTimerRef.current = null;
-    }, TOAST_DURATION_MS);
-  }, [event?.url]);
+    setShareMenuVisible(false);
+    showCopyToast(simpleShareAction.toastLabel);
+  }, [shareBusy, showCopyToast, simpleShareAction]);
+
+  const handleGenerateSharePoster = useCallback(async () => {
+    if (!event || shareBusy) return;
+    if (Platform.OS === 'web') {
+      showOperationFailedAlert(
+        'Web 端暂不支持生成活动分享图片。',
+        '请在 iPhone 或 Android 设备上打开这个活动后再试一次。',
+      );
+      return;
+    }
+
+    let posterUri: string | null = null;
+    setShareBusy(true);
+    try {
+      console.info('[DEBUG-event-share] share flow started', {
+        platform: Platform.OS,
+        sessionCount: sessions.length,
+        photoCount: infoPhotos.length,
+      });
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('当前设备不支持系统分享');
+      }
+      console.info('[DEBUG-event-share] system sharing is available');
+      const poster = await createEventSharePoster({
+        title: event.title,
+        sessions: resolveEventShareSessions(event, sessions),
+        photoUris: infoPhotos.map((photo) => photo.local_uri),
+        artists: prioritizedArtists.map((artist) => ({
+          name: getArtistPrimaryName(artist),
+          avatarUri: artist.avatar_uri,
+        })),
+        profile: {
+          name: userConfig?.name.trim() || 'Otaku',
+          avatarUri: userConfig?.avatar_uri ?? null,
+          avatarEmoji: userConfig?.avatar_emoji || '🎤',
+        },
+      });
+      posterUri = poster.uri;
+      console.info('[DEBUG-event-share] poster ready, opening system share', {
+        width: poster.width,
+        height: poster.height,
+      });
+      setShareMenuVisible(false);
+      await Sharing.shareAsync(poster.uri, {
+        dialogTitle: `分享${event.title}`,
+        mimeType: 'image/jpeg',
+        UTI: 'public.jpeg',
+      });
+      console.info('[DEBUG-event-share] system share closed');
+    } catch (error) {
+      console.error('[DEBUG-event-share] share flow failed', error);
+      showFailureAlert({
+        title: '分享失败',
+        reason: '无法生成或分享活动图片。',
+        nextStep: '请稍后重新尝试。',
+        details: error,
+      });
+    } finally {
+      if (posterUri) {
+        try {
+          new File(posterUri).delete();
+          console.info('[DEBUG-event-share] temporary poster deleted');
+        } catch {
+          console.warn('[DEBUG-event-share] temporary poster cleanup failed');
+          // Cache cleanup is best effort and must not hide the sharing result.
+        }
+      }
+      setShareBusy(false);
+    }
+  }, [event, infoPhotos, prioritizedArtists, sessions, shareBusy, userConfig]);
 
   const handleOpenEventUrl = useCallback(() => {
     if (!event?.url) return;
@@ -716,17 +820,46 @@ export default function EventDetailScreen() {
           headerShadowVisible: false,
           headerTintColor: colors.accent,
           headerRight: Platform.OS === 'ios' ? undefined : () => (
-            <TouchableOpacity onPress={() => router.push(`/events/${id}/edit`)} style={{ paddingRight: 4 }}>
-              <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>编辑</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="分享活动"
+                disabled={shareBusy}
+                onPress={() => setShareMenuVisible(true)}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: shareBusy ? 0.5 : 1 }}
+              >
+                {shareBusy
+                  ? <ActivityIndicator size="small" color={colors.accent} />
+                  : <AppIcon name="share" size={21} color={colors.accent} />}
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="编辑活动"
+                onPress={() => router.push(`/events/${id}/edit`)}
+                style={{ minWidth: 44, height: 44, paddingRight: 4, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>编辑</Text>
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
       <NativeTextToolbar
-        right={{
-          label: '编辑',
-          onPress: () => router.push(`/events/${id}/edit`),
-        }}
+        right={[
+          {
+            label: '分享',
+            accessibilityLabel: '分享活动',
+            icon: 'share',
+            disabled: shareBusy,
+            separateBackground: true,
+            onPress: () => setShareMenuVisible(true),
+          },
+          {
+            label: '编辑',
+            accessibilityLabel: '编辑活动',
+            onPress: () => router.push(`/events/${id}/edit`),
+          },
+        ]}
       />
 
       <ScrollView
@@ -1152,8 +1285,79 @@ export default function EventDetailScreen() {
         }}
       />
 
-      {copyToastVisible ? (
+      <BottomSheetDialog
+        visible={shareMenuVisible}
+        title="分享活动"
+        onClose={() => {
+          if (!shareBusy) setShareMenuVisible(false);
+        }}
+        enablePanDownToClose={!shareBusy}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}
+      >
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={simpleShareAction?.menuLabel}
+          disabled={shareBusy || !simpleShareAction}
+          activeOpacity={0.6}
+          onPress={handleCopyEventShare}
+          style={{
+            minHeight: 60,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.divider,
+            opacity: shareBusy ? 0.5 : 1,
+          }}
+        >
+          <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft }}>
+            <AppIcon name={event.url?.trim() ? 'link' : 'document'} size={18} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
+              {simpleShareAction?.menuLabel}
+            </Text>
+            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+              {event.url?.trim() ? '复制活动名称和演出链接' : '复制活动名称、时间和地点'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="生成分享图片"
+          accessibilityState={{ busy: shareBusy, disabled: shareBusy }}
+          disabled={shareBusy}
+          activeOpacity={0.6}
+          onPress={() => void handleGenerateSharePoster()}
+          style={{
+            minHeight: 66,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            opacity: shareBusy ? 0.72 : 1,
+          }}
+        >
+          <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft }}>
+            {shareBusy
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <AppIcon name="image" size={18} color={colors.accent} />}
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
+              {shareBusy ? '正在生成分享图片' : '生成分享图片'}
+            </Text>
+            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+              生成 5:3 竖版活动图片并打开系统分享
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </BottomSheetDialog>
+
+      {copyToastMessage ? (
         <View
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
           pointerEvents="none"
           style={{
             position: 'absolute',
@@ -1173,7 +1377,7 @@ export default function EventDetailScreen() {
             }}
           >
             <Text style={{ fontSize: 13, fontWeight: '600', color: colors.white }}>
-              链接已复制
+              {copyToastMessage}
             </Text>
           </View>
         </View>
