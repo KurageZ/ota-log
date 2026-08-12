@@ -1,4 +1,4 @@
-# ota-log
+# ota log
 
 本地优先的演出记录 App，面向日系 / 国内地下偶像、二次元 Live 等爱好者。
 
@@ -56,18 +56,70 @@ npm install
 
 安装完成后会自动执行 `postinstall`，对少量第三方依赖打补丁。
 
-### 2. 启动 Expo 开发服务
+### 2. 首次安装 Dev 版
+
+iOS 模拟器：
 
 ```sh
-npx expo start
+npm run ios:dev
 ```
 
-### 3. 运行到本地原生环境
+iOS 真机需要先通过 USB 连接并信任当前 Mac：
 
 ```sh
-npx expo run:ios
-npx expo run:android
+npm run ios:dev -- --device
 ```
+
+Android 需要先启动模拟器，或连接已开启 USB 调试的真机：
+
+```sh
+npm run android
+```
+
+这些命令安装的都是独立的 `ota log Dev`，不会覆盖 Preview 或正式版。
+
+### 3. 日常运行 Dev 版
+
+Dev 版安装完成后，如果只修改 JavaScript、TypeScript、页面或样式，不需要重新构建原生 App。启动 Metro：
+
+```sh
+npm run start:dev
+```
+
+然后在设备上打开 `ota log Dev`。设备和开发电脑通常需要处于同一局域网；局域网连接有问题时可以使用：
+
+```sh
+npm run start:dev -- --tunnel
+```
+
+安装或升级原生依赖、修改 Expo config plugin、权限、Bundle ID、App Group 或小组件后，需要重新运行对应的 iOS 或 Android 安装命令。
+
+## 应用版本与分发渠道
+
+项目使用三个可安装身份和四个 EAS Build profile：
+
+| Profile | App 名称 | Bundle ID / Package | 用途 | 是否依赖 Metro |
+| --- | --- | --- | --- | --- |
+| `development` | `ota log Dev` | `com.otalog.app.dev` | 日常开发与调试 | 是 |
+| `preview` | `ota log Preview` | `com.otalog.app.preview` | Ad Hoc / APK 内部测试 | 否 |
+| `beta` | `ota log` | `com.otalog.app` | TestFlight 发布候选版 | 否 |
+| `production` | `ota log` | `com.otalog.app` | App Store 正式发布 | 否 |
+
+`beta` 和 `production` 共用正式应用身份，以便 TestFlight 真实验证签名、小组件、数据迁移和覆盖升级。它们不能同时安装；Dev、Preview 和正式身份可以同时安装，且各自拥有独立的数据沙盒。
+
+构建不依赖 Metro 的 Preview 包：
+
+```sh
+# EAS 云端构建
+npx eas-cli@latest build --platform ios --profile preview
+npx eas-cli@latest build --platform android --profile preview
+
+# 在本机执行 EAS 构建流程
+npx eas-cli@latest build --platform ios --profile preview --local
+npx eas-cli@latest build --platform android --profile preview --local
+```
+
+iOS Preview 使用 Ad Hoc provisioning profile，只能安装到其中已登记 UDID 的设备；Android Preview 产物为可直接安装的 APK。完整发版步骤见 [docs/workflows/release.md](docs/workflows/release.md)。
 
 ## 关于 `ios/` 和 `android/`
 
