@@ -429,6 +429,16 @@ function matchesDate(record: { date: string | null; created_at: string }, date?:
   return (record.date ?? record.created_at).slice(0, 10) === date;
 }
 
+function matchesDateRange(
+  record: { date: string | null; created_at: string },
+  startDate?: string,
+  endDate?: string,
+): boolean {
+  if (!startDate || !endDate) return true;
+  const effective = (record.date ?? record.created_at).slice(0, 10);
+  return effective >= startDate && effective <= endDate;
+}
+
 function parseArtistIdsParam(value: string | string[] | undefined): string[] {
   const rawValues = Array.isArray(value) ? value : value ? [value] : [];
   return [...new Set(rawValues
@@ -778,6 +788,8 @@ export default function ChekiLibraryScreen() {
     year: yearParam,
     month: monthParam,
     date: dateParam,
+    startDate: startDateParam,
+    endDate: endDateParam,
     scope: scopeParamRaw,
   } = useLocalSearchParams<{
     artist_id?: string | string[];
@@ -785,6 +797,8 @@ export default function ChekiLibraryScreen() {
     year?: string;
     month?: string;
     date?: string;
+    startDate?: string;
+    endDate?: string;
     scope?: string;
   }>();
   const db = useDB();
@@ -799,6 +813,8 @@ export default function ChekiLibraryScreen() {
   const filterYear = yearParam ? Number(yearParam) : undefined;
   const filterMonth = monthParam ? Number(monthParam) : undefined;
   const filterDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
+  const filterStartDate = startDateParam && /^\d{4}-\d{2}-\d{2}$/.test(startDateParam) ? startDateParam : undefined;
+  const filterEndDate = endDateParam && /^\d{4}-\d{2}-\d{2}$/.test(endDateParam) ? endDateParam : undefined;
   const scopeParam = scopeParamRaw === 'favorite' || scopeParamRaw === 'oshi' ? scopeParamRaw : undefined;
   const selectedArtistIds = useMemo(() => parseArtistIdsParam(filterArtistParam), [filterArtistParam]);
 
@@ -930,6 +946,7 @@ export default function ChekiLibraryScreen() {
       if (!matchesArtist(cheki.artist_id)) return false;
       if (filterEventId && cheki.event_id !== filterEventId) return false;
       if (!matchesDate(cheki, filterDate)) return false;
+      if (!matchesDateRange(cheki, filterStartDate, filterEndDate)) return false;
       if (!matchesPeriod(cheki, filterYear, filterMonth)) return false;
       if (!matchesChekiKeyword(cheki, keyword, artistMap)) return false;
       if (!matchesScope(cheki.artist_id)) return false;
@@ -947,6 +964,8 @@ export default function ChekiLibraryScreen() {
       matchesArtist,
       filterEventId,
       filterDate,
+      filterStartDate,
+      filterEndDate,
       filterYear,
       filterMonth,
       keyword,
@@ -963,6 +982,7 @@ export default function ChekiLibraryScreen() {
       if (!matchesArtist(entry.artist_id)) return false;
       if (filterEventId && entry.event_id !== filterEventId) return false;
       if (!matchesDate(entry, filterDate)) return false;
+      if (!matchesDateRange(entry, filterStartDate, filterEndDate)) return false;
       if (!matchesPeriod(entry, filterYear, filterMonth)) return false;
       if (!matchesChekiKeyword(entry, keyword, artistMap)) return false;
       if (!matchesScope(entry.artist_id)) return false;
@@ -979,6 +999,8 @@ export default function ChekiLibraryScreen() {
       matchesArtist,
       filterEventId,
       filterDate,
+      filterStartDate,
+      filterEndDate,
       filterYear,
       filterMonth,
       keyword,
@@ -1001,6 +1023,7 @@ export default function ChekiLibraryScreen() {
       if (!matchesArtist(record.artist_id)) return false;
       if (filterEventId && record.event_id !== filterEventId) return false;
       if (!matchesDate(record, filterDate)) return false;
+      if (!matchesDateRange(record, filterStartDate, filterEndDate)) return false;
       if (!matchesPeriod(record, filterYear, filterMonth)) return false;
       if (!matchesScope(record.artist_id)) return false;
       if (eventLinkFilter === 'linked' && !record.event_id) return false;
@@ -1033,6 +1056,8 @@ export default function ChekiLibraryScreen() {
       matchesArtist,
       filterEventId,
       filterDate,
+      filterStartDate,
+      filterEndDate,
       filterYear,
       filterMonth,
       matchesScope,

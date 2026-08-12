@@ -260,6 +260,8 @@ export default function EventsIndexScreen() {
     artist_id?: string | string[];
     year?: string;
     month?: string;
+    startDate?: string;
+    endDate?: string;
     min_score?: string;
     scope?: string;
   }>();
@@ -280,6 +282,8 @@ export default function EventsIndexScreen() {
 
   const yearNum = params.year ? Number(params.year) : undefined;
   const monthNum = params.month ? Number(params.month) : undefined;
+  const startDate = params.startDate && /^\d{4}-\d{2}-\d{2}$/.test(params.startDate) ? params.startDate : undefined;
+  const endDate = params.endDate && /^\d{4}-\d{2}-\d{2}$/.test(params.endDate) ? params.endDate : undefined;
   const statusParam = params.status as EventStatus | undefined;
   const minScoreNum = params.min_score ? Number(params.min_score) : undefined;
   const scopeParam = params.scope === 'favorite' || params.scope === 'oshi' ? params.scope : undefined;
@@ -287,7 +291,7 @@ export default function EventsIndexScreen() {
   const artistMap = useMemo(() => new Map(artists.map((artist) => [artist.id, artist])), [artists]);
   const hasRepositoryFilter = Boolean(
     params.city || params.venue || params.status || selectedArtistIds.length > 0 ||
-    yearNum || minScoreNum || scopeParam || debouncedKeyword.trim()
+    yearNum || (startDate && endDate) || minScoreNum || scopeParam || debouncedKeyword.trim()
   );
 
   const loadData = useCallback(async () => {
@@ -300,6 +304,8 @@ export default function EventsIndexScreen() {
         artistIds: selectedArtistIds,
         year: yearNum,
         month: monthNum,
+        startDate,
+        endDate,
         minScore: minScoreNum,
         artistScope: scopeParam,
       };
@@ -309,7 +315,7 @@ export default function EventsIndexScreen() {
       const all = await db.events.findAll();
       setEvents(all);
     }
-  }, [db, hasRepositoryFilter, debouncedKeyword, minScoreNum, monthNum, params.city, params.venue, scopeParam, selectedArtistIds, statusParam, yearNum]);
+  }, [db, hasRepositoryFilter, debouncedKeyword, endDate, minScoreNum, monthNum, params.city, params.venue, scopeParam, selectedArtistIds, startDate, statusParam, yearNum]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
   useFocusEffect(useCallback(() => {

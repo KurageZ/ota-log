@@ -23,6 +23,8 @@ export interface EventFilter {
   artistIds?: string[];
   year?: number;
   month?: number;
+  startDate?: string;
+  endDate?: string;
   /** 仅保留评分 >= 该值的活动（1-5，仅 completed 会有评分） */
   minScore?: number;
   /** 出演者范围：favorite=任一出演者为收藏；oshi=出演者含单推 */
@@ -83,7 +85,16 @@ export interface EventArtistRankingItem {
   count: number;
 }
 
-function eventPeriodClause(year?: number, month?: number, column = 'event_date') {
+function eventPeriodClause(
+  year?: number,
+  month?: number,
+  column = 'event_date',
+  startDate?: string,
+  endDate?: string,
+) {
+  if (startDate && endDate) {
+    return { sql: ` AND ${column} >= ? AND ${column} <= ?`, params: [startDate, endDate] };
+  }
   if (year == null) return { sql: '', params: [] as string[] };
   return {
     sql: ` AND ${column} LIKE ? || '-%'`,
@@ -326,9 +337,11 @@ export class EventRepository {
   async groupRootArtistsByCompletedEvents(
     year?: number,
     month?: number,
-    limit?: number
+    limit?: number,
+    startDate?: string,
+    endDate?: string,
   ): Promise<EventArtistRankingItem[]> {
-    const period = eventPeriodClause(year, month, 'e.event_date');
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const rows = await this.db.getAllAsync<RootArtistEventCountRow>(
       `SELECT
          a.id AS artist_id,
@@ -355,8 +368,8 @@ export class EventRepository {
     }));
   }
 
-  async getYearStatusCounts(year?: number, month?: number): Promise<{ completed: number; planned: number; wishlist: number }> {
-    const period = eventPeriodClause(year, month);
+  async getYearStatusCounts(year?: number, month?: number, startDate?: string, endDate?: string): Promise<{ completed: number; planned: number; wishlist: number }> {
+    const period = eventPeriodClause(year, month, 'event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<YearStatusCountsRow>(
       `SELECT
          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
@@ -390,8 +403,20 @@ export class EventRepository {
     });
   }
 
-  async findTopCityByYear(year?: number, month?: number): Promise<{ name: string; count: number } | null> {
-    const period = eventPeriodClause(year, month);
+  async getDailyCountsByRange(startDate: string, endDate: string): Promise<Array<{ date: string; count: number }>> {
+    return this.db.getAllAsync<{ date: string; count: number }>(
+      `SELECT event_date AS date, COUNT(*) AS count
+       FROM event_first_summaries
+       WHERE event_date >= ? AND event_date <= ?
+         AND status IN ('completed', 'planned', 'wishlist')
+       GROUP BY event_date
+       ORDER BY event_date`,
+      [startDate, endDate],
+    );
+  }
+
+  async findTopCityByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<{ name: string; count: number } | null> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<LabelCountRow>(
       `SELECT s.city AS label, COUNT(DISTINCT s.event_id) AS count
        FROM event_sessions s
@@ -409,8 +434,8 @@ export class EventRepository {
     return row ? { name: row.label, count: row.count } : null;
   }
 
-  async findTopVenueByYear(year?: number, month?: number): Promise<{ name: string; count: number } | null> {
-    const period = eventPeriodClause(year, month);
+  async findTopVenueByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<{ name: string; count: number } | null> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<LabelCountRow>(
       `SELECT s.venue AS label, COUNT(DISTINCT s.event_id) AS count
        FROM event_sessions s
@@ -428,8 +453,8 @@ export class EventRepository {
     return row ? { name: row.label, count: row.count } : null;
   }
 
-  async findPerfectEventsByYear(year?: number, month?: number, limit = 5): Promise<Event[]> {
-    const period = eventPeriodClause(year, month);
+  async findPerfectEventsByYear(year?: number, month?: number, limit = 5, startDate?: string, endDate?: string): Promise<Event[]> {
+    const period = eventPeriodClause(year, month, 'event_date', startDate, endDate);
     return this.db.getAllAsync<Event>(
       `SELECT *
        FROM event_first_summaries
@@ -442,8 +467,8 @@ export class EventRepository {
     );
   }
 
-  async countCompletedByArtistYear(year: number | undefined, artistId: string, month?: number): Promise<number> {
-    const period = eventPeriodClause(year, month, 'e.event_date');
+  async countCompletedByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<OshiArtistCountRow>(
       `${ARTIST_LINEAGE_CTE}
        SELECT COUNT(DISTINCT e.id) AS count
@@ -457,8 +482,8 @@ export class EventRepository {
     return row?.count ?? 0;
   }
 
-  async findRecentCompletedByArtistYear(year: number | undefined, artistId: string, month?: number): Promise<Event | null> {
-    const period = eventPeriodClause(year, month, 'e.event_date');
+  async findRecentCompletedByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<Event | null> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     return this.db.getFirstAsync<Event>(
       `${ARTIST_LINEAGE_CTE}
        SELECT DISTINCT e.*
@@ -506,8 +531,27 @@ export class EventRepository {
     });
   }
 
-  async sumCompletedTicketPriceByYear(year?: number, month?: number): Promise<number> {
-    const period = eventPeriodClause(year, month);
+  async getDailyCompletedCountsByArtistRange(
+    startDate: string,
+    endDate: string,
+    artistId: string,
+  ): Promise<Array<{ date: string; count: number }>> {
+    return this.db.getAllAsync<{ date: string; count: number }>(
+      `${ARTIST_LINEAGE_CTE}
+       SELECT e.event_date AS date, COUNT(DISTINCT e.id) AS count
+       FROM event_first_summaries e
+       JOIN event_artists ea ON ea.event_id = e.id
+       WHERE e.status = 'completed'
+         AND e.event_date >= ? AND e.event_date <= ?
+         AND ea.artist_id IN (SELECT aid FROM artist_lineage)
+       GROUP BY e.event_date
+       ORDER BY e.event_date`,
+      [artistId, startDate, endDate],
+    );
+  }
+
+  async sumCompletedTicketPriceByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = eventPeriodClause(year, month, 'event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<{ total: number }>(
       `SELECT COALESCE(SUM(actual_expense), 0) AS total
        FROM event_first_summaries
@@ -520,9 +564,11 @@ export class EventRepository {
   async findTopSpendCompletedByYear(
     year?: number,
     month?: number,
-    limit = 5
+    limit = 5,
+    startDate?: string,
+    endDate?: string,
   ): Promise<Array<{ event: Event; ticketTotal: number; chekiTotal: number; totalSpend: number }>> {
-    const period = eventPeriodClause(year, month, 'e.event_date');
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const rows = await this.db.getAllAsync<EventSpendRow>(
       `SELECT
          e.*,
@@ -576,8 +622,8 @@ export class EventRepository {
     }));
   }
 
-  async getAverageCompletedSpendByYear(year?: number, month?: number): Promise<number> {
-    const period = eventPeriodClause(year, month, 'e.event_date');
+  async getAverageCompletedSpendByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<{ average: number }>(
       `SELECT COALESCE(AVG(ticket_total + cheki_total), 0) AS average
        FROM (
@@ -712,6 +758,14 @@ export class EventRepository {
           AND period_event.event_date LIKE ? || '-%'
       )`);
       params.push(eventDateLikeParam(filter.year, filter.month));
+    } else if (filter.startDate && filter.endDate) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM event_first_summaries period_event
+        WHERE period_event.id = e.id
+          AND period_event.event_date >= ?
+          AND period_event.event_date <= ?
+      )`);
+      params.push(filter.startDate, filter.endDate);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

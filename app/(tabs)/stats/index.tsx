@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import SegmentedControl from '@expo/ui/community/segmented-control';
 import {
   AndroidCompactTabHeader,
   AndroidLargeTabTitle,
@@ -11,7 +12,10 @@ import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { AppIcon } from '../../../src/components/AppIcon';
-import { BottomSheetDialog } from '../../../src/components/BottomSheetDialog';
+import {
+  StatsRangePicker,
+  type StatsRangePickerMode,
+} from '../../../src/components/StatsRangePicker';
 import { useDB } from '../../../src/context/DBContext';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { Artist, Event, UserConfig } from '../../../src/types/models';
@@ -27,14 +31,26 @@ import {
   loadStatsPreferences,
 } from '../../../src/utils/statsPreferences';
 import { createStatsLoadPlan } from '../../../src/utils/statsLoadPlan';
+import {
+  buildStatsTrendBuckets,
+  createPresetStatsRange,
+  formatStatsDateRange,
+  formatStatsPeriodLabel,
+  getTrendLabelIndices,
+  parseStatsRangeParams,
+  shiftStatsDateRange,
+  type StatsDateRange,
+  type StatsPeriodPreset,
+} from '../../../src/utils/statsDateRange';
+import { statsRangeSession } from '../../../src/utils/statsRangeSession';
 
-const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 const EVENT_RANKING_LIMIT = 10;
-
-interface Period {
-  year: number | null;
-  month: number | null;
-}
+const PERIOD_PRESETS: Array<{ preset: StatsPeriodPreset; label: string }> = [
+  { preset: 'week', label: '周' },
+  { preset: 'month', label: '月' },
+  { preset: 'year', label: '年' },
+  { preset: 'custom', label: '自定义' },
+];
 
 interface LabelCount {
   name: string;
@@ -98,29 +114,6 @@ function createEmptyStatsState(): StatsState {
     chekiArtistRanking: [],
     monthlyChekiCounts: Array(12).fill(0),
   };
-}
-
-function getSingleParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function parseRoutePeriod(
-  yearParam: string | string[] | undefined,
-  monthParam: string | string[] | undefined,
-): Period | null {
-  const yearValue = getSingleParam(yearParam);
-  if (!yearValue) return null;
-
-  const year = Number(yearValue);
-  if (!Number.isInteger(year) || year < 1900) return null;
-
-  const monthValue = getSingleParam(monthParam);
-  if (!monthValue) return { year, month: null };
-
-  const month = Number(monthValue);
-  if (!Number.isInteger(month) || month < 1 || month > 12) return { year, month: null };
-
-  return { year, month };
 }
 
 function SectionHeader({
@@ -220,175 +213,64 @@ function SurfaceCard({
   );
 }
 
-function MonthlyBarChart({
+function TrendBarChart({
   counts,
+  labels,
   colors,
   activeColor,
-  highlightIndex,
 }: {
   counts: number[];
+  labels: string[];
   colors: ReturnType<typeof useAppTheme>['colors'];
   activeColor?: string;
-  highlightIndex?: number;
 }) {
   const maxCount = Math.max(...counts, 1);
   const barColor = activeColor ?? colors.accent;
-  const hasHighlight = highlightIndex != null;
+  const visibleLabelIndices = getTrendLabelIndices(labels.length);
+  const dense = counts.length > 12;
 
   return (
     <>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 88, gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: dense ? 68 : 88, gap: dense ? 1 : 4 }}>
         {counts.map((count, index) => {
           const pct = count / maxCount;
-          const dimmed = hasHighlight && index !== highlightIndex;
           return (
-            <View key={index} style={{ flex: 1, alignItems: 'center', opacity: dimmed ? 0.32 : 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: count > 0 ? colors.textSecondary : colors.textMuted, marginBottom: 6 }}>
-                {count}
-              </Text>
+            <View key={index} style={{ flex: 1, alignItems: 'center', minWidth: 6 }}>
+              {!dense ? (
+                <Text style={{ fontSize: 10, fontWeight: '700', color: count > 0 ? colors.textSecondary : colors.textMuted, marginBottom: 6 }}>
+                  {count > 0 ? count : ''}
+                </Text>
+              ) : null}
               <View
                 style={{
-                  width: '100%',
-                  height: Math.max(6, pct * 60),
-                  borderRadius: 4,
+                  width: dense ? '62%' : '100%',
+                  maxWidth: dense ? 12 : undefined,
+                  height: count > 0 ? Math.max(dense ? 4 : 6, pct * 60) : dense ? 2 : 6,
+                  borderRadius: count > 0 ? (dense ? 3 : 4) : 1,
                   backgroundColor: count > 0 ? barColor : colors.inputBorder,
+                  opacity: count > 0 || !dense ? 1 : 0.45,
                 }}
               />
             </View>
           );
         })}
       </View>
-      <View style={{ flexDirection: 'row', marginTop: 8, gap: 4 }}>
-        {MONTHS.map((month, index) => (
+      <View style={{ flexDirection: 'row', marginTop: 8, gap: dense ? 1 : 4 }}>
+        {labels.map((label, index) => (
           <View key={index} style={{ flex: 1, alignItems: 'center' }}>
             <Text
               style={{
                 fontSize: 8,
-                fontWeight: hasHighlight && index === highlightIndex ? '900' : '400',
-                color: hasHighlight && index === highlightIndex ? colors.accent : colors.textMuted,
+                fontWeight: '500',
+                color: colors.textMuted,
               }}
             >
-              {month.replace('月', '')}
+              {visibleLabelIndices.has(index) ? label.replace('月', '') : ''}
             </Text>
           </View>
         ))}
       </View>
     </>
-  );
-}
-
-function PeriodPickerModal({
-  visible,
-  period,
-  colors,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  period: Period;
-  colors: ReturnType<typeof useAppTheme>['colors'];
-  onClose: () => void;
-  onSelect: (next: Period) => void;
-}) {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const [draftYear, setDraftYear] = useState(period.year ?? currentYear);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftYear(period.year ?? currentYear);
-    }
-  }, [visible, period.year]);
-
-  const isAllTimeSelected = period.year == null;
-  const isWholeYearSelected = period.year === draftYear && period.month == null;
-
-  return (
-    <BottomSheetDialog
-      visible={visible}
-      title="选择时间"
-      onClose={onClose}
-      maxHeightRatio={0.58}
-      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 }}
-    >
-      <TouchableOpacity
-        onPress={() => onSelect({ year: null, month: null })}
-        style={{
-          paddingVertical: 12,
-          borderRadius: 12,
-          alignItems: 'center',
-          marginBottom: 14,
-          backgroundColor: isAllTimeSelected ? colors.accent : colors.card,
-        }}
-      >
-        <Text style={{ fontSize: 15, fontWeight: '800', color: isAllTimeSelected ? colors.onAccent : colors.text }}>
-          所有时间
-        </Text>
-      </TouchableOpacity>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 20 }}>
-        <TouchableOpacity
-          onPress={() => setDraftYear((v) => v - 1)}
-          style={{ padding: 8, borderRadius: 10, backgroundColor: colors.card }}
-        >
-          <Text style={{ fontSize: 18, color: colors.accent, fontWeight: '700' }}>‹</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 20, fontWeight: '900', color: colors.heading, minWidth: 72, textAlign: 'center' }}>
-          {draftYear}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setDraftYear((v) => v + 1)}
-          disabled={draftYear >= currentYear}
-          style={{ padding: 8, borderRadius: 10, backgroundColor: colors.card, opacity: draftYear >= currentYear ? 0.4 : 1 }}
-        >
-          <Text style={{ fontSize: 18, color: colors.accent, fontWeight: '700' }}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        onPress={() => onSelect({ year: draftYear, month: null })}
-        style={{
-          paddingVertical: 12,
-          borderRadius: 12,
-          alignItems: 'center',
-          marginBottom: 14,
-          backgroundColor: isWholeYearSelected ? colors.accent : colors.card,
-        }}
-      >
-        <Text style={{ fontSize: 15, fontWeight: '800', color: isWholeYearSelected ? colors.onAccent : colors.text }}>
-          全年
-        </Text>
-      </TouchableOpacity>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {MONTHS.map((label, index) => {
-          const month = index + 1;
-          const disabled = draftYear > currentYear || (draftYear === currentYear && month > currentMonth);
-          const selected = period.year === draftYear && period.month === month;
-          return (
-            <TouchableOpacity
-              key={month}
-              disabled={disabled}
-              onPress={() => onSelect({ year: draftYear, month })}
-              style={{
-                width: '22%',
-                flexGrow: 1,
-                paddingVertical: 12,
-                borderRadius: 12,
-                alignItems: 'center',
-                backgroundColor: selected ? colors.accent : colors.card,
-                opacity: disabled ? 0.32 : 1,
-              }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </BottomSheetDialog>
   );
 }
 
@@ -451,6 +333,16 @@ function sumCounts(counts: number[]): number {
   return counts.reduce((total, count) => total + count, 0);
 }
 
+function aggregateTrendCounts(
+  rows: Array<{ date: string; count: number }>,
+  buckets: ReturnType<typeof buildStatsTrendBuckets>,
+): number[] {
+  return buckets.map((bucket) => rows.reduce(
+    (total, row) => row.date >= bucket.startDate && row.date <= bucket.endDate ? total + row.count : total,
+    0,
+  ));
+}
+
 export default function StatsScreen() {
   const db = useDB();
   const { colors, isDark } = useAppTheme();
@@ -459,33 +351,38 @@ export default function StatsScreen() {
   const androidHeader = useAndroidCollapsibleTabHeader();
   const iosTabBarScroll = useFloatingTabBarScroll();
   const router = useRouter();
-  const params = useLocalSearchParams<{ year?: string; month?: string }>();
-  const currentYear = new Date().getFullYear();
+  const params = useLocalSearchParams<{
+    preset?: string;
+    startDate?: string;
+    endDate?: string;
+    year?: string;
+    month?: string;
+  }>();
   const routePeriod = useMemo(
-    () => parseRoutePeriod(params.year, params.month),
-    [params.year, params.month]
+    () => parseStatsRangeParams(params),
+    [params.endDate, params.month, params.preset, params.startDate, params.year]
   );
-  const [period, setPeriod] = useState<Period>(
-    () => routePeriod ?? { year: currentYear, month: null }
+  const [period, setPeriod] = useState<StatsDateRange>(
+    () => routePeriod ?? statsRangeSession.getCurrent() ?? createPresetStatsRange('month')
   );
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerMode, setPickerMode] = useState<StatsRangePickerMode | null>(null);
   const [stats, setStats] = useState<StatsState | null>(null);
   const [statsSections, setStatsSections] = useState<StatsSectionConfig[] | null>(null);
   const loadRequestIdRef = useRef(0);
 
-  const { year, month } = period;
-  const yearArg = year ?? undefined;
-  const monthArg = month ?? undefined;
+  const startDateArg = period.startDate ?? undefined;
+  const endDateArg = period.endDate ?? undefined;
+  const trendBuckets = useMemo(() => buildStatsTrendBuckets(period), [period]);
   const routePeriodPending = routePeriod != null && (
-    period.year !== routePeriod.year || period.month !== routePeriod.month
+    period.preset !== routePeriod.preset
+    || period.startDate !== routePeriod.startDate
+    || period.endDate !== routePeriod.endDate
   );
 
   const tabBarScroll = isAndroid ? androidHeader.scrollProps : iosTabBarScroll;
 
   const loadData = useCallback(async () => {
     const requestId = ++loadRequestIdRef.current;
-    setStats(null);
-
     try {
       const preferences = await loadStatsPreferences();
       const {
@@ -517,27 +414,27 @@ export default function StatsScreen() {
         rootArtistEventRanking,
       ] = await Promise.all([
         needsStatusCounts
-          ? db.events.getYearStatusCounts(yearArg, monthArg)
+          ? db.events.getYearStatusCounts(undefined, undefined, startDateArg, endDateArg)
           : Promise.resolve(empty.statusCounts),
-        needsActivity && year != null
-          ? db.events.getMonthlyCountsByYear(year)
+        needsActivity && startDateArg && endDateArg
+          ? db.events.getDailyCountsByRange(startDateArg, endDateArg).then((rows) => aggregateTrendCounts(rows, trendBuckets))
           : Promise.resolve(empty.monthlyEventCounts),
-        needsActivity ? db.events.findTopCityByYear(yearArg, monthArg) : Promise.resolve(null),
-        needsActivity ? db.events.findTopVenueByYear(yearArg, monthArg) : Promise.resolve(null),
-        needsPerfectEvents ? db.events.findPerfectEventsByYear(yearArg, monthArg) : Promise.resolve([]),
+        needsActivity ? db.events.findTopCityByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
+        needsActivity ? db.events.findTopVenueByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
+        needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
         needsOshi ? db.userConfig.getConfig() : Promise.resolve(null),
-        needsChekiCount ? db.cheki.countByYear(yearArg, monthArg) : Promise.resolve(0),
-        needsCheki ? db.cheki.countDistinctArtistsByYear(yearArg, monthArg) : Promise.resolve(0),
-        needsCheki && year != null
-          ? db.cheki.getMonthlyCountsByYear(year)
+        needsChekiCount ? db.cheki.countByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
+        needsCheki ? db.cheki.countDistinctArtistsByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
+        needsCheki && startDateArg && endDateArg
+          ? db.cheki.getDailyCountsByRange(startDateArg, endDateArg).then((rows) => aggregateTrendCounts(rows, trendBuckets))
           : Promise.resolve(empty.monthlyChekiCounts),
-        needsCheki ? db.cheki.groupByArtistYear(yearArg, monthArg) : Promise.resolve([]),
-        needsSpending ? db.cheki.sumPriceByYear(yearArg, monthArg) : Promise.resolve(0),
-        needsSpending ? db.events.sumCompletedTicketPriceByYear(yearArg, monthArg) : Promise.resolve(0),
-        needsSpending ? db.events.getAverageCompletedSpendByYear(yearArg, monthArg) : Promise.resolve(0),
-        needsSpending ? db.events.findTopSpendCompletedByYear(yearArg, monthArg) : Promise.resolve([]),
+        needsCheki ? db.cheki.groupByArtistYear(undefined, undefined, undefined, startDateArg, endDateArg) : Promise.resolve([]),
+        needsSpending ? db.cheki.sumPriceByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
+        needsSpending ? db.events.sumCompletedTicketPriceByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
+        needsSpending ? db.events.getAverageCompletedSpendByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
+        needsSpending ? db.events.findTopSpendCompletedByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
         needsActivity
-          ? db.events.groupRootArtistsByCompletedEvents(yearArg, monthArg, EVENT_RANKING_LIMIT)
+          ? db.events.groupRootArtistsByCompletedEvents(undefined, undefined, EVENT_RANKING_LIMIT, startDateArg, endDateArg)
           : Promise.resolve([]),
       ]);
 
@@ -551,15 +448,17 @@ export default function StatsScreen() {
       ] = needsOshi && userConfig?.oshi_artist_id
           ? await Promise.all([
             db.artists.findById(userConfig.oshi_artist_id),
-            db.events.countCompletedByArtistYear(yearArg, userConfig.oshi_artist_id, monthArg),
-            db.events.findRecentCompletedByArtistYear(yearArg, userConfig.oshi_artist_id, monthArg),
-            db.cheki.countByArtistYear(yearArg, userConfig.oshi_artist_id, monthArg),
-            year == null
+            db.events.countCompletedByArtistYear(undefined, userConfig.oshi_artist_id, undefined, startDateArg, endDateArg),
+            db.events.findRecentCompletedByArtistYear(undefined, userConfig.oshi_artist_id, undefined, startDateArg, endDateArg),
+            db.cheki.countByArtistYear(undefined, userConfig.oshi_artist_id, undefined, startDateArg, endDateArg),
+            !startDateArg || !endDateArg
               ? Promise.resolve(Array(12).fill(0))
-              : db.events.getMonthlyCompletedCountsByArtistYear(year, userConfig.oshi_artist_id),
-            year == null
+              : db.events.getDailyCompletedCountsByArtistRange(startDateArg, endDateArg, userConfig.oshi_artist_id)
+                .then((rows) => aggregateTrendCounts(rows, trendBuckets)),
+            !startDateArg || !endDateArg
               ? Promise.resolve(Array(12).fill(0))
-              : db.cheki.getMonthlyCountsByArtistYear(year, userConfig.oshi_artist_id),
+              : db.cheki.getDailyCountsByArtistRange(startDateArg, endDateArg, userConfig.oshi_artist_id)
+                .then((rows) => aggregateTrendCounts(rows, trendBuckets)),
           ])
           : [null, 0, null, 0, Array(12).fill(0), Array(12).fill(0)];
 
@@ -601,13 +500,16 @@ export default function StatsScreen() {
         error,
       );
     }
-  }, [db, year, yearArg, monthArg]);
+  }, [db, endDateArg, startDateArg, trendBuckets]);
 
   useEffect(() => {
     if (!routePeriod) return;
+    statsRangeSession.rememberCustom(routePeriod);
 
     setPeriod((current) => (
-      current.year === routePeriod.year && current.month === routePeriod.month
+      current.preset === routePeriod.preset
+        && current.startDate === routePeriod.startDate
+        && current.endDate === routePeriod.endDate
         ? current
         : routePeriod
     ));
@@ -617,31 +519,6 @@ export default function StatsScreen() {
     if (routePeriodPending) return;
     loadData();
   }, [loadData, routePeriodPending]));
-
-  const periodButtonLabel = year == null
-    ? '所有时间'
-    : month != null
-      ? `${year}.${String(month).padStart(2, '0')}`
-      : `${year}`;
-
-  const renderAndroidPeriodButton = useCallback(() => (
-    <TouchableOpacity
-      onPress={() => setPickerVisible(true)}
-      activeOpacity={0.7}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 10,
-        backgroundColor: colors.accent,
-      }}
-    >
-      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onAccent }}>{periodButtonLabel}</Text>
-      <Text style={{ fontSize: 9, color: colors.onAccent }}>▼</Text>
-    </TouchableOpacity>
-  ), [periodButtonLabel, colors]);
 
   const renderAndroidAdjustButton = useCallback(() => (
     <TouchableOpacity
@@ -662,11 +539,9 @@ export default function StatsScreen() {
   ), [colors.accent, router]);
 
   const periodParams = useCallback((): Record<string, string> => {
-    const params: Record<string, string> = {};
-    if (year != null) params.year = String(year);
-    if (month != null) params.month = String(month);
-    return params;
-  }, [year, month]);
+    if (!period.startDate || !period.endDate) return { preset: 'all' };
+    return { preset: period.preset, startDate: period.startDate, endDate: period.endDate };
+  }, [period]);
 
   const goToEvents = useCallback((extra: Record<string, string>) => {
     router.push({ pathname: '/events', params: { ...periodParams(), ...extra } });
@@ -676,7 +551,17 @@ export default function StatsScreen() {
     router.push({ pathname: '/cheki', params: { ...periodParams(), ...extra } });
   }, [router, periodParams]);
 
-  const highlightIndex = month != null ? month - 1 : undefined;
+  const applyPeriod = useCallback((next: StatsDateRange) => {
+    statsRangeSession.rememberApplied(next);
+    setPeriod(next);
+    router.setParams({
+      preset: next.preset,
+      startDate: next.startDate ?? '',
+      endDate: next.endDate ?? '',
+      year: '',
+      month: '',
+    });
+  }, [router]);
 
   if (!stats || !statsSections) {
     return <View style={{ flex: 1, backgroundColor: colors.screen }} />;
@@ -714,8 +599,8 @@ export default function StatsScreen() {
     ? Math.round((oshiChekiCount / chekiCount) * 100)
     : 0;
   const oshiActivityTotal = sumCounts(monthlyOshiActivityCounts);
-  const periodLabel = year == null ? '所有时间' : month != null ? `${year} 年 ${month} 月` : `${year} 年度`;
-  const periodNoun = year == null ? '所有时间' : month != null ? '这个月' : '这一年';
+  const periodLabel = period.preset === 'all' ? '全部时间' : formatStatsDateRange(period);
+  const periodNoun = period.preset === 'all' ? '全部时间' : '这段时间';
   const oshiArtistId = userConfig?.oshi_artist_id ?? null;
   const visibleSections = statsSections.filter((section) => section.visible);
   const hasAnyVisibleData = visibleSections.some((section) => {
@@ -725,6 +610,103 @@ export default function StatsScreen() {
     if (section.type === 'perfectEvents') return perfectEvents.length > 0;
     return chekiCount > 0;
   });
+  const navigablePreset = period.preset === 'week' || period.preset === 'month' || period.preset === 'year'
+    ? period.preset
+    : null;
+  const canNavigatePeriod = navigablePreset != null;
+  const navigatorLabel = formatStatsPeriodLabel(period);
+
+  const periodControls = (
+    <View
+      style={{
+        marginBottom: 24,
+        gap: 8,
+      }}
+    >
+      <SegmentedControl
+        values={PERIOD_PRESETS.map(({ label }) => label)}
+        selectedIndex={PERIOD_PRESETS.findIndex(({ preset }) => (
+          preset === (period.preset === 'all' ? 'custom' : period.preset)
+        ))}
+        appearance={isDark ? 'dark' : 'light'}
+        onChange={({ nativeEvent }) => {
+          const selected = PERIOD_PRESETS[nativeEvent.selectedSegmentIndex];
+          if (!selected) return;
+          if (selected.preset === 'custom') {
+            const recentCustomRange = statsRangeSession.getCustom();
+            if (recentCustomRange) {
+              applyPeriod(recentCustomRange);
+              return;
+            }
+            setPickerMode('custom');
+            return;
+          }
+          applyPeriod(createPresetStatsRange(selected.preset));
+        }}
+        style={{ height: 32 }}
+      />
+      <View style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <TouchableOpacity
+          activeOpacity={0.65}
+          disabled={!canNavigatePeriod}
+          accessibilityRole="button"
+          accessibilityLabel="上一个周期"
+          accessibilityState={{ disabled: !canNavigatePeriod }}
+          onPress={() => applyPeriod(shiftStatsDateRange(period, -1))}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.cardAlt,
+            opacity: canNavigatePeriod ? 1 : 0.4,
+          }}
+        >
+          <AppIcon name="chevron" variant="back" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.65}
+          accessibilityRole="button"
+          accessibilityLabel={`${canNavigatePeriod ? '选择统计周期' : '自定义统计日期'}，当前${navigatorLabel}`}
+          onPress={() => setPickerMode(navigablePreset ?? 'custom')}
+          style={{ flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              lineHeight: 20,
+              fontWeight: '700',
+              color: colors.text,
+              textAlign: 'center',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {navigatorLabel}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.65}
+          disabled={!canNavigatePeriod}
+          accessibilityRole="button"
+          accessibilityLabel="下一个周期"
+          accessibilityState={{ disabled: !canNavigatePeriod }}
+          onPress={() => applyPeriod(shiftStatsDateRange(period, 1))}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.cardAlt,
+            opacity: canNavigatePeriod ? 1 : 0.4,
+          }}
+        >
+          <AppIcon name="chevron" variant="forward" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const renderStatsSection = (sectionType: StatsSectionType) => {
     if (sectionType === 'activity') {
@@ -737,15 +719,15 @@ export default function StatsScreen() {
             <StatBox label="心愿单" value={statusCounts.wishlist} colors={colors} onPress={() => goToEvents({ status: 'wishlist' })} />
           </View>
           <SurfaceCard colors={colors}>
-            {year != null ? (
+            {trendBuckets.length > 0 ? (
               <>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-                  月度数量分布
+                  数量趋势
                 </Text>
-                <MonthlyBarChart counts={monthlyEventCounts} colors={colors} highlightIndex={highlightIndex} />
+                <TrendBarChart counts={monthlyEventCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} />
               </>
             ) : null}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: year != null ? 18 : 0 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: trendBuckets.length > 0 ? 18 : 0 }}>
               <TouchableOpacity
                 activeOpacity={topCity ? 0.7 : 1}
                 disabled={!topCity}
@@ -839,7 +821,7 @@ export default function StatsScreen() {
                 style={{
                   borderRadius: 14,
                   padding: 14,
-                  marginBottom: year != null ? 14 : 0,
+                  marginBottom: trendBuckets.length > 0 ? 14 : 0,
                   backgroundColor: colors.accentSoft,
                 }}
               >
@@ -864,19 +846,19 @@ export default function StatsScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
-              {year != null ? (
+              {trendBuckets.length > 0 ? (
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-                      月度活跃
+                      活跃趋势
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }}>
                       活动次数 + 拍立得数量
                     </Text>
                   </View>
-                  <MonthlyBarChart counts={monthlyOshiActivityCounts} colors={colors} highlightIndex={highlightIndex} />
+                  <TrendBarChart counts={monthlyOshiActivityCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} />
                   <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
-                    全年活跃值 {oshiActivityTotal}
+                    区间活跃值 {oshiActivityTotal}
                   </Text>
                 </View>
               ) : null}
@@ -993,15 +975,15 @@ export default function StatsScreen() {
           <StatBox label="总张数" value={chekiCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
           <StatBox label="总人数" value={chekiArtistCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
         </View>
-        {year != null ? (
+        {trendBuckets.length > 0 ? (
           <SurfaceCard colors={colors}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-              月度分布
+              数量趋势
             </Text>
-            <MonthlyBarChart counts={monthlyChekiCounts} colors={colors} activeColor={colors.accent} highlightIndex={highlightIndex} />
+            <TrendBarChart counts={monthlyChekiCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} activeColor={colors.accent} />
           </SurfaceCard>
         ) : null}
-        {year != null ? <View style={{ height: 0, marginTop: -12 }} /> : null}
+        {trendBuckets.length > 0 ? <View style={{ height: 0, marginTop: -12 }} /> : null}
         {chekiArtistRanking.length > 0 ? (
           <SurfaceCard colors={colors}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
@@ -1034,7 +1016,9 @@ export default function StatsScreen() {
   };
 
   const statsContent = visibleSections.length === 0 ? (
-    <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 72 }}>
+    <>
+      {periodControls}
+      <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 48 }}>
       <AppIcon name="stats" size={36} color={colors.textMuted} style={{ marginBottom: 14 }} />
       <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '800', color: colors.text, marginBottom: 7 }}>
         暂无展示内容
@@ -1059,9 +1043,11 @@ export default function StatsScreen() {
           去自定义
         </Text>
       </TouchableOpacity>
-    </View>
+      </View>
+    </>
   ) : (
     <>
+      {periodControls}
       {visibleSections.map((section) => (
         <Fragment key={section.type}>{renderStatsSection(section.type)}</Fragment>
       ))}
@@ -1069,7 +1055,7 @@ export default function StatsScreen() {
         <View style={{ alignItems: 'center', paddingTop: 8 }}>
           <AppIcon name="stats" size={36} color={colors.textMuted} style={{ marginBottom: 12 }} />
           <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
-            {year == null ? '暂无统计数据' : `${periodLabel}暂无统计数据`}
+            {period.preset === 'all' ? '暂无统计数据' : `${periodLabel} 暂无统计数据`}
           </Text>
           <Text style={{ fontSize: 13, color: colors.textMuted }}>记录更多数据后，这里会慢慢变成你的统计回顾。</Text>
         </View>
@@ -1078,18 +1064,16 @@ export default function StatsScreen() {
   );
 
   const periodPicker = (
-    <PeriodPickerModal
-      visible={pickerVisible}
+    <StatsRangePicker
+      visible={pickerMode != null}
+      mode={pickerMode ?? 'custom'}
       period={period}
-      colors={colors}
-      onClose={() => setPickerVisible(false)}
+      initialCustomStartDate={statsRangeSession.getCustom()?.startDate ?? (period.preset === 'custom' ? period.startDate : null)}
+      initialCustomEndDate={statsRangeSession.getCustom()?.endDate ?? (period.preset === 'custom' ? period.endDate : null)}
+      onClose={() => setPickerMode(null)}
       onSelect={(next) => {
-        setPeriod(next);
-        router.setParams({
-          year: next.year == null ? '' : String(next.year),
-          month: next.month == null ? '' : String(next.month),
-        });
-        setPickerVisible(false);
+        applyPeriod(next);
+        setPickerMode(null);
       }}
     />
   );
@@ -1114,13 +1098,6 @@ export default function StatsScreen() {
           >
             调整
           </Stack.Toolbar.Button>
-          <Stack.Toolbar.Button
-            accessibilityLabel={`选择统计周期，当前${periodButtonLabel}`}
-            tintColor={colors.accent}
-            onPress={() => setPickerVisible(true)}
-          >
-            {periodButtonLabel}
-          </Stack.Toolbar.Button>
         </Stack.Toolbar>
         {periodPicker}
       </>
@@ -1132,10 +1109,7 @@ export default function StatsScreen() {
       <AndroidCompactTabHeader
         title="统计"
         right={(
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {renderAndroidAdjustButton()}
-            {renderAndroidPeriodButton()}
-          </View>
+          renderAndroidAdjustButton()
         )}
         compactHeaderStyle={androidHeader.compactHeaderStyle}
         overlayHeight={androidHeader.overlayHeight}
@@ -1152,10 +1126,7 @@ export default function StatsScreen() {
         <AndroidLargeTabTitle
           title="统计"
           right={(
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {renderAndroidAdjustButton()}
-              {renderAndroidPeriodButton()}
-            </View>
+            renderAndroidAdjustButton()
           )}
           largeTitleStyle={androidHeader.largeTitleStyle}
         />

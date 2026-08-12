@@ -881,6 +881,96 @@ describe('Cheki repositories', () => {
     await expect(eventRepository.countCompletedByArtistYear(2026, 'artist-1', 4)).resolves.toBe(0);
   });
 
+  test('stats repositories include both custom range boundaries', async () => {
+    rawDb.prepare('UPDATE events SET review_score = 5 WHERE id = ?').run('event-1');
+
+    await expect(
+      eventRepository.getYearStatusCounts(undefined, undefined, '2026-03-15', '2026-05-20'),
+    ).resolves.toEqual({ completed: 1, planned: 1, wishlist: 0 });
+    await expect(
+      eventRepository.getYearStatusCounts(undefined, undefined, '2026-03-16', '2026-05-19'),
+    ).resolves.toEqual({ completed: 0, planned: 0, wishlist: 0 });
+    await expect(
+      eventRepository.findFiltered({ startDate: '2026-03-15', endDate: '2026-03-15' }),
+    ).resolves.toEqual([expect.objectContaining({ id: 'event-1' })]);
+    await expect(
+      eventRepository.getDailyCountsByRange('2026-03-15', '2026-05-20'),
+    ).resolves.toEqual([
+      { date: '2026-03-15', count: 1 },
+      { date: '2026-05-20', count: 1 },
+    ]);
+    await expect(
+      eventRepository.findTopCityByYear(undefined, undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual({ name: 'Tokyo', count: 1 });
+    await expect(
+      eventRepository.findTopVenueByYear(undefined, undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual({ name: 'Zepp', count: 1 });
+    await expect(
+      eventRepository.findPerfectEventsByYear(undefined, undefined, 5, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual([expect.objectContaining({ id: 'event-1' })]);
+    await expect(
+      eventRepository.findPerfectEventsByYear(undefined, undefined, 5, '2026-03-16', '2026-05-20'),
+    ).resolves.toEqual([]);
+    await expect(
+      eventRepository.countCompletedByArtistYear(undefined, 'artist-1', undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toBe(1);
+    await expect(
+      eventRepository.findRecentCompletedByArtistYear(undefined, 'artist-1', undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual(expect.objectContaining({ id: 'event-1' }));
+    await expect(
+      eventRepository.getDailyCompletedCountsByArtistRange('2026-03-15', '2026-03-15', 'artist-1'),
+    ).resolves.toEqual([{ date: '2026-03-15', count: 1 }]);
+    await expect(
+      eventRepository.sumCompletedTicketPriceByYear(undefined, undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toBe(200);
+    await expect(
+      eventRepository.findTopSpendCompletedByYear(undefined, undefined, 5, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual([
+      expect.objectContaining({ event: expect.objectContaining({ id: 'event-1' }), totalSpend: 370 }),
+    ]);
+    await expect(
+      eventRepository.getAverageCompletedSpendByYear(undefined, undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toBe(370);
+    await expect(
+      eventRepository.groupRootArtistsByCompletedEvents(undefined, undefined, 10, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual([
+      expect.objectContaining({ artistId: 'artist-1', count: 1 }),
+    ]);
+    await expect(
+      eventRepository.groupRootArtistsByCompletedEvents(undefined, undefined, 10, '2026-03-16', '2026-05-20'),
+    ).resolves.toEqual([]);
+
+    await expect(
+      chekiRepository.countByYear(undefined, undefined, '2026-03-16', '2026-04-02'),
+    ).resolves.toBe(4);
+    await expect(
+      chekiRepository.sumPriceByYear(undefined, undefined, '2026-03-16', '2026-04-02'),
+    ).resolves.toBe(190);
+    await expect(
+      chekiRepository.getDailyCountsByRange('2026-03-16', '2026-04-02'),
+    ).resolves.toEqual([
+      { date: '2026-03-16', count: 3 },
+      { date: '2026-04-02', count: 1 },
+    ]);
+    await expect(
+      chekiRepository.groupByArtistYear(undefined, undefined, 10, '2026-03-15', '2026-03-16'),
+    ).resolves.toEqual([
+      expect.objectContaining({ artistId: 'artist-1', count: 4 }),
+    ]);
+    await expect(
+      chekiRepository.countByArtistYear(undefined, 'artist-1', undefined, '2026-03-15', '2026-03-16'),
+    ).resolves.toBe(4);
+    await expect(
+      chekiRepository.getDailyCountsByArtistRange('2026-03-15', '2026-03-16', 'artist-1'),
+    ).resolves.toEqual([
+      { date: '2026-03-15', count: 1 },
+      { date: '2026-03-16', count: 3 },
+    ]);
+    await expect(
+      chekiRepository.countDistinctArtistsByYear(undefined, undefined, '2026-03-15', '2026-03-16'),
+    ).resolves.toBe(1);
+  });
+
   test('groupRootArtistsByCompletedEvents ranks only artists without parent', async () => {
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)

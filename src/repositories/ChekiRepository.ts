@@ -29,7 +29,19 @@ const ARTIST_LINEAGE_CTE = `WITH RECURSIVE artist_lineage(aid) AS (
   WHERE a.parent_id IS NOT NULL
 )`;
 
-function periodClause(year?: number, month?: number, expression = 'COALESCE(r.date, r.created_at)') {
+function periodClause(
+  year?: number,
+  month?: number,
+  expression = 'COALESCE(r.date, r.created_at)',
+  startDate?: string,
+  endDate?: string,
+) {
+  if (startDate && endDate) {
+    return {
+      sql: `strftime('%Y-%m-%d', ${expression}) >= ? AND strftime('%Y-%m-%d', ${expression}) <= ?`,
+      params: [startDate, endDate],
+    };
+  }
   if (year == null) return { sql: '1 = 1', params: [] as string[] };
   return { sql: `strftime('%Y-%m', ${expression}) LIKE ?`, params: [periodLikeParam(year, month)] };
 }
@@ -177,15 +189,15 @@ export class ChekiRepository {
   async sumPriceAll(): Promise<number> {
     return this.scalar('SELECT COALESCE(SUM(unit_price), 0) AS value FROM cheki_items');
   }
-  async countByYear(year?: number, month?: number): Promise<number> {
-    const period = periodClause(year, month);
+  async countByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = periodClause(year, month, undefined, startDate, endDate);
     return this.scalar(
       `SELECT COALESCE(SUM(r.quantity), 0) AS value FROM cheki_records r WHERE ${period.sql}`,
       period.params,
     );
   }
-  async sumPriceByYear(year?: number, month?: number): Promise<number> {
-    const period = periodClause(year, month);
+  async sumPriceByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = periodClause(year, month, undefined, startDate, endDate);
     return this.scalar(
       `SELECT COALESCE(SUM(i.unit_price), 0) AS value
        FROM cheki_records r
@@ -205,8 +217,19 @@ export class ChekiRepository {
     const counts = new Map(rows.map((row) => [row.month, row.count]));
     return Array.from({ length: 12 }, (_, index) => counts.get(String(index + 1).padStart(2, '0')) ?? 0);
   }
-  async groupByArtistYear(year?: number, month?: number, limit?: number): Promise<ChekiArtistRankingItem[]> {
-    const period = periodClause(year, month);
+  async getDailyCountsByRange(startDate: string, endDate: string): Promise<Array<{ date: string; count: number }>> {
+    return this.db.getAllAsync<{ date: string; count: number }>(
+      `SELECT strftime('%Y-%m-%d', COALESCE(date, created_at)) AS date, SUM(quantity) AS count
+       FROM cheki_records
+       WHERE strftime('%Y-%m-%d', COALESCE(date, created_at)) >= ?
+         AND strftime('%Y-%m-%d', COALESCE(date, created_at)) <= ?
+       GROUP BY date
+       ORDER BY date`,
+      [startDate, endDate],
+    );
+  }
+  async groupByArtistYear(year?: number, month?: number, limit?: number, startDate?: string, endDate?: string): Promise<ChekiArtistRankingItem[]> {
+    const period = periodClause(year, month, undefined, startDate, endDate);
     const rows = await this.db.getAllAsync<{
       artist_id: string | null;
       artist_name: string | null;
@@ -229,8 +252,8 @@ export class ChekiRepository {
       count: row.count,
     }));
   }
-  async countByArtistYear(year: number | undefined, artistId: string, month?: number): Promise<number> {
-    const period = periodClause(year, month);
+  async countByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = periodClause(year, month, undefined, startDate, endDate);
     return this.scalar(
       `${ARTIST_LINEAGE_CTE}
        SELECT COALESCE(SUM(r.quantity), 0) AS value
@@ -252,8 +275,25 @@ export class ChekiRepository {
     const counts = new Map(rows.map((row) => [row.month, row.count]));
     return Array.from({ length: 12 }, (_, index) => counts.get(String(index + 1).padStart(2, '0')) ?? 0);
   }
-  async countDistinctArtistsByYear(year?: number, month?: number): Promise<number> {
-    const period = periodClause(year, month);
+  async getDailyCountsByArtistRange(
+    startDate: string,
+    endDate: string,
+    artistId: string,
+  ): Promise<Array<{ date: string; count: number }>> {
+    return this.db.getAllAsync<{ date: string; count: number }>(
+      `${ARTIST_LINEAGE_CTE}
+       SELECT strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) AS date, SUM(r.quantity) AS count
+       FROM cheki_records r
+       WHERE r.artist_id IN (SELECT aid FROM artist_lineage)
+         AND strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) >= ?
+         AND strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) <= ?
+       GROUP BY date
+       ORDER BY date`,
+      [artistId, startDate, endDate],
+    );
+  }
+  async countDistinctArtistsByYear(year?: number, month?: number, startDate?: string, endDate?: string): Promise<number> {
+    const period = periodClause(year, month, undefined, startDate, endDate);
     return this.scalar(
       `SELECT COUNT(DISTINCT r.artist_id) AS value
        FROM cheki_records r
