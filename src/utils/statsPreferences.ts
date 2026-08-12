@@ -4,6 +4,7 @@ export const STATS_PREFERENCES_STORAGE_KEY = 'ota-log.stats-preferences.v1';
 
 export const STATS_SECTION_TYPES = [
   'activity',
+  'activityHeatmap',
   'oshi',
   'spending',
   'perfectEvents',
@@ -24,6 +25,7 @@ export type StatsPreferences = {
 
 export const STATS_SECTION_LABELS: Record<StatsSectionType, string> = {
   activity: '活动统计',
+  activityHeatmap: '活动足迹',
   oshi: '单推',
   spending: '支出统计',
   perfectEvents: '满分活动',
@@ -116,4 +118,3 @@ export async function saveStatsPreferences(preferences: StatsPreferences): Promi
     JSON.stringify(sanitizeStatsPreferences(preferences)),
   );
 }
-

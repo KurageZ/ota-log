@@ -12,6 +12,7 @@ import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ChekiArtistShareChart } from '../../../src/components/ChekiArtistShareChart';
+import { ActivityHeatmap } from '../../../src/components/ActivityHeatmap';
 import { AppIcon } from '../../../src/components/AppIcon';
 import {
   StatsRangePicker,
@@ -21,7 +22,7 @@ import { useDB } from '../../../src/context/DBContext';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { Artist, Event, UserConfig } from '../../../src/types/models';
 import type { ChekiArtistRankingItem } from '../../../src/repositories/ChekiRepository';
-import type { EventArtistRankingItem } from '../../../src/repositories/EventRepository';
+import type { EventArtistRankingItem, EventDailyCount } from '../../../src/repositories/EventRepository';
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
@@ -72,6 +73,7 @@ interface StatsState {
     wishlist: number;
   };
   monthlyEventCounts: number[];
+  completedDailyEventCounts: EventDailyCount[];
   topCity: LabelCount | null;
   topVenue: LabelCount | null;
   perfectEvents: Event[];
@@ -96,6 +98,7 @@ function createEmptyStatsState(): StatsState {
   return {
     statusCounts: { completed: 0, planned: 0, wishlist: 0 },
     monthlyEventCounts: Array(12).fill(0),
+    completedDailyEventCounts: [],
     topCity: null,
     topVenue: null,
     perfectEvents: [],
@@ -373,6 +376,9 @@ export default function StatsScreen() {
 
   const startDateArg = period.startDate ?? undefined;
   const endDateArg = period.endDate ?? undefined;
+  const heatmapYear = period.preset === 'year' && period.startDate
+    ? Number(period.startDate.slice(0, 4))
+    : null;
   const trendBuckets = useMemo(() => buildStatsTrendBuckets(period), [period]);
   const routePeriodPending = routePeriod != null && (
     period.preset !== routePeriod.preset
@@ -388,6 +394,7 @@ export default function StatsScreen() {
       const preferences = await loadStatsPreferences();
       const {
         needsActivity,
+        needsActivityHeatmap,
         needsOshi,
         needsSpending,
         needsPerfectEvents,
@@ -400,6 +407,7 @@ export default function StatsScreen() {
       const [
         statusCounts,
         monthlyEventCounts,
+        completedDailyEventCounts,
         topCity,
         topVenue,
         perfectEvents,
@@ -420,6 +428,9 @@ export default function StatsScreen() {
         needsActivity && startDateArg && endDateArg
           ? db.events.getDailyCountsByRange(startDateArg, endDateArg).then((rows) => aggregateTrendCounts(rows, trendBuckets))
           : Promise.resolve(empty.monthlyEventCounts),
+        needsActivityHeatmap && heatmapYear != null
+          ? db.events.getCompletedDailyCountsByYear(heatmapYear)
+          : Promise.resolve(empty.completedDailyEventCounts),
         needsActivity ? db.events.findTopCityByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsActivity ? db.events.findTopVenueByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
@@ -472,6 +483,7 @@ export default function StatsScreen() {
       setStats({
         statusCounts,
         monthlyEventCounts,
+        completedDailyEventCounts,
         topCity,
         topVenue,
         perfectEvents,
@@ -501,7 +513,7 @@ export default function StatsScreen() {
         error,
       );
     }
-  }, [db, endDateArg, startDateArg, trendBuckets]);
+  }, [db, endDateArg, heatmapYear, startDateArg, trendBuckets]);
 
   useEffect(() => {
     if (!routePeriod) return;
@@ -571,6 +583,7 @@ export default function StatsScreen() {
   const {
     statusCounts,
     monthlyEventCounts,
+    completedDailyEventCounts,
     topCity,
     topVenue,
     perfectEvents,
@@ -613,6 +626,7 @@ export default function StatsScreen() {
   const visibleSections = statsSections.filter((section) => section.visible);
   const hasAnyVisibleData = visibleSections.some((section) => {
     if (section.type === 'activity') return eventTotal > 0;
+    if (section.type === 'activityHeatmap') return true;
     if (section.type === 'oshi') return oshiCompletedCount > 0 || oshiChekiCount > 0;
     if (section.type === 'spending') return totalSpend > 0 || topSpendEvents.length > 0;
     if (section.type === 'perfectEvents') return perfectEvents.length > 0;
@@ -791,6 +805,25 @@ export default function StatsScreen() {
               )}
             </View>
           </SurfaceCard>
+        </>
+      );
+    }
+
+    if (sectionType === 'activityHeatmap') {
+      return (
+        <>
+          <SectionHeader title="活动足迹" colors={colors} />
+          {heatmapYear == null ? (
+            <EmptyCard
+              title="切换到年度查看活动足迹"
+              body="活动足迹会汇总这一整年的已完成活动。"
+              colors={colors}
+            />
+          ) : (
+            <SurfaceCard colors={colors}>
+              <ActivityHeatmap year={heatmapYear} values={completedDailyEventCounts} colors={colors} />
+            </SurfaceCard>
+          )}
         </>
       );
     }

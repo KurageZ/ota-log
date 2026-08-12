@@ -27,6 +27,7 @@ describe('statsPreferences', () => {
     expect(createDefaultStatsPreferences()).toEqual({
       sections: [
         { type: 'activity', visible: true },
+        { type: 'activityHeatmap', visible: true },
         { type: 'oshi', visible: true },
         { type: 'spending', visible: true },
         { type: 'perfectEvents', visible: true },
@@ -56,6 +57,7 @@ describe('statsPreferences', () => {
       sections: [
         { type: 'cheki', visible: false },
         { type: 'activity', visible: true },
+        { type: 'activityHeatmap', visible: true },
         { type: 'cheki', visible: true },
         { type: 'unknown', visible: true },
         { type: 'oshi', visible: false },
@@ -68,6 +70,7 @@ describe('statsPreferences', () => {
     expect(preferences.sections).toEqual([
       { type: 'cheki', visible: false },
       { type: 'activity', visible: true },
+      { type: 'activityHeatmap', visible: true },
       { type: 'oshi', visible: false },
       { type: 'spending', visible: true },
       { type: 'perfectEvents', visible: true },
@@ -79,11 +82,12 @@ describe('statsPreferences', () => {
     const preferences = sanitizeStatsPreferences({
       sections: [
         { type: 'activity', visible: true },
+        { type: 'activityHeatmap', visible: false },
         { type: 'oshi', visible: false },
         { type: 'spending', visible: true },
         { type: 'perfectEvents', visible: true },
       ],
-      seenSectionTypes: ['activity', 'oshi', 'spending', 'perfectEvents'],
+      seenSectionTypes: ['activity', 'activityHeatmap', 'oshi', 'spending', 'perfectEvents'],
     });
 
     expect(preferences.sections.at(-1)).toEqual({ type: 'cheki', visible: false });
@@ -130,4 +134,3 @@ describe('statsPreferences', () => {
     );
   });
 });
-

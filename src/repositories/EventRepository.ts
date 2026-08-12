@@ -61,6 +61,11 @@ interface MonthlyCountRow {
   count: number;
 }
 
+interface DailyCountRow {
+  date: string;
+  count: number;
+}
+
 interface OshiArtistCountRow {
   count: number;
 }
@@ -82,6 +87,11 @@ export interface EventArtistRankingItem {
   artistId: string;
   name: string;
   avatarUri: string | null;
+  count: number;
+}
+
+export interface EventDailyCount {
+  date: string;
   count: number;
 }
 
@@ -412,6 +422,18 @@ export class EventRepository {
        GROUP BY event_date
        ORDER BY event_date`,
       [startDate, endDate],
+    );
+  }
+
+  async getCompletedDailyCountsByYear(year: number): Promise<EventDailyCount[]> {
+    return this.db.getAllAsync<DailyCountRow>(
+      `SELECT event_date AS date, COUNT(*) AS count
+       FROM event_first_summaries
+       WHERE event_date LIKE ? || '-%'
+         AND status = 'completed'
+       GROUP BY event_date
+       ORDER BY event_date ASC`,
+      [String(year)]
     );
   }
 

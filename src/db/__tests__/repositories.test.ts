@@ -867,6 +867,10 @@ describe('Cheki repositories', () => {
       planned: 1,
       wishlist: 0,
     });
+    await expect(eventRepository.getCompletedDailyCountsByYear(2026)).resolves.toEqual([
+      { date: '2026-03-15', count: 1 },
+    ]);
+    await expect(eventRepository.getCompletedDailyCountsByYear(2025)).resolves.toEqual([]);
 
     await expect(eventRepository.findTopCityByYear(2026, 3)).resolves.toEqual({ name: 'Tokyo', count: 1 });
     await expect(eventRepository.findTopCityByYear(2026, 5)).resolves.toEqual({ name: 'Osaka', count: 1 });
