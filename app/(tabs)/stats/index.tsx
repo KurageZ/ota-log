@@ -374,6 +374,7 @@ export default function StatsScreen() {
     () => routePeriod ?? statsRangeSession.getCurrent() ?? createPresetStatsRange('month')
   );
   const [pickerMode, setPickerMode] = useState<StatsRangePickerMode | null>(null);
+  const [preferredPickerMode, setPreferredPickerMode] = useState<StatsRangePickerMode | null>(null);
   const [stats, setStats] = useState<StatsState | null>(null);
   const [statsSections, setStatsSections] = useState<StatsSectionConfig[] | null>(null);
   const loadRequestIdRef = useRef(0);
@@ -534,6 +535,7 @@ export default function StatsScreen() {
   useEffect(() => {
     if (!routePeriod) return;
     statsRangeSession.rememberCustom(routePeriod);
+    setPreferredPickerMode(routePeriod.preset === 'all' ? 'custom' : routePeriod.preset);
 
     setPeriod((current) => (
       current.preset === routePeriod.preset
@@ -583,6 +585,7 @@ export default function StatsScreen() {
   const applyPeriod = useCallback((next: StatsDateRange) => {
     statsRangeSession.rememberApplied(next);
     setPeriod(next);
+    setPreferredPickerMode(next.preset === 'all' ? 'custom' : next.preset);
     router.setParams({
       preset: next.preset,
       startDate: next.startDate ?? '',
@@ -591,6 +594,11 @@ export default function StatsScreen() {
       month: '',
     });
   }, [router]);
+
+  const openPicker = useCallback((mode: StatsRangePickerMode) => {
+    setPreferredPickerMode(mode);
+    setPickerMode(mode);
+  }, []);
 
   if (!stats || !statsSections) {
     return <View style={{ flex: 1, backgroundColor: colors.screen }} />;
@@ -670,7 +678,7 @@ export default function StatsScreen() {
       <SegmentedControl
         values={PERIOD_PRESETS.map(({ label }) => label)}
         selectedIndex={PERIOD_PRESETS.findIndex(({ preset }) => (
-          preset === (period.preset === 'all' ? 'custom' : period.preset)
+          preset === (preferredPickerMode ?? (period.preset === 'all' ? 'custom' : period.preset))
         ))}
         appearance={isDark ? 'dark' : 'light'}
         onChange={({ nativeEvent }) => {
@@ -682,7 +690,7 @@ export default function StatsScreen() {
               applyPeriod(recentCustomRange);
               return;
             }
-            setPickerMode('custom');
+            openPicker('custom');
             return;
           }
           applyPeriod(createPresetStatsRange(selected.preset));
@@ -713,7 +721,7 @@ export default function StatsScreen() {
           activeOpacity={0.65}
           accessibilityRole="button"
           accessibilityLabel={`${canNavigatePeriod ? '选择统计周期' : '自定义统计日期'}，当前${navigatorLabel}`}
-          onPress={() => setPickerMode(navigablePreset ?? 'custom')}
+          onPress={() => openPicker(preferredPickerMode ?? navigablePreset ?? 'custom')}
           style={{ flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }}
         >
           <Text

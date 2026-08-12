@@ -14,7 +14,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { copyToDocuments } from '../utils/copyToDocuments';
 import { Artist, EventStatus } from '../types/models';
 import { useDB } from '../context/DBContext';
-import { formatTimeInput, isValidISODate, isValidTime, toISODate } from '../utils/date';
+import {
+  formatDateInput,
+  formatTimeInput,
+  isValidISODate,
+  isValidTime,
+  normalizeDateInput,
+  toISODate,
+} from '../utils/date';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { filterArtistsByQuery } from '../utils/filter';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
@@ -119,39 +126,6 @@ export interface EventFormHandle {
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-
-function formatDateInput(raw: string, previousValue?: string): string {
-  let digits = raw.replace(/\D/g, '').slice(0, 8);
-  const isDeleting = previousValue != null && raw.length < previousValue.length;
-
-  if (
-    isDeleting &&
-    previousValue.endsWith('-') &&
-    raw === previousValue.slice(0, -1)
-  ) {
-    digits = digits.slice(0, -1);
-  }
-
-  if (digits.length < 4) return digits;
-  if (digits.length === 4) return `${digits}-`;
-  if (digits.length < 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-  if (digits.length === 6) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-`;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
-}
-
-function normalizeDateInput(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 4) return digits;
-
-  const year = digits.slice(0, 4);
-  const monthDigits = digits.slice(4, 6);
-  const dayDigits = digits.slice(6, 8);
-
-  if (digits.length === 5) return `${year}-0${monthDigits}`;
-  if (digits.length === 6) return `${year}-${monthDigits}`;
-  if (digits.length === 7) return `${year}-${monthDigits}-0${dayDigits}`;
-  return `${year}-${monthDigits}-${dayDigits}`;
-}
 
 function normalizeInitialValues(initialValues?: EventFormPrefill): EventFormValues {
   const sessions = initialValues?.sessions?.length

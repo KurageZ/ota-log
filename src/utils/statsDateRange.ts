@@ -143,7 +143,7 @@ export function getStatsRangeDaysForMonth(
 }
 
 export function formatStatsDateRange(range: StatsDateRange): string {
-  if (!range.startDate || !range.endDate) return '全部';
+  if (!range.startDate || !range.endDate) return '全部时间';
   return `${range.startDate.replaceAll('-', '/')} – ${range.endDate.replaceAll('-', '/')}`;
 }
 

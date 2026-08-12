@@ -8,7 +8,12 @@ import {
   getStatsRangeDaysForMonth,
   getSystemFirstDayOfWeek,
 } from '../utils/statsDateRange';
-import { isValidISODate, toISODate } from '../utils/date';
+import {
+  formatDateInput,
+  isValidISODate,
+  normalizeDateInput,
+  toISODate,
+} from '../utils/date';
 import { BottomSheetDialog } from './BottomSheetDialog';
 
 LocaleConfig.locales['zh-cn'] = {
@@ -101,41 +106,41 @@ export function StatsDateRangePicker({
   };
 
   const canConfirm = validRange != null;
-  const summary = startDate
-    ? endDate
-      ? `${startDate.replaceAll('-', '/')} – ${endDate.replaceAll('-', '/')}`
-      : `${startDate.replaceAll('-', '/')} – 请选择结束日期`
-    : '请选择起始日期';
-
   return (
     <BottomSheetDialog
       visible={visible}
-      title="自定义日期"
+      title="自定义范围"
       onClose={onCancel}
       scrollable
-      snapPoints={['64%']}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
+      snapPoints={['66%']}
+      showCloseButton={false}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}
       headerAccessory={(
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="统计全部时间"
           onPress={onSelectAll}
           activeOpacity={0.7}
-          style={{ minWidth: 52, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+          style={{ minWidth: 80, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.accent }}>全部</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.accent }}>全部时间</Text>
         </TouchableOpacity>
       )}
     >
-      <Text
-        style={{ marginBottom: 8, fontSize: 13, lineHeight: 18, color: colors.textSecondary, textAlign: 'center', fontVariant: ['tabular-nums'] }}
-      >
-        {summary}
-      </Text>
       <View style={{ flexDirection: stackDateInputs ? 'column' : 'row', gap: 10, marginBottom: 10 }}>
         {[
-          { label: '起始日期', value: startDate, onChangeText: setStartDate },
-          { label: '结束日期', value: endDate, onChangeText: setEndDate },
+          {
+            label: '起始日期',
+            value: startDate,
+            onChangeText: (text: string) => setStartDate((previous) => formatDateInput(text, previous)),
+            onBlur: () => setStartDate((current) => normalizeDateInput(current)),
+          },
+          {
+            label: '结束日期',
+            value: endDate,
+            onChangeText: (text: string) => setEndDate((previous) => formatDateInput(text, previous)),
+            onBlur: () => setEndDate((current) => normalizeDateInput(current)),
+          },
         ].map((field) => (
           <View key={field.label} style={{ flex: stackDateInputs ? undefined : 1, minWidth: 0 }}>
             <Text style={{ marginBottom: 5, fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
@@ -145,8 +150,10 @@ export function StatsDateRangePicker({
               accessibilityLabel={`${field.label}，格式为年-月-日`}
               value={field.value}
               onChangeText={field.onChangeText}
+              onBlur={field.onBlur}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={10}
@@ -193,7 +200,7 @@ export function StatsDateRangePicker({
           textMonthFontWeight: '800',
           textDayHeaderFontWeight: '600',
         }}
-        accessibilityLabel="自定义日期范围选择器"
+        accessibilityLabel="自定义范围选择器"
       />
       <TouchableOpacity
         accessibilityRole="button"

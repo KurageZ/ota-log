@@ -19,6 +19,45 @@ export function formatTimeInput(raw: string): string {
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
+/**
+ * Formats a numeric date input as YYYY-MM-DD while the user is typing.
+ * Keeping the previous value lets backspace remove an automatically inserted
+ * separator in the same way as the event form.
+ */
+export function formatDateInput(raw: string, previousValue?: string): string {
+  let digits = raw.replace(/\D/g, '').slice(0, 8);
+  const isDeleting = previousValue != null && raw.length < previousValue.length;
+
+  if (
+    isDeleting
+    && previousValue.endsWith('-')
+    && raw === previousValue.slice(0, -1)
+  ) {
+    digits = digits.slice(0, -1);
+  }
+
+  if (digits.length < 4) return digits;
+  if (digits.length === 4) return `${digits}-`;
+  if (digits.length < 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  if (digits.length === 6) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+/** Completes one-digit month/day segments when leaving a date field. */
+export function normalizeDateInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+
+  const year = digits.slice(0, 4);
+  const monthDigits = digits.slice(4, 6);
+  const dayDigits = digits.slice(6, 8);
+
+  if (digits.length === 5) return `${year}-0${monthDigits}`;
+  if (digits.length === 6) return `${year}-${monthDigits}`;
+  if (digits.length === 7) return `${year}-${monthDigits}-0${dayDigits}`;
+  return `${year}-${monthDigits}-${dayDigits}`;
+}
+
 export function isValidTime(value: string): boolean {
   if (!/^\d{2}:\d{2}$/.test(value)) return false;
   const [hour, minute] = value.split(':').map(Number);

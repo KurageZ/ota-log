@@ -30,6 +30,7 @@ interface BottomSheetDialogProps {
   maxHeightRatio?: number;
   contentContainerStyle?: StyleProp<ViewStyle>;
   enablePanDownToClose?: boolean;
+  showCloseButton?: boolean;
 }
 
 export function BottomSheetDialog({
@@ -44,6 +45,7 @@ export function BottomSheetDialog({
   maxHeightRatio = 0.82,
   contentContainerStyle,
   enablePanDownToClose = true,
+  showCloseButton = true,
 }: BottomSheetDialogProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -96,21 +98,23 @@ export function BottomSheetDialog({
         {title}
       </Text>
       {headerAccessory}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => sheetModalRef.current?.dismiss()}
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.cardAlt,
-          marginLeft: headerAccessory ? 10 : 0,
-        }}
-      >
-        <AppIcon name="close" size={20} color={colors.textSecondary} />
-      </TouchableOpacity>
+      {showCloseButton ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => sheetModalRef.current?.dismiss()}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.cardAlt,
+            marginLeft: headerAccessory ? 10 : 0,
+          }}
+        >
+          <AppIcon name="close" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 

@@ -33,7 +33,7 @@ describe('statsDateRange', () => {
       endDate: '2027-01-02',
     });
     expect(createCustomStatsRange('2027-01-02', '2026-12-31')).toBeNull();
-    expect(formatStatsDateRange(createPresetStatsRange('all'))).toBe('全部');
+    expect(formatStatsDateRange(createPresetStatsRange('all'))).toBe('全部时间');
     expect(formatStatsDateRange(createCustomStatsRange('2026-12-31', '2027-01-02')!))
       .toBe('2026/12/31 – 2027/01/02');
   });
