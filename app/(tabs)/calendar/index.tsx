@@ -20,6 +20,7 @@ import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { EventCard } from '../../../src/components/EventCard';
 import { formatEventTimes } from '../../../src/components/EventPrimitives';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
+import { ExpandableList } from '../../../src/components/ExpandableList';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
 import { ChekiStackPreviewCard } from '../../../src/components/ChekiStackPreviewCard';
 import { FormFieldLabel } from '../../../src/components/FormPrimitives';
@@ -70,6 +71,7 @@ const VIEW_MODES: ViewMode[] = ['month', 'timeline'];
 const CALENDAR_CHEKI_GRID_GAP = 8;
 const CALENDAR_CHEKI_ASPECT_RATIO = 86 / 54;
 const CALENDAR_MONTH_CELL_SIGNAL_CARD_LIMIT = 3;
+const CALENDAR_RANKING_PREVIEW_LIMIT = 10;
 function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
@@ -881,26 +883,35 @@ export default function CalendarScreen() {
 
       {hasRankingCard ? (
         <CalendarDetailCard title="排行">
-          <ArtistRankingList
+          <ExpandableList
             items={dayArtistSummaries.map(({ artist, count }) => ({
               id: artist.id,
               name: getArtistPrimaryName(artist),
               avatarUri: artist.avatar_uri,
               value: count,
             }))}
-            colors={colors}
-            suffix="张"
-            onPressItem={(item) => {
-              if (!item.id) return;
-              router.push({
-                pathname: '/cheki',
-                params: {
-                  artist_id: item.id,
-                  date: selectedDate,
-                },
-              });
-            }}
-            getAccessibilityLabel={(item) => `查看${selectedDate} ${item.name}的拍立得记录`}
+            initialVisibleCount={CALENDAR_RANKING_PREVIEW_LIMIT}
+            resetKey={selectedDate}
+            expandLabel={(hiddenCount) => `展开其余 ${hiddenCount} 位`}
+            collapseLabel={() => '收起排行'}
+            renderItems={(items) => (
+              <ArtistRankingList
+                items={items}
+                colors={colors}
+                suffix="张"
+                onPressItem={(item) => {
+                  if (!item.id) return;
+                  router.push({
+                    pathname: '/cheki',
+                    params: {
+                      artist_id: item.id,
+                      date: selectedDate,
+                    },
+                  });
+                }}
+                getAccessibilityLabel={(item) => `查看${selectedDate} ${item.name}的拍立得记录`}
+              />
+            )}
           />
         </CalendarDetailCard>
       ) : null}

@@ -11,6 +11,7 @@ import { EventCard } from '../../../src/components/EventCard';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
+import { ExpandableList } from '../../../src/components/ExpandableList';
 import { ChekiArtistShareChart } from '../../../src/components/ChekiArtistShareChart';
 import { ActivityHeatmap } from '../../../src/components/ActivityHeatmap';
 import { AppIcon } from '../../../src/components/AppIcon';
@@ -47,7 +48,7 @@ import {
 import { statsRangeSession } from '../../../src/utils/statsRangeSession';
 import { buildActivityHeatmapValues, type DailyCount } from '../../../src/utils/activityHeatmap';
 
-const EVENT_RANKING_LIMIT = 10;
+const RANKING_PREVIEW_LIMIT = 10;
 const PERIOD_PRESETS: Array<{ preset: StatsPeriodPreset; label: string }> = [
   { preset: 'week', label: '周' },
   { preset: 'month', label: '月' },
@@ -460,7 +461,7 @@ export default function StatsScreen() {
         needsSpending ? db.events.getAverageCompletedSpendByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsSpending ? db.events.findTopSpendCompletedByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
         needsActivity
-          ? db.events.groupRootArtistsByCompletedEvents(undefined, undefined, EVENT_RANKING_LIMIT, startDateArg, endDateArg)
+          ? db.events.groupRootArtistsByCompletedEvents(undefined, undefined, undefined, startDateArg, endDateArg)
           : Promise.resolve([]),
       ]);
 
@@ -631,6 +632,7 @@ export default function StatsScreen() {
   const oshiActivityTotal = sumCounts(monthlyOshiActivityCounts);
   const periodLabel = period.preset === 'all' ? '全部时间' : formatStatsDateRange(period);
   const periodNoun = period.preset === 'all' ? '全部时间' : '这段时间';
+  const rankingResetKey = `${period.preset}:${period.startDate ?? ''}:${period.endDate ?? ''}`;
   const oshiArtistId = userConfig?.oshi_artist_id ?? null;
   const activityHeatmapValues = buildActivityHeatmapValues(
     completedDailyEventCounts,
@@ -804,23 +806,32 @@ export default function StatsScreen() {
                 排行（仅团体）
               </Text>
               {rootArtistEventRanking.length > 0 ? (
-                <ArtistRankingList
+                <ExpandableList
                   items={rootArtistEventRanking.map((item) => ({
                     id: item.artistId,
                     name: item.name,
                     avatarUri: item.avatarUri,
                     value: item.count,
                   }))}
-                  colors={colors}
-                  suffix="场"
-                  onPressItem={(item) => {
-                    if (item.id) goToEvents({ artist_id: item.id, status: 'completed' });
-                  }}
-                  getAccessibilityLabel={(item) => `查看${item.name}参与的已完成活动`}
+                  initialVisibleCount={RANKING_PREVIEW_LIMIT}
+                  resetKey={rankingResetKey}
+                  expandLabel={(hiddenCount) => `展开其余 ${hiddenCount} 位`}
+                  collapseLabel={() => '收起排行'}
+                  renderItems={(items) => (
+                    <ArtistRankingList
+                      items={items}
+                      colors={colors}
+                      suffix="场"
+                      onPressItem={(item) => {
+                        if (item.id) goToEvents({ artist_id: item.id, status: 'completed' });
+                      }}
+                      getAccessibilityLabel={(item) => `查看${item.name}参与的已完成活动`}
+                    />
+                  )}
                 />
               ) : (
                 <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
-                  记录完成活动并关联没有所属团体的艺人后，这里会显示前十排行。
+                  记录完成活动并关联没有所属团体的艺人后，这里会显示排行。
                 </Text>
               )}
             </View>
@@ -1062,15 +1073,24 @@ export default function StatsScreen() {
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
                 排行
               </Text>
-              <ArtistRankingList
+              <ExpandableList
                 items={chekiArtistItems}
-                colors={colors}
-                suffix="张"
-                percentageTotal={chekiCount}
-                onPressItem={(item) => {
-                  if (item.id) goToCheki({ artist_id: item.id });
-                }}
-                getAccessibilityLabel={(item) => `查看${item.name}的拍立得记录`}
+                initialVisibleCount={RANKING_PREVIEW_LIMIT}
+                resetKey={rankingResetKey}
+                expandLabel={(hiddenCount) => `展开其余 ${hiddenCount} 位`}
+                collapseLabel={() => '收起排行'}
+                renderItems={(items) => (
+                  <ArtistRankingList
+                    items={items}
+                    colors={colors}
+                    suffix="张"
+                    percentageTotal={chekiCount}
+                    onPressItem={(item) => {
+                      if (item.id) goToCheki({ artist_id: item.id });
+                    }}
+                    getAccessibilityLabel={(item) => `查看${item.name}的拍立得记录`}
+                  />
+                )}
               />
             </SurfaceCard>
           </>

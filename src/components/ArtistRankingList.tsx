@@ -12,7 +12,7 @@ export interface ArtistRankingItem {
 }
 
 interface ArtistRankingListProps {
-  items: ArtistRankingItem[];
+  items: readonly ArtistRankingItem[];
   colors: ThemeColors;
   suffix?: string;
   percentageTotal?: number;
