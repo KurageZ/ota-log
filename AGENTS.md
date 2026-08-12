@@ -14,6 +14,7 @@
 - 文档索引：`docs/README.md`
 - UI/UX 设计：`docs/product/ui-ux.md`
   - 根目录 `design.md` 是指向该文件的软链接，保留旧入口。
+- 统计自定义功能设计：`docs/product/stats-customization.md`
 - 活动数据结构设计：`docs/data/activity-data-model-design.md`
 - 拍立得数据结构设计：`docs/data/cheki-data-model-design.md`
 - 技术选型：`docs/tech/stack.md`

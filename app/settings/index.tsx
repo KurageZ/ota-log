@@ -357,6 +357,13 @@ export default function SettingsScreen() {
               tint={settingsTints.home}
               onPress={() => router.push('/settings/home')}
             />
+            <MenuItem
+              icon="stats"
+              label="统计自定义"
+              subtitle="调整统计内容顺序和显示状态"
+              tint={settingsTints.stats}
+              onPress={() => router.push('/settings/stats')}
+            />
             <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
               <TouchableOpacity
                 activeOpacity={0.7}

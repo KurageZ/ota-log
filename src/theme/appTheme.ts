@@ -82,6 +82,7 @@ export interface ThemeColors {
     profile: string;
     oshi: string;
     home: string;
+    stats: string;
     appearance: string;
     theme: string;
     calendar: string;
@@ -185,6 +186,7 @@ const classicViolet: ThemeDefinition = {
       profile: '#7c3aed',
       oshi: '#db2777',
       home: '#7c3aed',
+      stats: '#2563eb',
       appearance: '#2563eb',
       theme: '#7c3aed',
       calendar: '#7c3aed',
@@ -284,6 +286,7 @@ const classicViolet: ThemeDefinition = {
       profile: '#7c3aed',
       oshi: '#db2777',
       home: '#7c3aed',
+      stats: '#2563eb',
       appearance: '#2563eb',
       theme: '#7c3aed',
       calendar: '#7c3aed',
@@ -384,6 +387,7 @@ const monoChrome: ThemeDefinition = {
       profile: '#0ea5e9',
       oshi: '#db2777',
       home: '#7c3aed',
+      stats: '#2563eb',
       appearance: '#2563eb',
       theme: '#0b63f6',
       calendar: '#7c3aed',
@@ -481,6 +485,7 @@ const monoChrome: ThemeDefinition = {
       profile: '#38bdf8',
       oshi: '#f472b6',
       home: '#a78bfa',
+      stats: '#60a5fa',
       appearance: '#60a5fa',
       theme: '#58a4ff',
       calendar: '#a78bfa',
@@ -562,6 +567,7 @@ const nightNeon: ThemeDefinition = {
       profile: '#ff5c8a',
       oshi: '#ff5c8a',
       home: '#8d79ff',
+      stats: '#5da9ff',
       appearance: '#5da9ff',
       theme: '#ff5c8a',
       calendar: '#8d79ff',
@@ -640,6 +646,7 @@ const nightNeon: ThemeDefinition = {
       profile: '#ff5c8a',
       oshi: '#ff5c8a',
       home: '#a993ff',
+      stats: '#5da9ff',
       appearance: '#5da9ff',
       theme: '#ff5c8a',
       calendar: '#a993ff',

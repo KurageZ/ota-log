@@ -90,6 +90,7 @@ function RootNavigator() {
       <Stack.Screen name="date-items/[id]/edit" options={{ presentation: 'modal', title: '编辑重要日期' }} />
       <Stack.Screen name="settings/index" options={{ title: '设置' }} />
       <Stack.Screen name="settings/home" options={{ title: '首页自定义' }} />
+      <Stack.Screen name="settings/stats" options={{ title: '统计自定义' }} />
       <Stack.Screen name="settings/profile" options={{ title: '个人资料' }} />
       <Stack.Screen name="settings/oshi" options={{ title: '单推设置' }} />
       <Stack.Screen name="settings/widget" options={{ title: '小组件设置' }} />
