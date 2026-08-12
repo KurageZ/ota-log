@@ -11,6 +11,7 @@ import { EventCard } from '../../../src/components/EventCard';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
+import { ChekiArtistShareChart } from '../../../src/components/ChekiArtistShareChart';
 import { AppIcon } from '../../../src/components/AppIcon';
 import {
   StatsRangePicker,
@@ -422,7 +423,7 @@ export default function StatsScreen() {
         needsActivity ? db.events.findTopCityByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsActivity ? db.events.findTopVenueByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
-        needsOshi ? db.userConfig.getConfig() : Promise.resolve(null),
+        needsOshi || needsCheki ? db.userConfig.getConfig() : Promise.resolve(null),
         needsChekiCount ? db.cheki.countByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsCheki ? db.cheki.countDistinctArtistsByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsCheki && startDateArg && endDateArg
@@ -602,6 +603,13 @@ export default function StatsScreen() {
   const periodLabel = period.preset === 'all' ? '全部时间' : formatStatsDateRange(period);
   const periodNoun = period.preset === 'all' ? '全部时间' : '这段时间';
   const oshiArtistId = userConfig?.oshi_artist_id ?? null;
+  const chekiArtistItems = chekiArtistRanking.map((item) => ({
+    id: item.artistId,
+    name: item.name,
+    avatarUri: item.avatarUri,
+    value: item.count,
+    isOshi: item.artistId != null && item.artistId === oshiArtistId,
+  }));
   const visibleSections = statsSections.filter((section) => section.visible);
   const hasAnyVisibleData = visibleSections.some((section) => {
     if (section.type === 'activity') return eventTotal > 0;
@@ -985,25 +993,34 @@ export default function StatsScreen() {
         ) : null}
         {trendBuckets.length > 0 ? <View style={{ height: 0, marginTop: -12 }} /> : null}
         {chekiArtistRanking.length > 0 ? (
-          <SurfaceCard colors={colors}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-              排行
-            </Text>
-            <ArtistRankingList
-              items={chekiArtistRanking.map((item) => ({
-                id: item.artistId,
-                name: item.name,
-                avatarUri: item.avatarUri,
-                value: item.count,
-              }))}
-              colors={colors}
-              suffix="张"
-              onPressItem={(item) => {
-                if (item.id) goToCheki({ artist_id: item.id });
-              }}
-              getAccessibilityLabel={(item) => `查看${item.name}的拍立得记录`}
-            />
-          </SurfaceCard>
+          <>
+            <SurfaceCard colors={colors}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
+                艺人占比
+              </Text>
+              <ChekiArtistShareChart
+                items={chekiArtistItems}
+                total={chekiCount}
+                colors={colors}
+                isDark={isDark}
+              />
+            </SurfaceCard>
+            <SurfaceCard colors={colors}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
+                排行
+              </Text>
+              <ArtistRankingList
+                items={chekiArtistItems}
+                colors={colors}
+                suffix="张"
+                percentageTotal={chekiCount}
+                onPressItem={(item) => {
+                  if (item.id) goToCheki({ artist_id: item.id });
+                }}
+                getAccessibilityLabel={(item) => `查看${item.name}的拍立得记录`}
+              />
+            </SurfaceCard>
+          </>
         ) : (
           <EmptyCard
             title={`${periodLabel}还没有排行`}

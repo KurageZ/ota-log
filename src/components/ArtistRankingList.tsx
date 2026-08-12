@@ -2,6 +2,7 @@ import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { AppIcon } from './AppIcon';
 import type { ThemeColors } from '../theme/appTheme';
 import { resolveAvatarSource } from '../utils/avatarSource';
+import { formatSharePercentage } from '../utils/artistShare';
 
 export interface ArtistRankingItem {
   id: string | null;
@@ -14,6 +15,7 @@ interface ArtistRankingListProps {
   items: ArtistRankingItem[];
   colors: ThemeColors;
   suffix?: string;
+  percentageTotal?: number;
   onPressItem?: (item: ArtistRankingItem) => void;
   getAccessibilityLabel?: (item: ArtistRankingItem) => string;
 }
@@ -22,6 +24,7 @@ export function ArtistRankingList({
   items,
   colors,
   suffix = '',
+  percentageTotal,
   onPressItem,
   getAccessibilityLabel,
 }: ArtistRankingListProps) {
@@ -32,6 +35,9 @@ export function ArtistRankingList({
       {items.map((item, index) => {
         const avatarSource = resolveAvatarSource(item.avatarUri);
         const pct = Math.min(item.value / maxValue, 1);
+        const percentageLabel = percentageTotal && percentageTotal > 0
+          ? formatSharePercentage(item.value, percentageTotal)
+          : null;
         const isLast = index === items.length - 1;
         const canPress = onPressItem != null && item.id != null;
 
@@ -42,7 +48,11 @@ export function ArtistRankingList({
             disabled={!canPress}
             onPress={canPress ? () => onPressItem?.(item) : undefined}
             accessibilityRole={canPress ? 'button' : undefined}
-            accessibilityLabel={canPress ? getAccessibilityLabel?.(item) : undefined}
+            accessibilityLabel={canPress ? [
+              getAccessibilityLabel?.(item),
+              `${item.value}${suffix ? ` ${suffix}` : ''}`,
+              percentageLabel,
+            ].filter(Boolean).join('，') : undefined}
             style={{
               paddingVertical: 9,
               borderBottomWidth: isLast ? 0 : 1,
@@ -72,9 +82,10 @@ export function ArtistRankingList({
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, fontWeight: '800', color: colors.text }}>
                     {item.name}
                   </Text>
-                  <Text style={{ fontSize: 13, fontWeight: '900', color: colors.accent }}>
+                  <Text style={{ fontSize: 13, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}>
                     {item.value}
                     {suffix ? ` ${suffix}` : ''}
+                    {percentageLabel ? ` · ${percentageLabel}` : ''}
                   </Text>
                 </View>
                 <View
