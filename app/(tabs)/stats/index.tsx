@@ -45,6 +45,7 @@ import {
   type StatsPeriodPreset,
 } from '../../../src/utils/statsDateRange';
 import { statsRangeSession } from '../../../src/utils/statsRangeSession';
+import { buildActivityHeatmapValues, type DailyCount } from '../../../src/utils/activityHeatmap';
 
 const EVENT_RANKING_LIMIT = 10;
 const PERIOD_PRESETS: Array<{ preset: StatsPeriodPreset; label: string }> = [
@@ -74,6 +75,7 @@ interface StatsState {
   };
   monthlyEventCounts: number[];
   completedDailyEventCounts: EventDailyCount[];
+  dailyHeatmapChekiCounts: DailyCount[];
   topCity: LabelCount | null;
   topVenue: LabelCount | null;
   perfectEvents: Event[];
@@ -99,6 +101,7 @@ function createEmptyStatsState(): StatsState {
     statusCounts: { completed: 0, planned: 0, wishlist: 0 },
     monthlyEventCounts: Array(12).fill(0),
     completedDailyEventCounts: [],
+    dailyHeatmapChekiCounts: [],
     topCity: null,
     topVenue: null,
     perfectEvents: [],
@@ -403,11 +406,19 @@ export default function StatsScreen() {
         needsChekiCount,
       } = createStatsLoadPlan(preferences.sections);
       const empty = createEmptyStatsState();
+      const dailyChekiCountsPromise = (
+        (needsCheki || (needsActivityHeatmap && heatmapYear != null))
+        && startDateArg
+        && endDateArg
+      )
+        ? db.cheki.getDailyCountsByRange(startDateArg, endDateArg)
+        : Promise.resolve(empty.dailyHeatmapChekiCounts);
 
       const [
         statusCounts,
         monthlyEventCounts,
         completedDailyEventCounts,
+        dailyHeatmapChekiCounts,
         topCity,
         topVenue,
         perfectEvents,
@@ -431,6 +442,9 @@ export default function StatsScreen() {
         needsActivityHeatmap && heatmapYear != null
           ? db.events.getCompletedDailyCountsByYear(heatmapYear)
           : Promise.resolve(empty.completedDailyEventCounts),
+        needsActivityHeatmap && heatmapYear != null && startDateArg && endDateArg
+          ? dailyChekiCountsPromise
+          : Promise.resolve(empty.dailyHeatmapChekiCounts),
         needsActivity ? db.events.findTopCityByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsActivity ? db.events.findTopVenueByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
@@ -438,7 +452,7 @@ export default function StatsScreen() {
         needsChekiCount ? db.cheki.countByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsCheki ? db.cheki.countDistinctArtistsByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsCheki && startDateArg && endDateArg
-          ? db.cheki.getDailyCountsByRange(startDateArg, endDateArg).then((rows) => aggregateTrendCounts(rows, trendBuckets))
+          ? dailyChekiCountsPromise.then((rows) => aggregateTrendCounts(rows, trendBuckets))
           : Promise.resolve(empty.monthlyChekiCounts),
         needsCheki ? db.cheki.groupByArtistYear(undefined, undefined, undefined, startDateArg, endDateArg) : Promise.resolve([]),
         needsSpending ? db.cheki.sumPriceByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
@@ -484,6 +498,7 @@ export default function StatsScreen() {
         statusCounts,
         monthlyEventCounts,
         completedDailyEventCounts,
+        dailyHeatmapChekiCounts,
         topCity,
         topVenue,
         perfectEvents,
@@ -584,6 +599,7 @@ export default function StatsScreen() {
     statusCounts,
     monthlyEventCounts,
     completedDailyEventCounts,
+    dailyHeatmapChekiCounts,
     topCity,
     topVenue,
     perfectEvents,
@@ -616,6 +632,10 @@ export default function StatsScreen() {
   const periodLabel = period.preset === 'all' ? '全部时间' : formatStatsDateRange(period);
   const periodNoun = period.preset === 'all' ? '全部时间' : '这段时间';
   const oshiArtistId = userConfig?.oshi_artist_id ?? null;
+  const activityHeatmapValues = buildActivityHeatmapValues(
+    completedDailyEventCounts,
+    dailyHeatmapChekiCounts,
+  );
   const chekiArtistItems = chekiArtistRanking.map((item) => ({
     id: item.artistId,
     name: item.name,
@@ -821,7 +841,7 @@ export default function StatsScreen() {
             />
           ) : (
             <SurfaceCard colors={colors}>
-              <ActivityHeatmap year={heatmapYear} values={completedDailyEventCounts} colors={colors} />
+              <ActivityHeatmap year={heatmapYear} values={activityHeatmapValues} colors={colors} />
             </SurfaceCard>
           )}
         </>

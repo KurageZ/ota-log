@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { ContributionGraph } from 'react-native-chart-kit/v2';
 import type { ThemeColors } from '../theme/appTheme';
-
-export type ActivityHeatmapValue = {
-  date: string;
-  count: number;
-};
+import type { ActivityHeatmapValue } from '../utils/activityHeatmap';
 
 const CELL_SIZE = 9;
 const GUTTER_SIZE = 3;
@@ -44,10 +40,18 @@ export function ActivityHeatmap({
   values: ActivityHeatmapValue[];
   colors: ThemeColors;
 }) {
-  const [selectedDay, setSelectedDay] = useState<ActivityHeatmapValue | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const selectedDay = selectedDate
+    ? values.find((value) => value.date === selectedDate) ?? {
+      date: selectedDate,
+      count: 1 as const,
+      eventCount: 0,
+      chekiCount: 0,
+    }
+    : null;
 
   useEffect(() => {
-    setSelectedDay(null);
+    setSelectedDate(null);
   }, [year]);
 
   return (
@@ -65,7 +69,7 @@ export function ActivityHeatmap({
           {year} 年
         </Text>
         <Text style={{ flexShrink: 1, fontSize: 11, lineHeight: 15, color: colors.textMuted, textAlign: 'right' }}>
-          已完成活动，左右滑动查看
+          活动 + 拍立得，左右滑动查看
         </Text>
       </View>
 
@@ -100,8 +104,8 @@ export function ActivityHeatmap({
             if (cell.value === 2) return colors.accent;
             return colors.accentStrong;
           }}
-          activeCell={selectedDay ? {
-            date: selectedDay.date,
+          activeCell={selectedDate ? {
+            date: selectedDate,
             scale: 1.45,
             strokeColor: colors.heading,
             strokeWidth: 1.5,
@@ -109,37 +113,28 @@ export function ActivityHeatmap({
           getMonthLabel={(monthIndex) => `${monthIndex + 1}月`}
           getWeekdayLabel={(dayIndex) => WEEKDAY_LABELS[dayIndex] ?? ''}
           onDayPress={(event) => {
-            setSelectedDay({
-              date: formatLocalISODate(event.date),
-              count: Math.max(0, event.value ?? 0),
-            });
+            setSelectedDate(event.raw?.date ?? formatLocalISODate(event.date));
           }}
-          accessibilityLabel={`${year} 年已完成活动热力图，共 ${values.reduce((total, value) => total + value.count, 0)} 场`}
+          accessibilityLabel={`${year} 年活动与拍立得热力图，共 ${values.reduce((total, value) => total + value.eventCount, 0)} 场活动，${values.reduce((total, value) => total + value.chekiCount, 0)} 张拍立得`}
           testID="activity-heatmap"
         />
       </ScrollView>
 
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
           marginTop: 12,
         }}
       >
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <LegendItem color={colors.cardAlt} label="0" colors={colors} />
-          <LegendItem color={colors.accentBorder} label="1" colors={colors} />
-          <LegendItem color={colors.accent} label="2" colors={colors} />
-          <LegendItem color={colors.accentStrong} label="3+" colors={colors} />
+          <LegendItem color={colors.accentBorder} label="仅活动" colors={colors} />
+          <LegendItem color={colors.accent} label="+ 1–5 张" colors={colors} />
+          <LegendItem color={colors.accentStrong} label="+ 6 张以上" colors={colors} />
         </View>
         <Text
-          numberOfLines={1}
-          style={{ flexShrink: 1, fontSize: 11, lineHeight: 15, fontWeight: '700', color: colors.textSecondary, textAlign: 'right' }}
+          style={{ marginTop: 9, fontSize: 11, lineHeight: 16, fontWeight: '700', color: colors.textSecondary }}
         >
           {selectedDay
-            ? `${Number(selectedDay.date.slice(5, 7))}月${Number(selectedDay.date.slice(8, 10))}日 · ${selectedDay.count} 场`
+            ? `${Number(selectedDay.date.slice(5, 7))}月${Number(selectedDay.date.slice(8, 10))}日 · ${selectedDay.eventCount} 场 · ${selectedDay.chekiCount} 张`
             : '轻点格子查看'}
         </Text>
       </View>

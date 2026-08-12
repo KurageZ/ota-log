@@ -42,7 +42,7 @@ describe('createStatsLoadPlan', () => {
     expect(plan.needsChekiCount).toBe(false);
   });
 
-  it('loads only the daily event aggregation for the activity heatmap', () => {
+  it('loads only the combined daily aggregation plan for the activity heatmap', () => {
     expect(createStatsLoadPlan([{ type: 'activityHeatmap', visible: true }])).toEqual({
       needsActivity: false,
       needsActivityHeatmap: true,
