@@ -7,8 +7,6 @@ import {
   AndroidLargeTabTitle,
   useAndroidCollapsibleTabHeader,
 } from '../../../src/components/AndroidCollapsibleTabHeader';
-import { EventCard } from '../../../src/components/EventCard';
-import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ExpandableList } from '../../../src/components/ExpandableList';
@@ -23,8 +21,14 @@ import { useDB } from '../../../src/context/DBContext';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { Artist, Event, UserConfig } from '../../../src/types/models';
 import type { ChekiArtistRankingItem } from '../../../src/repositories/ChekiRepository';
-import type { EventArtistRankingItem, EventDailyCount } from '../../../src/repositories/EventRepository';
+import type {
+  EventArtistRankingItem,
+  EventDailyCount,
+  EventGroupRatingItem,
+  EventRatingSummary,
+} from '../../../src/repositories/EventRepository';
 import { useAppTheme } from '../../../src/theme/appTheme';
+import { getLocalDayDifference } from '../../../src/utils/dateItems';
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
 import { showOperationFailedAlert } from '../../../src/utils/failureAlert';
@@ -37,9 +41,9 @@ import { createStatsLoadPlan } from '../../../src/utils/statsLoadPlan';
 import {
   buildStatsTrendBuckets,
   createPresetStatsRange,
-  formatStatsDateRange,
   formatStatsPeriodLabel,
   getTrendLabelIndices,
+  getTrendValueLabelIndices,
   parseStatsRangeParams,
   shiftStatsDateRange,
   type StatsDateRange,
@@ -49,6 +53,7 @@ import { statsRangeSession } from '../../../src/utils/statsRangeSession';
 import { buildActivityHeatmapValues, type DailyCount } from '../../../src/utils/activityHeatmap';
 
 const RANKING_PREVIEW_LIMIT = 10;
+const PERFECT_EVENT_PREVIEW_LIMIT = 5;
 const PERIOD_PRESETS: Array<{ preset: StatsPeriodPreset; label: string }> = [
   { preset: 'week', label: '周' },
   { preset: 'month', label: '月' },
@@ -80,6 +85,8 @@ interface StatsState {
   topCity: LabelCount | null;
   topVenue: LabelCount | null;
   perfectEvents: Event[];
+  ratingSummary: EventRatingSummary;
+  topRatedGroups: EventGroupRatingItem[];
   userConfig: UserConfig | null;
   oshiArtist: Artist | null;
   oshiCompletedCount: number;
@@ -106,6 +113,8 @@ function createEmptyStatsState(): StatsState {
     topCity: null,
     topVenue: null,
     perfectEvents: [],
+    ratingSummary: { averageScore: null, ratedCount: 0, distribution: Array(5).fill(0) },
+    topRatedGroups: [],
     userConfig: null,
     oshiArtist: null,
     oshiCompletedCount: 0,
@@ -150,6 +159,7 @@ function StatBox({
   sub,
   colors,
   compact = false,
+  backgroundColor,
   onPress,
 }: {
   label: string;
@@ -157,6 +167,7 @@ function StatBox({
   sub?: string;
   colors: ReturnType<typeof useAppTheme>['colors'];
   compact?: boolean;
+  backgroundColor?: string;
   onPress?: () => void;
 }) {
   const Container: typeof View | typeof TouchableOpacity = onPress ? TouchableOpacity : View;
@@ -168,7 +179,7 @@ function StatBox({
         alignItems: 'center',
         paddingVertical: compact ? 10 : 14,
         paddingHorizontal: 6,
-        backgroundColor: colors.card,
+        backgroundColor: backgroundColor ?? colors.card,
         borderRadius: 16,
         shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
@@ -212,7 +223,7 @@ function SurfaceCard({
         backgroundColor: colors.card,
         borderRadius: 18,
         padding: 16,
-        marginBottom: 24,
+        marginBottom: 12,
         ...style,
       }}
     >
@@ -226,27 +237,55 @@ function TrendBarChart({
   labels,
   colors,
   activeColor,
+  prioritizeDataLabels = false,
+  showAllLabels = false,
+  showBarValues = false,
 }: {
   counts: number[];
   labels: string[];
   colors: ReturnType<typeof useAppTheme>['colors'];
   activeColor?: string;
+  prioritizeDataLabels?: boolean;
+  showAllLabels?: boolean;
+  showBarValues?: boolean;
 }) {
   const maxCount = Math.max(...counts, 1);
   const barColor = activeColor ?? colors.accent;
-  const visibleLabelIndices = getTrendLabelIndices(labels.length);
+  const visibleLabelIndices = getTrendLabelIndices(labels.length, counts, {
+    prioritizeData: prioritizeDataLabels,
+    showAll: showAllLabels,
+  });
   const dense = counts.length > 12;
+  const visibleValueIndices = getTrendValueLabelIndices(counts, dense ? 2 : 1);
+  const axisLabelWidth = dense ? 18 : 20;
+  const chartHeight = dense && showBarValues ? 88 : dense ? 68 : 88;
+
+  const getAxisLabel = (label: string) => {
+    if (prioritizeDataLabels && label.includes('/')) {
+      return label.slice(label.lastIndexOf('/') + 1);
+    }
+    return label.replace('月', '');
+  };
 
   return (
     <>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: dense ? 68 : 88, gap: dense ? 1 : 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: chartHeight, gap: dense ? 1 : 4 }}>
         {counts.map((count, index) => {
           const pct = count / maxCount;
           return (
             <View key={index} style={{ flex: 1, alignItems: 'center', minWidth: 6 }}>
-              {!dense ? (
-                <Text style={{ fontSize: 10, fontWeight: '700', color: count > 0 ? colors.textSecondary : colors.textMuted, marginBottom: 6 }}>
-                  {count > 0 ? count : ''}
+              {(!dense || showBarValues) ? (
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: dense ? 9 : 10,
+                    lineHeight: 12,
+                    fontWeight: '700',
+                    color: count > 0 ? colors.textSecondary : colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  {count > 0 && visibleValueIndices.has(index) ? count : ''}
                 </Text>
               ) : null}
               <View
@@ -265,15 +304,21 @@ function TrendBarChart({
       </View>
       <View style={{ flexDirection: 'row', marginTop: 8, gap: dense ? 1 : 4 }}>
         {labels.map((label, index) => (
-          <View key={index} style={{ flex: 1, alignItems: 'center' }}>
+          <View key={index} style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
             <Text
+              numberOfLines={1}
+              ellipsizeMode="clip"
               style={{
+                width: axisLabelWidth,
                 fontSize: 8,
                 fontWeight: '500',
                 color: colors.textMuted,
+                lineHeight: 12,
+                textAlign: 'center',
+                flexShrink: 0,
               }}
             >
-              {visibleLabelIndices.has(index) ? label.replace('月', '') : ''}
+              {visibleLabelIndices.has(index) ? getAxisLabel(label) : ''}
             </Text>
           </View>
         ))}
@@ -293,7 +338,7 @@ function EmptyCard({
 }) {
   return (
     <SurfaceCard colors={colors}>
-      <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
         {title}
       </Text>
       <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>{body}</Text>
@@ -337,8 +382,167 @@ function formatCurrency(amount: number): string {
   return `¥${amount.toFixed(0)}`;
 }
 
-function sumCounts(counts: number[]): number {
-  return counts.reduce((total, count) => total + count, 0);
+function formatRating(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function formatRecentEventAge(date: string): string {
+  const difference = getLocalDayDifference(date);
+  if (difference > 0) return `还有 ${difference} 天`;
+  if (difference === 0) return '今天';
+  return `${Math.abs(difference)} 天前`;
+}
+
+function SpendRankingList({
+  items,
+  colors,
+  onPressItem,
+}: {
+  items: readonly SpendEntry[];
+  colors: ReturnType<typeof useAppTheme>['colors'];
+  onPressItem: (entry: SpendEntry) => void;
+}) {
+  return (
+    <View>
+      {items.map((entry, index) => {
+        const isLast = index === items.length - 1;
+        return (
+          <TouchableOpacity
+            key={entry.event.id}
+            activeOpacity={0.7}
+            onPress={() => onPressItem(entry)}
+            accessibilityRole="button"
+            accessibilityLabel={`查看活动详情：${entry.event.title}，花费 ${formatCurrency(entry.totalSpend)}`}
+            style={{
+              minHeight: 60,
+              paddingVertical: 9,
+              borderBottomWidth: isLast ? 0 : 1,
+              borderBottomColor: colors.divider,
+              justifyContent: 'center',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+                  {entry.event.title}
+                </Text>
+                <Text numberOfLines={1} style={{ marginTop: 3, fontSize: 12, color: colors.textSecondary }}>
+                  {entry.event.event_date} · 门票 {formatCurrency(entry.ticketTotal)} + 特典 {formatCurrency(entry.chekiTotal)}
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: 13, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}
+              >
+                {formatCurrency(entry.totalSpend)}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function PerfectEventList({
+  items,
+  colors,
+  onPressItem,
+}: {
+  items: readonly Event[];
+  colors: ReturnType<typeof useAppTheme>['colors'];
+  onPressItem: (event: Event) => void;
+}) {
+  return (
+    <View>
+      {items.map((event, index) => {
+        const location = [event.city, event.venue].filter(Boolean).join(' / ');
+        const isLast = index === items.length - 1;
+        return (
+          <TouchableOpacity
+            key={event.id}
+            activeOpacity={0.7}
+            onPress={() => onPressItem(event)}
+            accessibilityRole="button"
+            accessibilityLabel={`查看活动详情：${event.title}，评分 5 分`}
+            style={{
+              minHeight: 60,
+              paddingVertical: 9,
+              borderBottomWidth: isLast ? 0 : 1,
+              borderBottomColor: colors.divider,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+                {event.title}
+              </Text>
+              <Text numberOfLines={1} style={{ marginTop: 5, fontSize: 12, color: colors.textSecondary }}>
+                {event.event_date}{location ? ` · ${location}` : ''}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}>
+              5 分
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function GroupRatingList({
+  items,
+  colors,
+  onPressItem,
+}: {
+  items: readonly EventGroupRatingItem[];
+  colors: ReturnType<typeof useAppTheme>['colors'];
+  onPressItem: (item: EventGroupRatingItem) => void;
+}) {
+  return (
+    <View>
+      {items.map((item, index) => (
+        <TouchableOpacity
+          key={item.artistId}
+          activeOpacity={0.7}
+          onPress={() => onPressItem(item)}
+          accessibilityRole="button"
+          accessibilityLabel={`查看${item.name}参与的已完成活动，综合分 ${item.rankingScore}，平均评分 ${formatRating(item.averageScore)}，${item.ratedCount} 场已评分`}
+          style={{
+            minHeight: 56,
+            paddingVertical: 9,
+            borderBottomWidth: index === items.length - 1 ? 0 : 1,
+            borderBottomColor: colors.divider,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+          }}
+        >
+          <OshiAvatar source={resolveAvatarSource(item.avatarUri)} size={38} isOshi={false} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+              {item.name}
+            </Text>
+            <Text style={{ marginTop: 3, fontSize: 11, color: colors.textSecondary }}>
+              平均 {formatRating(item.averageScore)} 分 · {item.ratedCount} 场已评分
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}>
+              {item.rankingScore}
+            </Text>
+            <Text style={{ marginTop: 2, fontSize: 10, color: colors.textMuted }}>综合分</Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 }
 
 function aggregateTrendCounts(
@@ -424,6 +628,8 @@ export default function StatsScreen() {
         topCity,
         topVenue,
         perfectEvents,
+        ratingSummary,
+        topRatedGroups,
         userConfig,
         chekiCount,
         chekiArtistCount,
@@ -449,7 +655,13 @@ export default function StatsScreen() {
           : Promise.resolve(empty.dailyHeatmapChekiCounts),
         needsActivity ? db.events.findTopCityByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
         needsActivity ? db.events.findTopVenueByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(null),
-        needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, 5, startDateArg, endDateArg) : Promise.resolve([]),
+        needsPerfectEvents ? db.events.findPerfectEventsByYear(undefined, undefined, null, startDateArg, endDateArg) : Promise.resolve([]),
+        needsPerfectEvents
+          ? db.events.getRatingSummaryByYear(undefined, undefined, startDateArg, endDateArg)
+          : Promise.resolve(empty.ratingSummary),
+        needsPerfectEvents
+          ? db.events.findTopRatedRootArtistsByYear(undefined, undefined, 5, startDateArg, endDateArg)
+          : Promise.resolve(empty.topRatedGroups),
         needsOshi || needsCheki ? db.userConfig.getConfig() : Promise.resolve(null),
         needsChekiCount ? db.cheki.countByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
         needsCheki ? db.cheki.countDistinctArtistsByYear(undefined, undefined, startDateArg, endDateArg) : Promise.resolve(0),
@@ -504,6 +716,8 @@ export default function StatsScreen() {
         topCity,
         topVenue,
         perfectEvents,
+        ratingSummary,
+        topRatedGroups,
         userConfig,
         oshiArtist,
         oshiCompletedCount,
@@ -525,8 +739,8 @@ export default function StatsScreen() {
       setStatsSections((current) => current ?? []);
       setStats(createEmptyStatsState());
       showOperationFailedAlert(
-        '无法读取统计数据。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再打开。',
+        '无法载入统计数据',
+        '请稍后再试。如果仍无法载入，请重新启动 App。',
         error,
       );
     }
@@ -556,7 +770,7 @@ export default function StatsScreen() {
       onPress={() => router.push('/settings/stats')}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel="调整统计内容"
+      accessibilityLabel="编辑统计内容"
       style={{
         minWidth: 52,
         minHeight: 44,
@@ -565,7 +779,7 @@ export default function StatsScreen() {
         paddingHorizontal: 10,
       }}
     >
-      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.accent }}>调整</Text>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.accent }}>编辑</Text>
     </TouchableOpacity>
   ), [colors.accent, router]);
 
@@ -612,6 +826,8 @@ export default function StatsScreen() {
     topCity,
     topVenue,
     perfectEvents,
+    ratingSummary,
+    topRatedGroups,
     userConfig,
     oshiArtist,
     oshiCompletedCount,
@@ -637,9 +853,7 @@ export default function StatsScreen() {
   const oshiChekiRatio = chekiCount > 0
     ? Math.round((oshiChekiCount / chekiCount) * 100)
     : 0;
-  const oshiActivityTotal = sumCounts(monthlyOshiActivityCounts);
-  const periodLabel = period.preset === 'all' ? '全部时间' : formatStatsDateRange(period);
-  const periodNoun = period.preset === 'all' ? '全部时间' : '这段时间';
+  const periodNoun = '所选时间';
   const rankingResetKey = `${period.preset}:${period.startDate ?? ''}:${period.endDate ?? ''}`;
   const oshiArtistId = userConfig?.oshi_artist_id ?? null;
   const activityHeatmapValues = buildActivityHeatmapValues(
@@ -659,7 +873,7 @@ export default function StatsScreen() {
     if (section.type === 'activityHeatmap') return true;
     if (section.type === 'oshi') return oshiCompletedCount > 0 || oshiChekiCount > 0;
     if (section.type === 'spending') return totalSpend > 0 || topSpendEvents.length > 0;
-    if (section.type === 'perfectEvents') return perfectEvents.length > 0;
+    if (section.type === 'perfectEvents') return ratingSummary.ratedCount > 0;
     return chekiCount > 0;
   });
   const navigablePreset = period.preset === 'week' || period.preset === 'month' || period.preset === 'year'
@@ -667,13 +881,20 @@ export default function StatsScreen() {
     : null;
   const canNavigatePeriod = navigablePreset != null;
   const navigatorLabel = formatStatsPeriodLabel(period);
+  const previousPeriodLabel = navigablePreset === 'week'
+    ? '上一周'
+    : navigablePreset === 'month'
+      ? '上个月'
+      : '上一年';
+  const nextPeriodLabel = navigablePreset === 'week'
+    ? '下一周'
+    : navigablePreset === 'month'
+      ? '下个月'
+      : '下一年';
 
   const periodControls = (
     <View
-      style={{
-        marginBottom: 24,
-        gap: 8,
-      }}
+      style={{ gap: 8 }}
     >
       <SegmentedControl
         values={PERIOD_PRESETS.map(({ label }) => label)}
@@ -702,7 +923,7 @@ export default function StatsScreen() {
           activeOpacity={0.65}
           disabled={!canNavigatePeriod}
           accessibilityRole="button"
-          accessibilityLabel="上一个周期"
+          accessibilityLabel={previousPeriodLabel}
           accessibilityState={{ disabled: !canNavigatePeriod }}
           onPress={() => applyPeriod(shiftStatsDateRange(period, -1))}
           style={{
@@ -741,7 +962,7 @@ export default function StatsScreen() {
           activeOpacity={0.65}
           disabled={!canNavigatePeriod}
           accessibilityRole="button"
-          accessibilityLabel="下一个周期"
+          accessibilityLabel={nextPeriodLabel}
           accessibilityState={{ disabled: !canNavigatePeriod }}
           onPress={() => applyPeriod(shiftStatsDateRange(period, 1))}
           style={{
@@ -764,19 +985,26 @@ export default function StatsScreen() {
     if (sectionType === 'activity') {
       return (
         <>
-          <SectionHeader title="活动统计" colors={colors} />
+          <SectionHeader title="活动" colors={colors} />
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
             <StatBox label="已完成" value={statusCounts.completed} colors={colors} onPress={() => goToEvents({ status: 'completed' })} />
-            <StatBox label="已计划" value={statusCounts.planned} colors={colors} onPress={() => goToEvents({ status: 'planned' })} />
+            <StatBox label="计划中" value={statusCounts.planned} colors={colors} onPress={() => goToEvents({ status: 'planned' })} />
             <StatBox label="心愿单" value={statusCounts.wishlist} colors={colors} onPress={() => goToEvents({ status: 'wishlist' })} />
           </View>
-          <SurfaceCard colors={colors}>
+          <SurfaceCard colors={colors} style={{ paddingBottom: rootArtistEventRanking.length > 0 ? 0 : 16 }}>
             {trendBuckets.length > 0 ? (
               <>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-                  数量趋势
+                  活动趋势
                 </Text>
-                <TrendBarChart counts={monthlyEventCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} />
+                <TrendBarChart
+                  counts={monthlyEventCounts}
+                  labels={trendBuckets.map((bucket) => bucket.label)}
+                  colors={colors}
+                  showBarValues={period.preset === 'month'}
+                  prioritizeDataLabels={period.preset === 'month'}
+                  showAllLabels={period.preset === 'year'}
+                />
               </>
             ) : null}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: trendBuckets.length > 0 ? 18 : 0 }}>
@@ -791,7 +1019,7 @@ export default function StatsScreen() {
                   {topCity ? topCity.name : '—'}
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>
-                  {topCity ? `${topCity.count} 场` : '暂无数据'}
+                  {topCity ? `${topCity.count} 场` : '无数据'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -805,13 +1033,13 @@ export default function StatsScreen() {
                   {topVenue ? topVenue.name : '—'}
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>
-                  {topVenue ? `${topVenue.count} 场` : '暂无数据'}
+                  {topVenue ? `${topVenue.count} 场` : '无数据'}
                 </Text>
               </TouchableOpacity>
             </View>
             <View style={{ marginTop: 18 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-                排行（仅团体）
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                艺人排行
               </Text>
               {rootArtistEventRanking.length > 0 ? (
                 <ExpandableList
@@ -839,7 +1067,7 @@ export default function StatsScreen() {
                 />
               ) : (
                 <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
-                  记录完成活动并关联没有所属团体的艺人后，这里会显示排行。
+                  无数据
                 </Text>
               )}
             </View>
@@ -851,11 +1079,11 @@ export default function StatsScreen() {
     if (sectionType === 'activityHeatmap') {
       return (
         <>
-          <SectionHeader title="活动足迹" colors={colors} />
+          <SectionHeader title="活跃度" colors={colors} />
           {heatmapYear == null ? (
             <EmptyCard
-              title="切换到年度查看活动足迹"
-              body="活动足迹会汇总这一整年的已完成活动。"
+              title="选择“年”查看活跃度"
+              body="仅支持年度视图"
               colors={colors}
             />
           ) : (
@@ -878,17 +1106,19 @@ export default function StatsScreen() {
                 <StatBox
                   label="相关活动"
                   value={oshiCompletedCount}
-                  sub={statusCounts.completed > 0 ? `相关活动 · 占比 ${oshiEventRatio}%` : '相关活动 · 暂无数据'}
+                  sub={statusCounts.completed > 0 ? `活动 · 占比 ${oshiEventRatio}%` : '暂无已完成活动'}
                   colors={colors}
                   compact
+                  backgroundColor={colors.accentSoft}
                   onPress={() => goToEvents({ artist_id: oshiArtistId, status: 'completed' })}
                 />
                 <StatBox
                   label="单推拍立得"
                   value={oshiChekiCount}
-                  sub={chekiCount > 0 ? `拍立得 · 占比 ${oshiChekiRatio}%` : '拍立得 · 暂无数据'}
+                  sub={chekiCount > 0 ? `拍立得 · 占比 ${oshiChekiRatio}%` : '暂无拍立得'}
                   colors={colors}
                   compact
+                  backgroundColor={colors.accentSoft}
                   onPress={() => goToCheki({ artist_id: oshiArtistId })}
                 />
               </View>
@@ -907,6 +1137,9 @@ export default function StatsScreen() {
               >
                 <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accentText, marginBottom: 6 }}>
                   最近一次活动
+                  {recentOshiEvent ? (
+                    <Text style={{ fontWeight: '900' }}> · {formatRecentEventAge(recentOshiEvent.event_date)}</Text>
+                  ) : null}
                 </Text>
                 {recentOshiEvent ? (
                   <>
@@ -922,7 +1155,7 @@ export default function StatsScreen() {
                   </>
                 ) : (
                   <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
-                    {periodNoun}还没有相关活动
+                    {periodNoun}范围内没有相关活动
                   </Text>
                 )}
               </TouchableOpacity>
@@ -930,23 +1163,27 @@ export default function StatsScreen() {
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-                      活跃趋势
+                      活跃度
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                      活动次数 + 拍立得数量
+                      活动与拍立得
                     </Text>
                   </View>
-                  <TrendBarChart counts={monthlyOshiActivityCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} />
-                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
-                    区间活跃值 {oshiActivityTotal}
-                  </Text>
+                  <TrendBarChart
+                    counts={monthlyOshiActivityCounts}
+                    labels={trendBuckets.map((bucket) => bucket.label)}
+                    colors={colors}
+                    showBarValues={period.preset === 'month'}
+                    prioritizeDataLabels={period.preset === 'month'}
+                    showAllLabels={period.preset === 'year'}
+                  />
                 </View>
               ) : null}
             </SurfaceCard>
           ) : (
             <EmptyCard
-              title="还没有设置单推"
-              body='先去 「我的」 页设置单推吧'
+              title="未设置单推"
+              body='在“我的”中设置单推后，即可查看相关活动和拍立得。'
               colors={colors}
             />
           )}
@@ -957,61 +1194,32 @@ export default function StatsScreen() {
     if (sectionType === 'spending') {
       return (
         <>
-          <SectionHeader title="支出统计" colors={colors} />
+          <SectionHeader title="支出" colors={colors} />
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-            <StatBox label="全部总花费" value={totalSpend > 0 ? formatCurrency(totalSpend) : '—'} colors={colors} />
+            <StatBox label="总支出" value={totalSpend > 0 ? formatCurrency(totalSpend) : '—'} colors={colors} />
             <StatBox
-              label="平均单场活动花费"
+              label="场均支出"
               value={averageEventSpend > 0 ? formatCurrency(averageEventSpend) : '—'}
               colors={colors}
             />
           </View>
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-            <StatBox label="门票总花费" value={eventTicketTotal > 0 ? formatCurrency(eventTicketTotal) : '—'} colors={colors} />
-            <StatBox label="拍立得总花费" value={chekiPriceTotal > 0 ? formatCurrency(chekiPriceTotal) : '—'} colors={colors} />
+            <StatBox label="门票" value={eventTicketTotal > 0 ? formatCurrency(eventTicketTotal) : '—'} colors={colors} />
+            <StatBox label="拍立得" value={chekiPriceTotal > 0 ? formatCurrency(chekiPriceTotal) : '—'} colors={colors} />
           </View>
-          <SurfaceCard colors={colors}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 12 }}>
-              花费最高的 5 场活动
+          <SurfaceCard colors={colors} style={{ paddingBottom: topSpendEvents.length > 0 ? 0 : 16 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+              支出最高的活动
             </Text>
             {topSpendEvents.length > 0 ? (
-              topSpendEvents.map((entry) => (
-                <TouchableOpacity
-                  key={entry.event.id}
-                  activeOpacity={0.7}
-                  onPress={() => router.push(`/events/${entry.event.id}`)}
-                  style={{
-                    paddingVertical: 12,
-                    borderTopWidth: 1,
-                    borderTopColor: colors.divider,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 8 }} numberOfLines={1}>
-                    {entry.event.title}
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 3 }}>
-                        {entry.event.event_date}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted }}>
-                        门票 {formatCurrency(entry.ticketTotal)} + 特典 {formatCurrency(entry.chekiTotal)}
-                      </Text>
-                    </View>
-                    <View style={{ width: 96, alignItems: 'flex-end', justifyContent: 'center', minHeight: 35 }}>
-                      <Text
-                        style={{ fontSize: 18, lineHeight: 20, fontWeight: '900', color: colors.text, textAlign: 'right' }}
-                        numberOfLines={2}
-                      >
-                        {formatCurrency(entry.totalSpend)}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
+              <SpendRankingList
+                items={topSpendEvents}
+                colors={colors}
+                onPressItem={(entry) => router.push(`/events/${entry.event.id}`)}
+              />
             ) : (
               <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
-                {periodNoun}还没有产生可统计的活动花费。
+                {periodNoun}内没有可统计的支出。
               </Text>
             )}
           </SurfaceCard>
@@ -1022,17 +1230,86 @@ export default function StatsScreen() {
     if (sectionType === 'perfectEvents') {
       return (
         <>
-          <SectionHeader title="满分活动" colors={colors} />
-          {perfectEvents.length > 0 ? (
-            <View style={{ marginBottom: 12 }}>
-              {perfectEvents.map((event) => (
-                <EventCard key={event.id} event={event} oshiBadge={getEventCardOshiBadge(event.status, null)} />
-              ))}
-            </View>
+          <SectionHeader title="活动评分" colors={colors} />
+          {ratingSummary.ratedCount > 0 ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                <StatBox
+                  label="平均评分"
+                  value={ratingSummary.averageScore == null ? '—' : formatRating(ratingSummary.averageScore)}
+                  colors={colors}
+                />
+                <StatBox label="已评分活动" value={ratingSummary.ratedCount} colors={colors} />
+              </View>
+              <SurfaceCard colors={colors} style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
+                  评分分布
+                </Text>
+                <TrendBarChart
+                  counts={ratingSummary.distribution}
+                  labels={['1 星', '2 星', '3 星', '4 星', '5 星']}
+                  colors={colors}
+                  showBarValues
+                  showAllLabels
+                />
+              </SurfaceCard>
+              <SurfaceCard
+                colors={colors}
+                style={{ marginBottom: 12, paddingBottom: topRatedGroups.length > 0 ? 0 : 16 }}
+              >
+                <View style={{ marginBottom: topRatedGroups.length > 0 ? 5 : 0 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    团体评分排行
+                  </Text>
+                  <Text style={{ marginTop: 4, fontSize: 11, lineHeight: 16, color: colors.textSecondary }}>
+                    综合分基于平均评分与场次计算。
+                  </Text>
+                </View>
+                {topRatedGroups.length > 0 ? (
+                  <GroupRatingList
+                    items={topRatedGroups}
+                    colors={colors}
+                    onPressItem={(item) => goToEvents({ artist_id: item.artistId, status: 'completed' })}
+                  />
+                ) : (
+                  <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    已评分活动关联团体后，这里会显示排行。
+                  </Text>
+                )}
+              </SurfaceCard>
+              <SurfaceCard
+                colors={colors}
+                style={{ paddingBottom: perfectEvents.length > 0 ? 0 : 16 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                  满分活动
+                </Text>
+                {perfectEvents.length > 0 ? (
+                  <ExpandableList
+                    items={perfectEvents}
+                    initialVisibleCount={PERFECT_EVENT_PREVIEW_LIMIT}
+                    resetKey={rankingResetKey}
+                    expandLabel={(hiddenCount) => `展开其余 ${hiddenCount} 场`}
+                    collapseLabel={() => '收起活动'}
+                    renderItems={(items) => (
+                      <PerfectEventList
+                        items={items}
+                        colors={colors}
+                        onPressItem={(event) => router.push(`/events/${event.id}`)}
+                      />
+                    )}
+                  />
+                ) : (
+                  <Text style={{ marginTop: 9, fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    所选时间内没有满分活动。
+                  </Text>
+                )}
+              </SurfaceCard>
+            </>
           ) : (
             <EmptyCard
-              title={`${periodLabel}还没有满分活动`}
-              body="多多参加一些活动吧。"
+              title="暂无活动评分"
+              body="为活动评分后，此处会显示评分回顾。"
               colors={colors}
             />
           )}
@@ -1047,26 +1324,33 @@ export default function StatsScreen() {
           colors={colors}
           trailing={chekiCount > 0 ? (
             <TouchableOpacity onPress={() => goToCheki()} hitSlop={6}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>查看拍立得 ›</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>查看全部</Text>
             </TouchableOpacity>
           ) : undefined}
         />
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-          <StatBox label="总张数" value={chekiCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
-          <StatBox label="总人数" value={chekiArtistCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
+          <StatBox label="拍立得" value={chekiCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
+          <StatBox label="艺人数" value={chekiArtistCount} colors={colors} onPress={chekiCount > 0 ? () => goToCheki() : undefined} />
         </View>
         {trendBuckets.length > 0 ? (
-          <SurfaceCard colors={colors}>
+          <SurfaceCard colors={colors} style={{ marginBottom: 12 }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-              数量趋势
+              分布
             </Text>
-            <TrendBarChart counts={monthlyChekiCounts} labels={trendBuckets.map((bucket) => bucket.label)} colors={colors} activeColor={colors.accent} />
+            <TrendBarChart
+              counts={monthlyChekiCounts}
+              labels={trendBuckets.map((bucket) => bucket.label)}
+              colors={colors}
+              activeColor={colors.accent}
+              showBarValues={period.preset === 'month'}
+              prioritizeDataLabels={period.preset === 'month'}
+              showAllLabels={period.preset === 'year'}
+            />
           </SurfaceCard>
         ) : null}
-        {trendBuckets.length > 0 ? <View style={{ height: 0, marginTop: -12 }} /> : null}
         {chekiArtistRanking.length > 0 ? (
           <>
-            <SurfaceCard colors={colors}>
+            <SurfaceCard colors={colors} style={{ marginBottom: 12 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
                 艺人占比
               </Text>
@@ -1077,9 +1361,9 @@ export default function StatsScreen() {
                 isDark={isDark}
               />
             </SurfaceCard>
-            <SurfaceCard colors={colors}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 14 }}>
-                排行
+            <SurfaceCard colors={colors} style={{ paddingBottom: 0 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                艺人排行
               </Text>
               <ExpandableList
                 items={chekiArtistItems}
@@ -1104,8 +1388,8 @@ export default function StatsScreen() {
           </>
         ) : (
           <EmptyCard
-            title={`${periodLabel}还没有排行`}
-            body="先去添加一些拍立得吧"
+            title="暂无拍立得排行"
+            body="添加拍立得并关联艺人后，此处会显示排行。"
             colors={colors}
           />
         )}
@@ -1119,15 +1403,15 @@ export default function StatsScreen() {
       <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 48 }}>
       <AppIcon name="stats" size={36} color={colors.textMuted} style={{ marginBottom: 14 }} />
       <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '800', color: colors.text, marginBottom: 7 }}>
-        暂无展示内容
+        未显示任何内容
       </Text>
       <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textMuted, textAlign: 'center', marginBottom: 18 }}>
-        你可以在统计自定义中重新启用活动、支出、拍立得等内容。
+        在“统计自定义”中选择要显示的内容。
       </Text>
       <TouchableOpacity
         activeOpacity={0.72}
         accessibilityRole="button"
-        accessibilityLabel="前往统计自定义"
+        accessibilityLabel="编辑统计内容"
         onPress={() => router.push('/settings/stats')}
         style={{
           minHeight: 44,
@@ -1138,7 +1422,7 @@ export default function StatsScreen() {
         }}
       >
         <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '800', color: colors.onAccent }}>
-          去自定义
+          去编辑
         </Text>
       </TouchableOpacity>
       </View>
@@ -1153,7 +1437,7 @@ export default function StatsScreen() {
         <View style={{ alignItems: 'center', paddingTop: 8 }}>
           <AppIcon name="stats" size={36} color={colors.textMuted} style={{ marginBottom: 12 }} />
           <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
-            {period.preset === 'all' ? '暂无统计数据' : `${periodLabel} 暂无统计数据`}
+            暂无统计数据
           </Text>
           <Text style={{ fontSize: 13, color: colors.textMuted }}>记录更多数据后，这里会慢慢变成你的统计回顾。</Text>
         </View>
@@ -1190,11 +1474,11 @@ export default function StatsScreen() {
         </ScrollView>
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
-            accessibilityLabel="调整统计内容"
+            accessibilityLabel="编辑统计内容"
             tintColor={colors.accent}
             onPress={() => router.push('/settings/stats')}
           >
-            调整
+            编辑
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
         {periodPicker}

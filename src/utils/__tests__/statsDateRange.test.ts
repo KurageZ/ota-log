@@ -6,6 +6,7 @@ import {
   formatStatsDateRange,
   formatStatsPeriodLabel,
   getTrendLabelIndices,
+  getTrendValueLabelIndices,
   getStatsRangeDaysForMonth,
   parseStatsRangeParams,
   shiftStatsDateRange,
@@ -74,6 +75,26 @@ describe('statsDateRange', () => {
   test('keeps dense daily charts to five evenly spaced axis labels', () => {
     expect([...getTrendLabelIndices(31)]).toEqual([0, 8, 15, 23, 30]);
     expect([...getTrendLabelIndices(7)]).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  test('shows every month on a yearly chart', () => {
+    expect([...getTrendLabelIndices(12, undefined, { showAll: true })])
+      .toEqual(Array.from({ length: 12 }, (_, index) => index));
+  });
+
+  test('prioritizes dates with data while skipping adjacent labels', () => {
+    const counts = Array.from({ length: 31 }, (_, index) => (
+      [4, 5, 6, 10, 11].includes(index) ? 1 : 0
+    ));
+
+    expect([...getTrendLabelIndices(31, counts, { prioritizeData: true })]).toEqual([4, 6, 10]);
+  });
+
+  test('only hides nearby duplicate bar values', () => {
+    expect([...getTrendValueLabelIndices([2, 2, 3, 4, 4])]).toEqual([0, 2, 3]);
+    expect([...getTrendValueLabelIndices([2, 3])]).toEqual([0, 1]);
+    expect([...getTrendValueLabelIndices([2, 2, 2, 2])]).toEqual([0, 2]);
+    expect([...getTrendValueLabelIndices([2, 2, 2], 1)]).toEqual([0, 1, 2]);
   });
 
   test('creates and shifts natural week, month, and year ranges', () => {

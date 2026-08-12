@@ -198,10 +198,58 @@ export function buildStatsTrendBuckets(range: StatsDateRange): StatsTrendBucket[
   return buckets;
 }
 
-export function getTrendLabelIndices(length: number): Set<number> {
+export interface TrendLabelIndexOptions {
+  prioritizeData?: boolean;
+  minimumGap?: number;
+  showAll?: boolean;
+}
+
+export function getTrendLabelIndices(
+  length: number,
+  counts?: number[],
+  options: TrendLabelIndexOptions = {},
+): Set<number> {
   if (length <= 0) return new Set();
+  if (options.showAll) return new Set(Array.from({ length }, (_, index) => index));
+
+  if (options.prioritizeData && counts?.length === length) {
+    const dataIndices = counts.reduce<number[]>((indices, count, index) => {
+      if (count > 0) indices.push(index);
+      return indices;
+    }, []);
+
+    if (dataIndices.length > 0) {
+      const minimumGap = Math.max(1, Math.round(options.minimumGap ?? 2));
+      const selected: number[] = [];
+      for (const index of dataIndices) {
+        if (selected.every((selectedIndex) => index - selectedIndex >= minimumGap)) {
+          selected.push(index);
+        }
+      }
+      return new Set(selected);
+    }
+  }
+
   if (length <= 7) return new Set(Array.from({ length }, (_, index) => index));
   return new Set([0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round((length - 1) * ratio)));
+}
+
+export function getTrendValueLabelIndices(counts: number[], minimumGap = 2): Set<number> {
+  const gap = Math.max(1, Math.round(minimumGap));
+  const selected: number[] = [];
+
+  counts.forEach((count, index) => {
+    if (count <= 0) return;
+    const previousIndex = selected[selected.length - 1];
+    if (
+      previousIndex != null
+      && index - previousIndex < gap
+      && counts[previousIndex] === count
+    ) return;
+    selected.push(index);
+  });
+
+  return new Set(selected);
 }
 
 export function parseStatsRangeParams(params: {

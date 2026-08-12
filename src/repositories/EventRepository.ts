@@ -83,6 +83,25 @@ interface RootArtistEventCountRow {
   count: number;
 }
 
+interface EventRatingSummaryRow {
+  average_score: number | null;
+  rated_count: number;
+  score_1_count: number;
+  score_2_count: number;
+  score_3_count: number;
+  score_4_count: number;
+  score_5_count: number;
+}
+
+interface GroupRatingRow {
+  artist_id: string;
+  artist_name: string;
+  avatar_uri: string | null;
+  average_score: number;
+  rated_count: number;
+  last_event_date: string;
+}
+
 export interface EventArtistRankingItem {
   artistId: string;
   name: string;
@@ -93,6 +112,21 @@ export interface EventArtistRankingItem {
 export interface EventDailyCount {
   date: string;
   count: number;
+}
+
+export interface EventRatingSummary {
+  averageScore: number | null;
+  ratedCount: number;
+  distribution: number[];
+}
+
+export interface EventGroupRatingItem {
+  artistId: string;
+  name: string;
+  avatarUri: string | null;
+  averageScore: number;
+  ratedCount: number;
+  rankingScore: number;
 }
 
 function eventPeriodClause(
@@ -475,8 +509,9 @@ export class EventRepository {
     return row ? { name: row.label, count: row.count } : null;
   }
 
-  async findPerfectEventsByYear(year?: number, month?: number, limit = 5, startDate?: string, endDate?: string): Promise<Event[]> {
+  async findPerfectEventsByYear(year?: number, month?: number, limit: number | null = 5, startDate?: string, endDate?: string): Promise<Event[]> {
     const period = eventPeriodClause(year, month, 'event_date', startDate, endDate);
+    const limitClause = limit == null ? '' : 'LIMIT ?';
     return this.db.getAllAsync<Event>(
       `SELECT *
        FROM event_first_summaries
@@ -484,9 +519,110 @@ export class EventRepository {
          ${period.sql}
          AND review_score = 5
        ORDER BY event_date DESC, created_at DESC
-       LIMIT ?`,
-      [...period.params, limit]
+       ${limitClause}`,
+      limit == null ? period.params : [...period.params, limit]
     );
+  }
+
+  async getRatingSummaryByYear(
+    year?: number,
+    month?: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<EventRatingSummary> {
+    const period = eventPeriodClause(year, month, 'event_date', startDate, endDate);
+    const row = await this.db.getFirstAsync<EventRatingSummaryRow>(
+      `SELECT
+         AVG(review_score) AS average_score,
+         COUNT(review_score) AS rated_count,
+         SUM(CASE WHEN review_score = 1 THEN 1 ELSE 0 END) AS score_1_count,
+         SUM(CASE WHEN review_score = 2 THEN 1 ELSE 0 END) AS score_2_count,
+         SUM(CASE WHEN review_score = 3 THEN 1 ELSE 0 END) AS score_3_count,
+         SUM(CASE WHEN review_score = 4 THEN 1 ELSE 0 END) AS score_4_count,
+         SUM(CASE WHEN review_score = 5 THEN 1 ELSE 0 END) AS score_5_count
+       FROM event_first_summaries
+       WHERE status = 'completed'
+         AND review_score IS NOT NULL
+         ${period.sql}`,
+      period.params,
+    );
+
+    return {
+      averageScore: row?.average_score ?? null,
+      ratedCount: row?.rated_count ?? 0,
+      distribution: [
+        row?.score_1_count ?? 0,
+        row?.score_2_count ?? 0,
+        row?.score_3_count ?? 0,
+        row?.score_4_count ?? 0,
+        row?.score_5_count ?? 0,
+      ],
+    };
+  }
+
+  async findTopRatedRootArtistsByYear(
+    year?: number,
+    month?: number,
+    limit: number | null = 5,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<EventGroupRatingItem[]> {
+    const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
+    const rows = await this.db.getAllAsync<GroupRatingRow>(
+      `WITH RECURSIVE artist_roots(artist_id, root_id) AS (
+         SELECT id, id FROM artists WHERE parent_id IS NULL
+         UNION ALL
+         SELECT child.id, artist_roots.root_id
+         FROM artists child
+         JOIN artist_roots ON child.parent_id = artist_roots.artist_id
+       ),
+       rated_events AS (
+         SELECT e.id, e.review_score, e.event_date
+         FROM event_first_summaries e
+         WHERE e.status = 'completed'
+           AND e.review_score IS NOT NULL
+           ${period.sql}
+       ),
+       group_events AS (
+         SELECT DISTINCT rated_events.id, rated_events.review_score, rated_events.event_date, artist_roots.root_id
+         FROM rated_events
+         JOIN event_artists ea ON ea.event_id = rated_events.id
+         JOIN artist_roots ON artist_roots.artist_id = ea.artist_id
+       )
+       SELECT
+         root.id AS artist_id,
+         root.name AS artist_name,
+         root.avatar_uri,
+         AVG(group_events.review_score) AS average_score,
+         COUNT(*) AS rated_count,
+         MAX(group_events.event_date) AS last_event_date
+       FROM group_events
+       JOIN artists root ON root.id = group_events.root_id
+       GROUP BY root.id, root.name, root.avatar_uri
+       ORDER BY root.name ASC`,
+      period.params,
+    );
+
+    const maxRatedCount = Math.max(...rows.map((row) => row.rated_count), 1);
+    const ranked = rows.map((row) => ({
+      artistId: row.artist_id,
+      name: row.artist_name,
+      avatarUri: row.avatar_uri,
+      averageScore: row.average_score,
+      ratedCount: row.rated_count,
+      rankingScore: Math.round(
+        (row.average_score / 5) * Math.sqrt(row.rated_count / maxRatedCount) * 100,
+      ),
+      lastEventDate: row.last_event_date,
+    })).sort((left, right) => (
+      right.rankingScore - left.rankingScore
+      || right.averageScore - left.averageScore
+      || right.ratedCount - left.ratedCount
+      || right.lastEventDate.localeCompare(left.lastEventDate)
+      || left.name.localeCompare(right.name)
+    ));
+
+    return (limit == null ? ranked : ranked.slice(0, limit)).map(({ lastEventDate: _lastEventDate, ...item }) => item);
   }
 
   async countCompletedByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<number> {

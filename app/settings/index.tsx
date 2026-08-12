@@ -360,7 +360,7 @@ export default function SettingsScreen() {
             <MenuItem
               icon="stats"
               label="统计自定义"
-              subtitle="调整统计内容顺序和显示状态"
+              subtitle="编辑统计内容顺序和显示状态"
               tint={settingsTints.stats}
               onPress={() => router.push('/settings/stats')}
             />

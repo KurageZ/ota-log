@@ -52,7 +52,7 @@ function buildWeekMarks(period: StatsDateRange, accent: string, onAccent: string
 }
 
 function titleForPreset(preset: Preset): string {
-  if (preset === 'week') return '选择周';
+  if (preset === 'week') return '选择一周';
   if (preset === 'month') return '选择月份';
   return '选择年份';
 }

@@ -109,7 +109,7 @@ export function StatsDateRangePicker({
   return (
     <BottomSheetDialog
       visible={visible}
-      title="自定义范围"
+      title="选择日期范围"
       onClose={onCancel}
       scrollable
       snapPoints={['66%']}
@@ -130,7 +130,7 @@ export function StatsDateRangePicker({
       <View style={{ flexDirection: stackDateInputs ? 'column' : 'row', gap: 10, marginBottom: 10 }}>
         {[
           {
-            label: '起始日期',
+            label: '开始日期',
             value: startDate,
             onChangeText: (text: string) => setStartDate((previous) => formatDateInput(text, previous)),
             onBlur: () => setStartDate((current) => normalizeDateInput(current)),
@@ -174,7 +174,7 @@ export function StatsDateRangePicker({
       </View>
       {hasInvalidDate || rangeReversed ? (
         <Text accessibilityRole="alert" style={{ marginBottom: 8, fontSize: 12, lineHeight: 17, color: colors.danger }}>
-          {rangeReversed ? '结束日期不能早于起始日期。' : '请输入 YYYY-MM-DD 格式的有效日期。'}
+          {rangeReversed ? '结束日期不能早于开始日期。' : '请输入有效日期。'}
         </Text>
       ) : null}
       <Calendar
@@ -200,11 +200,11 @@ export function StatsDateRangePicker({
           textMonthFontWeight: '800',
           textDayHeaderFontWeight: '600',
         }}
-        accessibilityLabel="自定义范围选择器"
+        accessibilityLabel="日期范围选择器"
       />
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="确认日期范围"
+        accessibilityLabel="应用日期范围"
         disabled={!canConfirm}
         onPress={() => {
           if (validRange) onConfirm(validRange.startDate!, validRange.endDate!);
@@ -220,7 +220,7 @@ export function StatsDateRangePicker({
           opacity: canConfirm ? 1 : 0.4,
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>确定</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>应用</Text>
       </TouchableOpacity>
     </BottomSheetDialog>
   );

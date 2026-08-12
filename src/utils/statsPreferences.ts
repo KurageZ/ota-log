@@ -24,11 +24,11 @@ export type StatsPreferences = {
 };
 
 export const STATS_SECTION_LABELS: Record<StatsSectionType, string> = {
-  activity: '活动统计',
-  activityHeatmap: '活动足迹',
+  activity: '活动',
+  activityHeatmap: '活跃度',
   oshi: '单推',
-  spending: '支出统计',
-  perfectEvents: '满分活动',
+  spending: '支出',
+  perfectEvents: '活动评分',
   cheki: '拍立得',
 };
 

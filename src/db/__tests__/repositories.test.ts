@@ -916,6 +916,20 @@ describe('Cheki repositories', () => {
       eventRepository.findPerfectEventsByYear(undefined, undefined, 5, '2026-03-16', '2026-05-20'),
     ).resolves.toEqual([]);
     await expect(
+      eventRepository.getRatingSummaryByYear(undefined, undefined, '2026-03-15', '2026-03-15'),
+    ).resolves.toEqual({
+      averageScore: 5,
+      ratedCount: 1,
+      distribution: [0, 0, 0, 0, 1],
+    });
+    await expect(
+      eventRepository.getRatingSummaryByYear(undefined, undefined, '2026-03-16', '2026-05-20'),
+    ).resolves.toEqual({
+      averageScore: null,
+      ratedCount: 0,
+      distribution: [0, 0, 0, 0, 0],
+    });
+    await expect(
       eventRepository.countCompletedByArtistYear(undefined, 'artist-1', undefined, '2026-03-15', '2026-03-15'),
     ).resolves.toBe(1);
     await expect(
@@ -1040,6 +1054,64 @@ describe('Cheki repositories', () => {
     ]);
   });
 
+  test('rating ranking maps members to their root group and counts an event once', async () => {
+    rawDb.prepare('UPDATE events SET review_score = 5 WHERE id = ?').run('event-1');
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'member-1', 'Member One', null, 'artist-1', null, null, 0,
+      '2026-03-01T00:00:00.000Z',
+    );
+    rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
+      .run('event-1', 'member-1');
+    const insertRatedEvent = rawDb.prepare(
+      `INSERT INTO fixture_events
+         (id, title, event_type, event_date, event_time, city, venue, ticket_price,
+          status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insertRatedEvent.run(
+      'member-event', 'Member Event', 'livehouse', '2026-03-16', null, null, null, 0,
+      'completed', 4, null, null, null, null, null,
+      '2026-03-16T00:00:00.000Z', '2026-03-16T00:00:00.000Z',
+    );
+    insertRatedEvent.run(
+      'single-high-event', 'Single High Event', 'livehouse', '2026-03-17', null, null, null, 0,
+      'completed', 5, null, null, null, null, null,
+      '2026-03-17T00:00:00.000Z', '2026-03-17T00:00:00.000Z',
+    );
+    rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
+      .run('member-event', 'member-1');
+    rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
+      .run('single-high-event', 'artist-2');
+
+    const ranking = await eventRepository.findTopRatedRootArtistsByYear(
+      undefined,
+      undefined,
+      5,
+      '2026-03-15',
+      '2026-03-17',
+    );
+    expect(ranking).toEqual([
+      expect.objectContaining({
+        artistId: 'artist-1',
+        name: 'Artist One',
+        avatarUri: 'file:///artist-1-avatar.jpg',
+        averageScore: 4.5,
+        ratedCount: 2,
+      }),
+      expect.objectContaining({
+        artistId: 'artist-2',
+        name: 'Artist Two',
+        averageScore: 5,
+        ratedCount: 1,
+      }),
+    ]);
+    expect(ranking[0]?.rankingScore).toBe(90);
+    expect(ranking[1]?.rankingScore).toBe(71);
+  });
+
   test('all-time stats include records across years', async () => {
     rawDb.prepare(
       `INSERT INTO fixture_events
@@ -1072,6 +1144,9 @@ describe('Cheki repositories', () => {
     await expect(eventRepository.findTopCityByYear()).resolves.toEqual({ name: 'Tokyo', count: 2 });
     await expect(eventRepository.findTopVenueByYear()).resolves.toEqual({ name: 'Namba Hatch', count: 1 });
     await expect(eventRepository.findPerfectEventsByYear()).resolves.toEqual([
+      expect.objectContaining({ id: 'event-2025' }),
+    ]);
+    await expect(eventRepository.findPerfectEventsByYear(undefined, undefined, null)).resolves.toEqual([
       expect.objectContaining({ id: 'event-2025' }),
     ]);
     await expect(eventRepository.sumCompletedTicketPriceByYear()).resolves.toBe(300);

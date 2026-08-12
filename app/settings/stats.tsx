@@ -71,16 +71,16 @@ export default function StatsSettingsScreen() {
           await saveStatsPreferences(viewedPreferences);
         } catch (error) {
           showOperationFailedAlert(
-            '无法保存已查看状态。',
-            '新内容提示可能会再次出现，请稍后重新打开统计自定义。',
+            '无法更新新内容提示',
+            '下次打开时，新内容标记可能再次出现。',
             error,
           );
         }
       }
     } catch (error) {
       showOperationFailedAlert(
-        '无法读取统计设置。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再打开。',
+        '无法载入统计设置',
+        '请稍后再试。如果仍无法载入，请重新启动 App。',
         error,
       );
     } finally {
@@ -133,8 +133,8 @@ export default function StatsSettingsScreen() {
         setSections(lastSavedSectionsRef.current);
       }
       showOperationFailedAlert(
-        '无法保存统计设置。',
-        '本次调整没有保存，请稍后再试一次。',
+        '无法保存统计设置',
+        '本次更改未保存，请再试一次。',
         error,
       );
     }
@@ -165,11 +165,10 @@ export default function StatsSettingsScreen() {
   }, [persistSections]);
 
   const handleReset = useCallback(() => {
-    Alert.alert('恢复默认', '统计内容会恢复默认顺序，并重新启用全部内容。确认继续吗？', [
+    Alert.alert('还原默认设置？', '将还原默认顺序，并显示所有统计内容。', [
       { text: '取消', style: 'cancel' },
       {
-        text: '恢复',
-        style: 'destructive',
+        text: '还原',
         onPress: () => {
           const defaults = createDefaultStatsPreferences();
           setSeenSectionTypes(defaults.seenSectionTypes);
@@ -234,7 +233,7 @@ export default function StatsSettingsScreen() {
             <View
               accessible
               accessibilityRole="button"
-              accessibilityLabel={`${STATS_SECTION_LABELS[section.type]}，${isNew ? '新增，' : ''}${section.visible ? '已启用' : '未启用'}，拖动排序`}
+              accessibilityLabel={`${STATS_SECTION_LABELS[section.type]}，${isNew ? '新增，' : ''}${section.visible ? '已显示。拖动可重新排序或隐藏。' : '已隐藏。拖动可重新排序或显示。'}`}
               style={{
                 width: 44,
                 height: 44,
@@ -270,10 +269,10 @@ export default function StatsSettingsScreen() {
           <SortableItem.Handle style={{ width: 0, height: 0, opacity: 0 }}>
             <View />
           </SortableItem.Handle>
-          <SectionLabel label="未启用" />
+          <SectionLabel label="隐藏" />
           {item.disabledCount === 0 ? (
             <Text style={{ paddingLeft: 2, fontSize: 12, lineHeight: 16, fontWeight: '600', color: colors.textMuted }}>
-              拖拽到这里隐藏内容
+              拖到此处隐藏
             </Text>
           ) : null}
         </SortableItem>
@@ -308,10 +307,10 @@ export default function StatsSettingsScreen() {
         paddingHorizontal: 10,
         backgroundColor: colors.accentSoft,
       }}
-      accessibilityLabel="恢复默认统计设置"
+      accessibilityLabel="还原默认统计设置"
     >
       <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '800', color: colors.accent }}>
-        重置
+        还原
       </Text>
     </TouchableOpacity>
   ), [colors.accent, colors.accentSoft, handleReset]);
@@ -321,10 +320,10 @@ export default function StatsSettingsScreen() {
       <Stack.Screen options={{ headerRight: Platform.OS === 'ios' ? undefined : renderResetAction }} />
       <NativeTextToolbar
         right={{
-          label: '重置',
-          accessibilityLabel: '恢复默认统计设置',
+          label: '还原',
+          accessibilityLabel: '还原默认统计设置',
           onPress: handleReset,
-          tintColor: colors.danger,
+          tintColor: colors.accent,
         }}
       />
       {isLoading ? (
@@ -338,7 +337,7 @@ export default function StatsSettingsScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
-          <SectionLabel label="已启用" />
+          <SectionLabel label="显示" />
           <Sortable
             data={sortableItems}
             renderItem={renderSortableItem}

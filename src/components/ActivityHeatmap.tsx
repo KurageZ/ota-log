@@ -69,7 +69,7 @@ export function ActivityHeatmap({
           {year} 年
         </Text>
         <Text style={{ flexShrink: 1, fontSize: 11, lineHeight: 15, color: colors.textMuted, textAlign: 'right' }}>
-          活动 + 拍立得，左右滑动查看
+          已完成活动与拍立得
         </Text>
       </View>
 
@@ -127,16 +127,16 @@ export function ActivityHeatmap({
       >
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           <LegendItem color={colors.accentBorder} label="仅活动" colors={colors} />
-          <LegendItem color={colors.accent} label="+ 1–5 张" colors={colors} />
-          <LegendItem color={colors.accentStrong} label="+ 6 张以上" colors={colors} />
+          <LegendItem color={colors.accent} label="活动 + 1–5 张" colors={colors} />
+          <LegendItem color={colors.accentStrong} label="活动 + 6 张以上" colors={colors} />
         </View>
-        <Text
-          style={{ marginTop: 9, fontSize: 11, lineHeight: 16, fontWeight: '700', color: colors.textSecondary }}
-        >
-          {selectedDay
-            ? `${Number(selectedDay.date.slice(5, 7))}月${Number(selectedDay.date.slice(8, 10))}日 · ${selectedDay.eventCount} 场 · ${selectedDay.chekiCount} 张`
-            : '轻点格子查看'}
-        </Text>
+        {selectedDay ? (
+          <Text
+            style={{ marginTop: 9, fontSize: 11, lineHeight: 16, fontWeight: '700', color: colors.textSecondary }}
+          >
+            {`${Number(selectedDay.date.slice(5, 7))}月${Number(selectedDay.date.slice(8, 10))}日 · ${selectedDay.eventCount} 场 · ${selectedDay.chekiCount} 张`}
+          </Text>
+        ) : null}
       </View>
     </View>
   );

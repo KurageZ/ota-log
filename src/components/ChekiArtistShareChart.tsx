@@ -16,7 +16,8 @@ import {
 const CHART_SIZE = 136;
 const CHART_CENTER = CHART_SIZE / 2;
 const RADIUS = 50;
-const STROKE_WIDTH = 18;
+const ARTIST_STROKE_WIDTH = 22;
+const OTHER_STROKE_WIDTH = 12;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const SEGMENT_GAP = 3;
 
@@ -65,7 +66,7 @@ export function ChekiArtistShareChart({
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`拍立得艺人占比。${segments.map((segment) => (
+      accessibilityLabel={`拍立得占比。${segments.map((segment) => (
         `${segment.name}${segment.value}张，占${formatSharePercentage(segment.value, total)}`
       )).join('；')}`}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}
@@ -78,7 +79,7 @@ export function ChekiArtistShareChart({
             r={RADIUS}
             fill="none"
             stroke={colors.inputBorder}
-            strokeWidth={STROKE_WIDTH}
+            strokeWidth={OTHER_STROKE_WIDTH}
             opacity={0.45}
           />
           {segments.map((segment, index) => {
@@ -95,7 +96,7 @@ export function ChekiArtistShareChart({
                 r={RADIUS}
                 fill="none"
                 stroke={segmentColors[index]}
-                strokeWidth={STROKE_WIDTH}
+                strokeWidth={segment.isOther ? OTHER_STROKE_WIDTH : ARTIST_STROKE_WIDTH}
                 strokeDasharray={`${visibleLength} ${CIRCUMFERENCE - visibleLength}`}
                 strokeDashoffset={dashOffset}
                 rotation={-90}
@@ -111,7 +112,7 @@ export function ChekiArtistShareChart({
           <Text style={{ fontSize: 24, lineHeight: 28, fontWeight: '900', color: colors.heading, fontVariant: ['tabular-nums'] }}>
             {total}
           </Text>
-          <Text style={{ marginTop: 1, fontSize: 11, lineHeight: 14, color: colors.textMuted }}>总张数</Text>
+          <Text style={{ marginTop: 1, fontSize: 11, lineHeight: 14, color: colors.textMuted }}>拍立得</Text>
         </View>
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 9 }}>
