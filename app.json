@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ota-log",
+    "name": "ota log",
     "slug": "ota-log",
     "version": "1.5.0",
     "orientation": "portrait",
@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.otalog.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true
       }

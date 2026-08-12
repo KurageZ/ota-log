@@ -11,10 +11,10 @@ const variants = {
     identifier: 'com.otalog.app.preview',
     scheme: 'otalog-preview',
   },
-  beta: {
-    name: 'ota log Beta',
-    identifier: 'com.otalog.app.beta',
-    scheme: 'otalog-beta',
+  production: {
+    name: 'ota log',
+    identifier: 'com.otalog.app',
+    scheme: 'otalog',
   },
 };
 

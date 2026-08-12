@@ -21,15 +21,27 @@
       "distribution": "store",
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "beta"
+        "APP_VARIANT": "production"
       }
     },
     "production": {
-      "autoIncrement": true
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "production"
+      }
     }
   },
   "submit": {
-    "beta": {},
-    "production": {}
+    "beta": {
+      "ios": {
+        "ascAppId": "6800717486"
+      }
+    },
+    "production": {
+      "ios": {
+        "ascAppId": "6800717486"
+      }
+    }
   }
 }
