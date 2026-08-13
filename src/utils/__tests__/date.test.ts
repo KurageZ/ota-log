@@ -1,4 +1,14 @@
-import { formatDateInput, normalizeDateInput } from '../date';
+import { formatChineseDateWithWeekday, formatDateInput, normalizeDateInput } from '../date';
+
+describe('Chinese date formatting', () => {
+  test('includes the weekday and keeps the year by default', () => {
+    expect(formatChineseDateWithWeekday('2026-08-13')).toBe('2026年8月13日 周四');
+  });
+
+  test('returns invalid input unchanged', () => {
+    expect(formatChineseDateWithWeekday('2026-02-30')).toBe('2026-02-30');
+  });
+});
 
 describe('date input formatting', () => {
   test('inserts date separators while typing digits', () => {

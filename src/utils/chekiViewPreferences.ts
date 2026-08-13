@@ -3,32 +3,36 @@ import { ChekiGridDensity } from './cheki';
 
 export const CHEKI_VIEW_PREFERENCES_STORAGE_KEY = 'ota-log.cheki-view-preferences.v2';
 
-export type ChekiBrowseMode = 'item' | 'record';
-export type ChekiItemLayout = 'artist' | 'album';
+export type ChekiBrowseMode = 'album' | 'record';
+export type ChekiAlbumGrouping = 'artist' | 'date' | 'none';
 export type ChekiSortOrder = 'desc' | 'asc';
 
 export interface ChekiViewPreferences {
   browseMode: ChekiBrowseMode;
-  itemLayout: ChekiItemLayout;
-  sortOrder: ChekiSortOrder;
+  albumGrouping: ChekiAlbumGrouping;
+  albumSortOrder: ChekiSortOrder;
+  recordSortOrder: ChekiSortOrder;
   density: ChekiGridDensity;
+  useSpecAspectRatio: boolean;
   showRecordThumbnails: boolean;
 }
 
 export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
-  browseMode: 'item',
-  itemLayout: 'artist',
-  sortOrder: 'desc',
-  density: 'medium',
+  browseMode: 'album',
+  albumGrouping: 'artist',
+  albumSortOrder: 'desc',
+  recordSortOrder: 'desc',
+  density: 'large',
+  useSpecAspectRatio: false,
   showRecordThumbnails: true,
 };
 
 function isBrowseMode(value: unknown): value is ChekiBrowseMode {
-  return value === 'item' || value === 'record';
+  return value === 'album' || value === 'record';
 }
 
-function isItemLayout(value: unknown): value is ChekiItemLayout {
-  return value === 'artist' || value === 'album';
+function isAlbumGrouping(value: unknown): value is ChekiAlbumGrouping {
+  return value === 'artist' || value === 'date' || value === 'none';
 }
 
 function isSortOrder(value: unknown): value is ChekiSortOrder {
@@ -43,19 +47,33 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
   if (!value || typeof value !== 'object') return DEFAULT_CHEKI_VIEW_PREFERENCES;
   const raw = value as Record<string, unknown>;
   if ('mode' in raw && !('browseMode' in raw)) return DEFAULT_CHEKI_VIEW_PREFERENCES;
+  const legacySortOrder = isSortOrder(raw.sortOrder) ? raw.sortOrder : null;
+  const legacyGrouping = raw.itemLayout === 'artist'
+    ? 'artist'
+    : raw.itemLayout === 'album'
+      ? 'none'
+      : null;
   return {
     browseMode: isBrowseMode(raw.browseMode)
       ? raw.browseMode
+      : raw.browseMode === 'item'
+        ? 'album'
       : DEFAULT_CHEKI_VIEW_PREFERENCES.browseMode,
-    itemLayout: isItemLayout(raw.itemLayout)
-      ? raw.itemLayout
-      : DEFAULT_CHEKI_VIEW_PREFERENCES.itemLayout,
-    sortOrder: isSortOrder(raw.sortOrder)
-      ? raw.sortOrder
-      : DEFAULT_CHEKI_VIEW_PREFERENCES.sortOrder,
+    albumGrouping: isAlbumGrouping(raw.albumGrouping)
+      ? raw.albumGrouping
+      : legacyGrouping ?? DEFAULT_CHEKI_VIEW_PREFERENCES.albumGrouping,
+    albumSortOrder: isSortOrder(raw.albumSortOrder)
+      ? raw.albumSortOrder
+      : legacySortOrder ?? DEFAULT_CHEKI_VIEW_PREFERENCES.albumSortOrder,
+    recordSortOrder: isSortOrder(raw.recordSortOrder)
+      ? raw.recordSortOrder
+      : legacySortOrder ?? DEFAULT_CHEKI_VIEW_PREFERENCES.recordSortOrder,
     density: isDensity(raw.density)
       ? raw.density
       : DEFAULT_CHEKI_VIEW_PREFERENCES.density,
+    useSpecAspectRatio: typeof raw.useSpecAspectRatio === 'boolean'
+      ? raw.useSpecAspectRatio
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.useSpecAspectRatio,
     showRecordThumbnails: typeof raw.showRecordThumbnails === 'boolean'
       ? raw.showRecordThumbnails
       : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails,

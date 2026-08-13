@@ -13,6 +13,20 @@ export function formatDate(isoDate: string): string {
   return isoDate;
 }
 
+export function formatChineseDateWithWeekday(
+  isoDate: string,
+  options: { omitCurrentYear?: boolean } = {},
+): string {
+  if (!isValidISODate(isoDate)) return isoDate;
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+  const yearLabel = options.omitCurrentYear && year === new Date().getFullYear()
+    ? ''
+    : `${year}年`;
+  return `${yearLabel}${month}月${day}日 ${weekday}`;
+}
+
 export function formatTimeInput(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 4);
   if (digits.length <= 2) return digits;

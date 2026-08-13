@@ -1,22 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, Image, Switch, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
+  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
 } from 'react-native';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import Animated, {
-  Easing,
-  Extrapolation,
-  FadeIn,
-  FadeInUp,
-  FadeOut,
-  interpolate,
-  Keyframe,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  type SharedValue,
-} from 'react-native-reanimated';
 import { useDB } from '../context/DBContext';
 import { Artist, Cheki, ChekiManualEntry, Event } from '../types/models';
 import { resolveAvatarSource } from '../utils/avatarSource';
@@ -39,8 +25,8 @@ import {
 import { showDeleteFailedAlert } from '../utils/failureAlert';
 import { ThemeColors, useAppTheme } from '../theme/appTheme';
 import { ChekiManualEntryList } from '../components/ChekiManualEntryList';
-import { ChekiStackPreviewCard } from '../components/ChekiStackPreviewCard';
 import { ChekiRecordListItem } from '../components/ChekiRecordListItem';
+import { EventSectionHeader } from '../components/EventSectionHeader';
 import type { ChekiRecordWithItems } from '../repositories/ChekiRecordRepository';
 import {
   AndroidCompactTabHeader,
@@ -59,7 +45,7 @@ import { measureImageTransitionOrigin } from '../utils/imageTransition';
 import {
   ChekiSortOrder,
   ChekiBrowseMode,
-  ChekiItemLayout,
+  ChekiAlbumGrouping,
   ChekiViewPreferences,
   DEFAULT_CHEKI_VIEW_PREFERENCES,
   loadChekiViewPreferences,
@@ -79,6 +65,8 @@ import {
   type ChekiItemFilters,
   type ChekiRecordFilters,
 } from '../utils/chekiFilters';
+import { buildChekiDateSections, buildChekiMonthSections } from '../utils/chekiSections';
+import { formatChineseDateWithWeekday } from '../utils/date';
 
 function recordYear(record: { date: string | null; created_at: string }): string {
   return (record.date ?? record.created_at).slice(0, 4);
@@ -86,59 +74,27 @@ function recordYear(record: { date: string | null; created_at: string }): string
 
 type ChekiGalleryItem =
   | { type: 'record'; key: string; record: ChekiRecordWithItems }
+  | { type: 'recordSectionHeader'; key: string; title: string; count: number }
   | { type: 'header'; key: string; groupKey: string; group: ChekiArtistGroup }
-  | { type: 'dateHeader'; key: string; date: string }
+  | { type: 'dateHeader'; key: string; title: string; count: number }
   | { type: 'row'; key: string; groupKey: string; chekis: Cheki[]; viewerChekis: Cheki[]; isLastPhotoRow: boolean }
-  | { type: 'stack'; key: string; stackKey: string; title: string; chekis: Cheki[]; manualEntries: ChekiManualEntry[]; totalCount: number; totalPrice: number; artist: Artist | null }
-  | { type: 'stackExpandedRow'; key: string; stackKey: string; chekis: Cheki[]; viewerChekis: Cheki[]; isLastPhotoRow: boolean; insideStackCard: boolean }
-  | { type: 'stackExpandedManual'; key: string; stackKey: string; entries: ChekiManualEntry[]; hasPhotos: boolean; insideStackCard: boolean }
   | { type: 'manual'; key: string; groupKey: string; entries: ChekiManualEntry[] }
   | { type: 'notice'; key: string; text: string };
 
 const CHEKI_GRID_GAP = 8;
 const CHEKI_ASPECT_RATIO = 86 / 54;
-const CHEKI_STACK_PREVIEW_LIMIT = 10;
-const CHEKI_STACK_ANIMATION_MS = 260;
-const CHEKI_STACK_REVEAL_MS = 190;
-const CHEKI_FRAME_RADIUS = 11;
 const CHEKI_BARE_THUMBNAIL_RADIUS = 10;
 const CHEKI_GRID_DENSITY_LABELS: Record<ChekiGridDensity, string> = {
   large: '大图',
   medium: '中图',
   small: '小图',
 };
-const chekiStackLayoutTransition = LinearTransition
-  .duration(220)
-  .easing(Easing.out(Easing.cubic));
-const chekiStackEntering = FadeIn
-  .duration(CHEKI_STACK_REVEAL_MS)
-  .easing(Easing.out(Easing.cubic));
-const chekiStackExiting = FadeOut
-  .duration(120)
-  .easing(Easing.out(Easing.cubic));
-const chekiStackContentEntering = FadeInUp
-  .duration(CHEKI_STACK_REVEAL_MS)
-  .easing(Easing.out(Easing.cubic))
-  .withInitialValues({ opacity: 0, transform: [{ translateY: -6 }] });
-const chekiStackContentExiting = new Keyframe({
-  0: { opacity: 1, transform: [{ translateY: 0 }] },
-  100: { opacity: 0, transform: [{ translateY: -6 }], easing: Easing.out(Easing.cubic) },
-}).duration(110);
-
-function getChekiFrameInsets(width: number): { side: number; top: number; bottom: number } {
-  if (width < 76) return { side: 3, top: 3, bottom: 5 };
-  if (width < 96) return { side: 4, top: 4, bottom: 7 };
-  return { side: 5, top: 5, bottom: 9 };
-}
-
-type ChekiThumbnailChrome = 'framed' | 'bare';
 
 function ChekiGridThumbnail({
   uri,
   width,
   height,
   colors,
-  chrome = 'framed',
   imageRef,
   aspectRatio,
 }: {
@@ -146,66 +102,52 @@ function ChekiGridThumbnail({
   width: number;
   height: number;
   colors: ThemeColors;
-  chrome?: ChekiThumbnailChrome;
   imageRef?: Ref<Image>;
-  aspectRatio: number;
+  aspectRatio: number | null;
 }) {
+  const usesSpecLayout = aspectRatio !== null;
+  const cardInset = usesSpecLayout ? Math.max(5, Math.round(width * 0.07)) : 0;
   const fitInside = (maxWidth: number, maxHeight: number) => {
+    if (aspectRatio === null) return { width: maxWidth, height: maxHeight };
     const widthFromHeight = maxHeight * aspectRatio;
     return widthFromHeight <= maxWidth
       ? { width: widthFromHeight, height: maxHeight }
       : { width: maxWidth, height: maxWidth / aspectRatio };
   };
-  if (chrome === 'bare') {
-    const fitted = fitInside(width, height);
-    return (
-      <View style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+  const fitted = fitInside(width - cardInset * 2, height - cardInset * 2);
+
+  return (
+    <View
+      style={{
+        width,
+        height,
+        padding: cardInset,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: usesSpecLayout ? 12 : 0,
+        backgroundColor: usesSpecLayout ? colors.cardAlt : 'transparent',
+      }}
+    >
+      <View
+        style={{
+          ...fitted,
+          borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
+          backgroundColor: colors.card,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: usesSpecLayout ? 3 : 0 },
+          shadowOpacity: usesSpecLayout ? 0.18 : 0,
+          shadowRadius: usesSpecLayout ? 5 : 0,
+          elevation: usesSpecLayout ? 3 : 0,
+        }}
+      >
         <Image
           ref={imageRef}
           source={{ uri }}
           resizeMethod="resize"
           resizeMode="contain"
-          style={{
-            ...fitted,
-            borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
-            backgroundColor: colors.cardAlt,
-          }}
+          style={{ width: '100%', height: '100%', borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS }}
         />
       </View>
-    );
-  }
-
-  const frameInsets = getChekiFrameInsets(width);
-  const innerWidth = Math.max(1, width - frameInsets.side * 2);
-  const innerHeight = Math.max(1, height - frameInsets.top - frameInsets.bottom);
-  const fitted = fitInside(innerWidth, innerHeight);
-
-  return (
-    <View style={{
-      width,
-      height,
-      paddingLeft: frameInsets.side,
-      paddingRight: frameInsets.side,
-      paddingTop: frameInsets.top,
-      paddingBottom: frameInsets.bottom,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: CHEKI_FRAME_RADIUS,
-      borderWidth: 1,
-      borderColor: colors.divider,
-      backgroundColor: colors.card,
-    }}>
-      <Image
-        ref={imageRef}
-        source={{ uri }}
-        resizeMethod="resize"
-        resizeMode="contain"
-        style={{
-          ...fitted,
-          borderRadius: Math.max(6, CHEKI_FRAME_RADIUS - frameInsets.side),
-          backgroundColor: colors.cardAlt,
-        }}
-      />
     </View>
   );
 }
@@ -217,7 +159,7 @@ function ChekiThumbnailButton({
   height,
   colors,
   onOpen,
-  chrome = 'framed',
+  useSpecAspectRatio,
 }: {
   cheki: Cheki;
   viewerChekis: Cheki[];
@@ -225,7 +167,7 @@ function ChekiThumbnailButton({
   height: number;
   colors: ThemeColors;
   onOpen: (cheki: Cheki, chekis: Cheki[], origin: FullscreenImageTransitionOrigin | null) => void;
-  chrome?: ChekiThumbnailChrome;
+  useSpecAspectRatio: boolean;
 }) {
   const thumbnailRef = useRef<View>(null);
   const thumbnailImageRef = useRef<Image>(null);
@@ -243,18 +185,15 @@ function ChekiThumbnailButton({
       return;
     }
 
-    const borderRadius = chrome === 'bare'
-      ? CHEKI_BARE_THUMBNAIL_RADIUS
-      : Math.max(6, CHEKI_FRAME_RADIUS - getChekiFrameInsets(width).side);
     cancelPendingMeasurementRef.current = measureImageTransitionOrigin(
       node,
-      borderRadius,
+      CHEKI_BARE_THUMBNAIL_RADIUS,
       (origin) => {
         cancelPendingMeasurementRef.current = null;
         onOpen(cheki, viewerChekis, origin);
       },
     );
-  }, [cheki, chrome, onOpen, viewerChekis, width]);
+  }, [cheki, onOpen, viewerChekis]);
 
   return (
     <View ref={thumbnailRef} collapsable={false}>
@@ -267,47 +206,13 @@ function ChekiThumbnailButton({
           width={width}
           height={height}
           colors={colors}
-          chrome={chrome}
           imageRef={thumbnailImageRef}
-          aspectRatio={getChekiSpecAspectRatio(normalizeChekiSpec(cheki.spec))}
+          aspectRatio={useSpecAspectRatio
+            ? getChekiSpecAspectRatio(normalizeChekiSpec(cheki.spec))
+            : null}
         />
       </TouchableOpacity>
     </View>
-  );
-}
-
-function ChekiDateSectionHeader({
-  title,
-  totalCount,
-  expanded,
-  colors,
-  onPress,
-}: {
-  title: string;
-  totalCount: number;
-  expanded: boolean;
-  colors: ThemeColors;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${title}，${totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
-      style={{ minHeight: 44, marginTop: 6, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-    >
-      <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent }} />
-      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, fontSize: 17, lineHeight: 35, fontWeight: '700', color: colors.heading }}>
-        {title}
-      </Text>
-      <View style={{ borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
-        <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '900', color: colors.accent }}>
-          {totalCount} 张
-        </Text>
-      </View>
-      <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={16} color={colors.accent} />
-    </TouchableOpacity>
   );
 }
 
@@ -346,6 +251,37 @@ function sortChekiRecords<T extends { date: string | null; created_at: string }>
   return sortOrder === 'asc' ? sorted.reverse() : sorted;
 }
 
+function formatRecordMonth(month: string): string {
+  const [year, monthNumber] = month.split('-');
+  return `${year}年${Number(monthNumber)}月`;
+}
+
+function formatAlbumDate(date: string): string {
+  if (date === '__undated__') return '日期未填写';
+  return formatChineseDateWithWeekday(date, { omitCurrentYear: true });
+}
+
+function buildRecordMonthItems(
+  records: ChekiRecordWithItems[],
+  sortOrder: ChekiSortOrder,
+): ChekiGalleryItem[] {
+  return buildChekiMonthSections(records, sortOrder).flatMap(({ key, items }) => {
+    return [
+      {
+        type: 'recordSectionHeader' as const,
+        key: `record-section:${key}`,
+        title: key === '__undated__' ? '日期未填写' : formatRecordMonth(key),
+        count: items.length,
+      },
+      ...items.map((record) => ({
+        type: 'record' as const,
+        key: `record:${record.id}`,
+        record,
+      })),
+    ];
+  });
+}
+
 function buildAlbumGridItems(
   chekis: Cheki[],
   manualEntries: ChekiManualEntry[],
@@ -374,69 +310,28 @@ function buildAlbumGridItems(
   return items;
 }
 
-function buildManualArtistSummaries(
-  entries: ChekiManualEntry[],
-  artistMap: Map<string, Artist>,
-  oshiArtistId: string | null,
-) {
-  const counts = new Map<string, number>();
-  for (const entry of entries) {
-    counts.set(entry.artist_id, (counts.get(entry.artist_id) ?? 0) + entry.count);
-  }
-
-  return Array.from(counts.entries())
-    .map(([artistId, count]) => {
-      const artist = artistMap.get(artistId);
-      return artist ? {
-        id: artist.id,
-        name: getArtistPrimaryName(artist),
-        avatarUri: artist.avatar_uri,
-        isOshi: artist.id === oshiArtistId,
-        count,
-      } : null;
-    })
-    .filter((item): item is {
-      id: string;
-      name: string;
-      avatarUri: string | null;
-      isOshi: boolean;
-      count: number;
-    } => item !== null)
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-}
-
-function appendExpandedStackItems(items: ChekiGalleryItem[], expandedStacks: Set<string>, columns: ChekiGridColumns): ChekiGalleryItem[] {
-  const result: ChekiGalleryItem[] = [];
-  for (const item of items) {
-    result.push(item);
-    if (item.type !== 'stack' || !expandedStacks.has(item.stackKey)) continue;
-
-    const insideStackCard = item.stackKey.startsWith('artist:');
-
-    chunkChekis(item.chekis, columns).forEach((row, rowIndex, rows) => {
-      result.push({
-        type: 'stackExpandedRow',
-        key: `${item.stackKey}:expanded-row:${rowIndex}`,
-        stackKey: item.stackKey,
-        chekis: row,
-        viewerChekis: item.chekis,
-        isLastPhotoRow: rowIndex === rows.length - 1 && item.manualEntries.length === 0,
-        insideStackCard,
-      });
-    });
-
-    if (item.manualEntries.length > 0) {
-      result.push({
-        type: 'stackExpandedManual',
-        key: `${item.stackKey}:expanded-manual`,
-        stackKey: item.stackKey,
-        entries: item.manualEntries,
-        hasPhotos: item.chekis.length > 0,
-        insideStackCard,
-      });
-    }
-  }
-  return result;
+function buildDateGroupedAlbumGridItems(
+  chekis: Cheki[],
+  columns: ChekiGridColumns,
+  sortOrder: ChekiSortOrder,
+): ChekiGalleryItem[] {
+  return buildChekiDateSections(chekis, sortOrder).flatMap(({ key, items }) => {
+    const groupChekis = items;
+    const rows: ChekiGalleryItem[] = chunkChekis(groupChekis, columns).map((row, index, allRows) => ({
+      type: 'row',
+      key: `date:${key}:row:${index}`,
+      groupKey: `date:${key}`,
+      chekis: row,
+      viewerChekis: groupChekis,
+      isLastPhotoRow: index === allRows.length - 1,
+    }));
+    return [{
+      type: 'dateHeader' as const,
+      key: `date:${key}:header`,
+      title: formatAlbumDate(key),
+      count: groupChekis.length,
+    }, ...rows];
+  });
 }
 
 function matchesPeriod(record: { date: string | null; created_at: string }, year?: number, month?: number): boolean {
@@ -500,10 +395,13 @@ function SegmentedOptions({
           <TouchableOpacity
             key={option.value}
             activeOpacity={0.72}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={option.label}
             onPress={() => onChange(option.value)}
             style={{
               flex: 1,
-              minHeight: 34,
+              minHeight: 44,
               borderRadius: 9,
               alignItems: 'center',
               justifyContent: 'center',
@@ -516,6 +414,69 @@ function SegmentedOptions({
               fontWeight: '800',
               color: selected ? colors.text : colors.textMuted,
             }}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function BrowseModeOptions({
+  colors,
+  value,
+  onChange,
+}: {
+  colors: ThemeColors;
+  value: ChekiBrowseMode;
+  onChange: (value: ChekiBrowseMode) => void;
+}) {
+  const options: Array<{
+    value: ChekiBrowseMode;
+    label: string;
+    icon: 'album' | 'reorder';
+  }> = [
+    { value: 'album', label: '相册', icon: 'album' },
+    { value: 'record', label: '记录', icon: 'reorder' },
+  ];
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <TouchableOpacity
+            key={option.value}
+            activeOpacity={0.72}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={option.label}
+            onPress={() => onChange(option.value)}
+            style={{
+              flex: 1,
+              minHeight: 72,
+              paddingHorizontal: 12,
+              paddingVertical: 12,
+              borderRadius: 14,
+              borderWidth: selected ? 1.5 : 1,
+              borderColor: selected ? colors.accent : colors.inputBorder,
+              backgroundColor: selected ? colors.accentSofter : colors.card,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt }}>
+                <AppIcon name={option.icon} size={17} color={selected ? colors.onAccent : colors.textSecondary} />
+              </View>
+              <AppIcon
+                name="radio"
+                variant={selected ? 'selected' : 'unselected'}
+                size={18}
+                color={selected ? colors.accent : colors.textMuted}
+                secondaryColor={colors.card}
+              />
+            </View>
+            <Text style={{ marginTop: 8, fontSize: 15, lineHeight: 20, fontWeight: '800', color: colors.heading }}>
               {option.label}
             </Text>
           </TouchableOpacity>
@@ -541,269 +502,6 @@ function useReducedMotionEnabled(): boolean {
   }, []);
 
   return reducedMotion;
-}
-
-type ChekiStackGalleryItem = Extract<ChekiGalleryItem, { type: 'stack' }>;
-
-function AnimatedChekiStackPhoto({
-  cheki,
-  index,
-  total,
-  columns,
-  cardWidth,
-  cardHeight,
-  areaWidth,
-  previewScale,
-  progress,
-  colors,
-  isDark,
-  expanded,
-  renderImage,
-  onPress,
-}: {
-  cheki: Cheki;
-  index: number;
-  total: number;
-  columns: ChekiGridColumns;
-  cardWidth: number;
-  cardHeight: number;
-  areaWidth: number;
-  previewScale: number;
-  progress: SharedValue<number>;
-  colors: ThemeColors;
-  isDark: boolean;
-  expanded: boolean;
-  renderImage: boolean;
-  onPress: () => void;
-}) {
-  const previewCount = Math.min(total, CHEKI_STACK_PREVIEW_LIMIT);
-  const previewIndex = Math.min(index, Math.max(0, previewCount - 1));
-  const previewStep = previewCount > 1
-    ? Math.min(42, Math.max(12, (areaWidth - cardWidth * previewScale) / (previewCount - 0.2)))
-    : 0;
-  const previewWidth = cardWidth * previewScale + previewStep * Math.max(0, previewCount - 1);
-  const previewStart = Math.max(0, (areaWidth - previewWidth) / 2);
-  const collapsedX = previewStart + previewIndex * previewStep;
-  const collapsedY = 9;
-  const row = Math.floor(index / columns);
-  const column = index % columns;
-  const gridX = column * (cardWidth + CHEKI_GRID_GAP);
-  const gridY = row * (cardHeight + CHEKI_GRID_GAP);
-  const hiddenInStack = index >= previewCount;
-  const extraCount = index === previewCount - 1 ? total - previewCount : 0;
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const opacity = hiddenInStack
-      ? interpolate(progress.value, [0, 0.18, 1], [0, 0, 1], Extrapolation.CLAMP)
-      : 1;
-    return {
-      opacity,
-      transform: [
-        { translateX: interpolate(progress.value, [0, 1], [collapsedX, gridX]) },
-        { translateY: interpolate(progress.value, [0, 1], [collapsedY, gridY]) },
-        { scale: interpolate(progress.value, [0, 1], [previewScale, 1]) },
-      ],
-    };
-  }, [
-    collapsedX,
-    collapsedY,
-    gridX,
-    gridY,
-    hiddenInStack,
-    previewScale,
-  ]);
-
-  return (
-    <Animated.View
-      pointerEvents={hiddenInStack && !expanded ? 'none' : 'auto'}
-      style={[{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: cardWidth,
-        height: cardHeight,
-        zIndex: expanded ? 1 : CHEKI_STACK_PREVIEW_LIMIT - previewIndex,
-      }, animatedStyle]}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onPress}
-        style={{
-          width: cardWidth,
-          height: cardHeight,
-        }}
-      >
-        {renderImage ? (
-          <ChekiGridThumbnail
-            uri={cheki.photo_uri}
-            width={cardWidth}
-            height={cardHeight}
-            colors={colors}
-            aspectRatio={getChekiSpecAspectRatio(normalizeChekiSpec(cheki.spec))}
-          />
-        ) : null}
-        {!expanded && extraCount > 0 ? (
-          <View style={{
-            position: 'absolute',
-            right: 5,
-            bottom: 7,
-            borderRadius: 999,
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            backgroundColor: isDark ? withAlpha(colors.heading, 0.84) : withAlpha(colors.text, 0.84),
-          }}>
-            <Text style={{ fontSize: 10, lineHeight: 13, fontWeight: '900', color: colors.card }}>
-              +{extraCount}
-            </Text>
-          </View>
-        ) : null}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-function ChekiSpreadStackCard({
-  item,
-  expanded,
-  columns,
-  cardWidth,
-  cardHeight,
-  colors,
-  isDark,
-  oshiArtistId,
-  onToggle,
-}: {
-  item: ChekiStackGalleryItem;
-  expanded: boolean;
-  columns: ChekiGridColumns;
-  cardWidth: number;
-  cardHeight: number;
-  colors: ThemeColors;
-  isDark: boolean;
-  oshiArtistId: string | null;
-  onToggle: () => void;
-}) {
-  const reducedMotion = useReducedMotionEnabled();
-  const progress = useSharedValue(expanded ? 1 : 0);
-  const previewChekis = useMemo(
-    () => item.chekis.slice(0, CHEKI_STACK_PREVIEW_LIMIT),
-    [item.chekis],
-  );
-  const areaWidth = columns * cardWidth + (columns - 1) * CHEKI_GRID_GAP;
-  const previewScale = Math.min(0.78, Math.max(0.48, 78 / cardWidth));
-  const previewHeight = cardHeight * previewScale;
-  const collapsedAreaHeight = item.chekis.length > 0 ? previewHeight + 20 : 0;
-  const areaHeight = collapsedAreaHeight;
-  const groupAvatarSrc = item.artist ? resolveAvatarSource(item.artist.avatar_uri) : null;
-  const isOshi = item.artist?.id === oshiArtistId;
-  const hasExpandedContent = expanded && (item.chekis.length > 0 || item.manualEntries.length > 0);
-
-  useEffect(() => {
-    progress.value = withTiming(expanded ? 1 : 0, {
-      duration: reducedMotion ? 1 : CHEKI_STACK_ANIMATION_MS,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [expanded, progress, reducedMotion]);
-
-  return (
-    <View style={{
-      borderRadius: 18,
-      borderBottomLeftRadius: hasExpandedContent ? 0 : 18,
-      borderBottomRightRadius: hasExpandedContent ? 0 : 18,
-      backgroundColor: colors.card,
-      marginBottom: hasExpandedContent ? 0 : 12,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.18 : 0.08,
-      shadowRadius: 14,
-      elevation: 3,
-    }}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.title}，${item.totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
-        style={{
-          minHeight: 74,
-          paddingHorizontal: 14,
-          paddingTop: 13,
-          paddingBottom: 8,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-        }}
-      >
-        <View style={{ width: 40, height: 40 }}>
-          <OshiAvatar source={groupAvatarSrc} size={isOshi ? 40 : 36} isOshi={isOshi} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 15, lineHeight: 30, fontWeight: '800', color: colors.heading }}>
-              {item.title}
-            </Text>
-            {isOshi ? <OshiBadge /> : null}
-          </View>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 5 }}>
-          <View style={{ borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '900', color: colors.accent }}>
-              {item.totalCount} 张
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '800', color: colors.accent }}>
-              {expanded ? '收起' : '展开'}
-            </Text>
-            <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={15} color={colors.accent} />
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      {item.chekis.length > 0 && !expanded ? (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
-          <Animated.View style={{ width: areaWidth, height: areaHeight, position: 'relative', overflow: 'visible' }}>
-            {previewChekis.map((cheki, index) => (
-              <AnimatedChekiStackPhoto
-                key={cheki.id}
-                cheki={cheki}
-                index={index}
-                total={item.chekis.length}
-                columns={columns}
-                cardWidth={cardWidth}
-                cardHeight={cardHeight}
-                areaWidth={areaWidth}
-                previewScale={previewScale}
-                progress={progress}
-                colors={colors}
-                isDark={isDark}
-                expanded={expanded}
-                renderImage
-                onPress={onToggle}
-              />
-            ))}
-          </Animated.View>
-        </View>
-      ) : item.chekis.length === 0 ? (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={onToggle}
-          style={{ paddingHorizontal: 14, paddingBottom: 14 }}
-        >
-          <View style={{
-            borderRadius: 14,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            backgroundColor: colors.accentSofter,
-          }}>
-            <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: '700', color: colors.textSecondary }}>
-              这一组还没有图片。
-            </Text>
-          </View>
-        </TouchableOpacity>
-      ) : null}
-
-    </View>
-  );
 }
 
 export default function ChekiLibraryScreen() {
@@ -856,7 +554,6 @@ export default function ChekiLibraryScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [viewPreferences, setViewPreferences] = useState<ChekiViewPreferences>(DEFAULT_CHEKI_VIEW_PREFERENCES);
   const [viewSettingsVisible, setViewSettingsVisible] = useState(false);
-  const [expandedStacks, setExpandedStacks] = useState<Set<string>>(new Set());
   const [galleryViewportHeight, setGalleryViewportHeight] = useState(0);
   const [galleryHeaderHeight, setGalleryHeaderHeight] = useState(0);
   const galleryContentWidth = Math.max(1, screenWidth - 32);
@@ -870,16 +567,18 @@ export default function ChekiLibraryScreen() {
       availableWidth: galleryContentWidth,
       availableHeight: galleryAvailableHeight,
       gap: CHEKI_GRID_GAP,
-      aspectRatio: CHEKI_ASPECT_RATIO,
+      aspectRatio: viewPreferences.useSpecAspectRatio ? 1 : CHEKI_ASPECT_RATIO,
     }),
-    [galleryAvailableHeight, galleryContentWidth, viewPreferences.density],
+    [
+      galleryAvailableHeight,
+      galleryContentWidth,
+      viewPreferences.density,
+      viewPreferences.useSpecAspectRatio,
+    ],
   );
   const columns = gridLayout.columns;
   const chekiW = gridLayout.itemWidth;
   const chekiH = gridLayout.itemHeight;
-  const stackContentWidth = Math.max(1, screenWidth - 32 - 28);
-  const stackChekiW = Math.floor((stackContentWidth - CHEKI_GRID_GAP * (columns - 1)) / columns);
-  const stackChekiH = Math.round(stackChekiW * CHEKI_ASPECT_RATIO);
 
   const [chekiList, setChekiList] = useState<Cheki[]>([]);
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
@@ -1150,27 +849,34 @@ export default function ChekiLibraryScreen() {
   );
   const galleryItems = useMemo(() => {
     if (viewPreferences.browseMode === 'record') {
-      return sortChekiRecords(filteredRecordList, viewPreferences.sortOrder).map((record) => ({
-        type: 'record' as const,
-        key: `record:${record.id}`,
-        record,
-      }));
+      return buildRecordMonthItems(filteredRecordList, viewPreferences.recordSortOrder);
     }
 
-    if (viewPreferences.itemLayout === 'album') {
-      return buildAlbumGridItems(filteredChekiList, filteredManualEntries, columns, viewPreferences.sortOrder);
+    if (viewPreferences.albumGrouping === 'none') {
+      return buildAlbumGridItems(filteredChekiList, [], columns, viewPreferences.albumSortOrder);
     }
 
-    return buildArtistGridItems(groups, columns);
+    if (viewPreferences.albumGrouping === 'date') {
+      return buildDateGroupedAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder);
+    }
+
+    const sortedGroups = groups.map((group) => ({
+      ...group,
+      chekis: sortChekiRecords(group.chekis, viewPreferences.albumSortOrder),
+      manualEntries: [],
+      totalCount: group.chekis.length,
+    })).filter((group) => group.chekis.length > 0);
+    return buildArtistGridItems(sortedGroups, columns);
   }, [
     columns,
     filteredChekiList,
     filteredManualEntries,
     filteredRecordList,
     groups,
+    viewPreferences.albumGrouping,
+    viewPreferences.albumSortOrder,
     viewPreferences.browseMode,
-    viewPreferences.itemLayout,
-    viewPreferences.sortOrder,
+    viewPreferences.recordSortOrder,
   ]);
   const artistNameMap = useMemo(
     () => Object.fromEntries([...artistMap.values()].map((artist) => [artist.id, getArtistPrimaryName(artist)])),
@@ -1414,7 +1120,6 @@ export default function ChekiLibraryScreen() {
 
   const persistViewPreferences = useCallback((nextPreferences: ChekiViewPreferences) => {
     setViewPreferences(nextPreferences);
-    setExpandedStacks(new Set());
     void saveChekiViewPreferences(nextPreferences);
   }, []);
 
@@ -1425,13 +1130,16 @@ export default function ChekiLibraryScreen() {
     });
   }, [persistViewPreferences, viewPreferences]);
 
-  const handleChangeItemLayout = useCallback((itemLayout: ChekiItemLayout) => {
-    persistViewPreferences({ ...viewPreferences, itemLayout });
+  const handleChangeAlbumGrouping = useCallback((albumGrouping: ChekiAlbumGrouping) => {
+    persistViewPreferences({ ...viewPreferences, albumGrouping });
   }, [persistViewPreferences, viewPreferences]);
 
   const handleChangeSortOrder = useCallback((sortOrder: ChekiSortOrder) => {
-    persistViewPreferences({ ...viewPreferences, sortOrder });
-  }, [persistViewPreferences, viewPreferences]);
+    persistViewPreferences({
+      ...viewPreferences,
+      ...(isRecordMode ? { recordSortOrder: sortOrder } : { albumSortOrder: sortOrder }),
+    });
+  }, [isRecordMode, persistViewPreferences, viewPreferences]);
 
   const handleChangeDensity = useCallback((density: ChekiGridDensity) => {
     persistViewPreferences({ ...viewPreferences, density });
@@ -1441,14 +1149,9 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, showRecordThumbnails });
   }, [persistViewPreferences, viewPreferences]);
 
-  const toggleStack = useCallback((stackKey: string) => {
-    setExpandedStacks((current) => {
-      const next = new Set(current);
-      if (next.has(stackKey)) next.delete(stackKey);
-      else next.add(stackKey);
-      return next;
-    });
-  }, []);
+  const handleChangeSpecAspectRatio = useCallback((useSpecAspectRatio: boolean) => {
+    persistViewPreferences({ ...viewPreferences, useSpecAspectRatio });
+  }, [persistViewPreferences, viewPreferences]);
 
   const activeSearchFilters = useMemo(() => {
     const filters: Array<{ id: string; label: string; onPress: () => void }> = [];
@@ -1674,6 +1377,10 @@ export default function ChekiLibraryScreen() {
   ), [colors, isRecordMode, openUnifiedCreate]);
 
   const renderGalleryItem = useCallback(({ item }: { item: ChekiGalleryItem }) => {
+    if (item.type === 'recordSectionHeader') {
+      return <EventSectionHeader title={item.title} count={item.count} colors={colors} />;
+    }
+
     if (item.type === 'record') {
       const artist = item.record.artist_id ? artistMap.get(item.record.artist_id) ?? null : null;
       const event = item.record.event_id ? eventMap.get(item.record.event_id) ?? null : null;
@@ -1708,11 +1415,7 @@ export default function ChekiLibraryScreen() {
     }
 
     if (item.type === 'dateHeader') {
-      return (
-        <Text style={{ marginTop: 6, marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-          {item.date}
-        </Text>
-      );
+      return <EventSectionHeader title={item.title} count={item.count} colors={colors} />;
     }
 
     if (item.type === 'header') {
@@ -1757,142 +1460,6 @@ export default function ChekiLibraryScreen() {
       );
     }
 
-    if (item.type === 'stack') {
-      const expanded = expandedStacks.has(item.stackKey);
-      if (item.stackKey.startsWith('artist:')) {
-        return (
-          <ChekiSpreadStackCard
-            item={item}
-            expanded={expanded}
-            columns={columns}
-            cardWidth={stackChekiW}
-            cardHeight={stackChekiH}
-            colors={colors}
-            isDark={isDark}
-            oshiArtistId={oshiArtistId}
-            onToggle={() => toggleStack(item.stackKey)}
-          />
-        );
-      }
-
-      if (expanded) {
-        return (
-          <Animated.View
-            entering={reducedMotion ? undefined : chekiStackEntering}
-            exiting={reducedMotion ? undefined : chekiStackExiting}
-            layout={reducedMotion ? undefined : chekiStackLayoutTransition}
-          >
-            <ChekiDateSectionHeader
-              title={item.title}
-              totalCount={item.totalCount}
-              expanded
-              colors={colors}
-              onPress={() => toggleStack(item.stackKey)}
-            />
-          </Animated.View>
-        );
-      }
-
-      const manualCount = Math.max(0, item.totalCount - item.chekis.length);
-
-      return (
-        <Animated.View
-          entering={reducedMotion ? undefined : chekiStackEntering}
-          exiting={reducedMotion ? undefined : chekiStackExiting}
-          layout={reducedMotion ? undefined : chekiStackLayoutTransition}
-        >
-          <ChekiDateSectionHeader
-            title={item.title}
-            totalCount={item.totalCount}
-            expanded={false}
-            colors={colors}
-            onPress={() => toggleStack(item.stackKey)}
-          />
-          <ChekiStackPreviewCard
-            chekis={item.chekis}
-            manualCount={manualCount}
-            manualArtistSummaries={buildManualArtistSummaries(item.manualEntries, artistMap, oshiArtistId)}
-            areaWidth={galleryContentWidth}
-            thumbnailWidth={chekiW}
-            thumbnailHeight={chekiH}
-            columns={columns}
-            onPress={() => toggleStack(item.stackKey)}
-            activeOpacity={1}
-            accessibilityLabel={`${item.title}，${item.totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
-            chrome="bare"
-          />
-        </Animated.View>
-      );
-    }
-
-    if (item.type === 'stackExpandedRow') {
-      const rowBottomRadius = item.insideStackCard && item.isLastPhotoRow ? 18 : 0;
-      const rowChekiW = item.insideStackCard ? stackChekiW : chekiW;
-      const rowChekiH = item.insideStackCard ? stackChekiH : chekiH;
-      return (
-        <Animated.View
-          entering={reducedMotion ? undefined : chekiStackContentEntering}
-          exiting={reducedMotion ? undefined : chekiStackContentExiting}
-          layout={reducedMotion ? undefined : chekiStackLayoutTransition}
-          style={{
-            paddingHorizontal: item.insideStackCard ? 14 : 0,
-            paddingBottom: item.insideStackCard
-              ? (item.isLastPhotoRow ? 14 : CHEKI_GRID_GAP)
-              : 0,
-            marginBottom: item.insideStackCard
-              ? (item.isLastPhotoRow ? 12 : 0)
-              : (item.isLastPhotoRow ? 20 : CHEKI_GRID_GAP),
-            flexDirection: 'row',
-            gap: CHEKI_GRID_GAP,
-            backgroundColor: item.insideStackCard ? colors.card : 'transparent',
-            borderBottomLeftRadius: rowBottomRadius,
-            borderBottomRightRadius: rowBottomRadius,
-          }}
-        >
-          {item.chekis.map((cheki) => (
-            <ChekiThumbnailButton
-              key={cheki.id}
-              cheki={cheki}
-              viewerChekis={item.viewerChekis}
-              width={rowChekiW}
-              height={rowChekiH}
-              colors={colors}
-              onOpen={openViewer}
-            />
-          ))}
-        </Animated.View>
-      );
-    }
-
-    if (item.type === 'stackExpandedManual') {
-      return (
-        <Animated.View
-          entering={reducedMotion ? undefined : chekiStackContentEntering}
-          exiting={reducedMotion ? undefined : chekiStackContentExiting}
-          layout={reducedMotion ? undefined : chekiStackLayoutTransition}
-          style={{
-            paddingHorizontal: item.insideStackCard ? 14 : 0,
-            paddingTop: item.hasPhotos ? 4 : 0,
-            paddingBottom: item.insideStackCard ? 14 : 0,
-            marginBottom: item.insideStackCard ? 12 : 20,
-            backgroundColor: item.insideStackCard ? colors.card : 'transparent',
-            borderBottomLeftRadius: item.insideStackCard ? 18 : 0,
-            borderBottomRightRadius: item.insideStackCard ? 18 : 0,
-          }}
-        >
-          <ChekiManualEntryList
-            entries={item.entries}
-            eventMap={eventMap}
-            isDark={isDark}
-            artistMap={artistMap}
-            oshiArtistId={oshiArtistId}
-            showArtistMeta
-            onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
-          />
-        </Animated.View>
-      );
-    }
-
     if (item.type === 'manual') {
       return (
         <View style={{ marginBottom: 24 }}>
@@ -1902,7 +1469,7 @@ export default function ChekiLibraryScreen() {
             isDark={isDark}
             artistMap={artistMap}
             oshiArtistId={oshiArtistId}
-            showArtistMeta={viewPreferences.itemLayout !== 'artist'}
+            showArtistMeta={viewPreferences.albumGrouping !== 'artist'}
             onPressEntry={(entry) => router.push(`/cheki/records/${entry.id}`)}
           />
         </View>
@@ -1920,7 +1487,7 @@ export default function ChekiLibraryScreen() {
             height={chekiH}
             colors={colors}
             onOpen={openViewer}
-            chrome={item.groupKey === '__album__' ? 'bare' : 'framed'}
+            useSpecAspectRatio={viewPreferences.useSpecAspectRatio}
           />
         ))}
       </View>
@@ -1932,17 +1499,12 @@ export default function ChekiLibraryScreen() {
     colors,
     columns,
     eventMap,
-    expandedStacks,
-    galleryContentWidth,
     isDark,
     openViewer,
     oshiArtistId,
-    reducedMotion,
-    stackContentWidth,
-    stackChekiH,
-    stackChekiW,
-    toggleStack,
+    viewPreferences.albumGrouping,
     viewPreferences.showRecordThumbnails,
+    viewPreferences.useSpecAspectRatio,
   ]);
 
   const galleryList = (
@@ -1975,7 +1537,7 @@ export default function ChekiLibraryScreen() {
             <SearchFilterBar
               keyword={keyword}
               onKeywordChange={setKeyword}
-              placeholder="搜索艺人、活动或备注"
+              placeholder={isRecordMode ? '搜索记录' : '搜索拍立得'}
               onOpenFilter={() => {
                 if (isRecordMode) {
                   setRecordFilterDraft(cloneChekiRecordFilters(recordFilters));
@@ -2064,44 +1626,47 @@ export default function ChekiLibraryScreen() {
           visible={viewSettingsVisible}
           title="显示选项"
           onClose={() => setViewSettingsVisible(false)}
-          maxHeightRatio={0.52}
+          maxHeightRatio={0.7}
           scrollable
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
         >
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-              浏览方式
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 16, lineHeight: 22, fontWeight: '800', color: colors.heading }}>
+              浏览模式
             </Text>
-            <SegmentedOptions
-              colors={colors}
-              options={[
-                { value: 'item', label: '单张拍立得' },
-                { value: 'record', label: '拍立得记录' },
-              ]}
-              value={viewPreferences.browseMode}
-              onChange={(value) => handleChangeBrowseMode(value as ChekiBrowseMode)}
-            />
-          </View>
-
-          {viewPreferences.browseMode === 'item' ? (
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                排列方式
-              </Text>
-              <SegmentedOptions
+            <View style={{ marginTop: 12 }}>
+              <BrowseModeOptions
                 colors={colors}
-                options={[
-                  { value: 'artist', label: '按艺人' },
-                  { value: 'album', label: '相册' },
-                ]}
-                value={viewPreferences.itemLayout}
-                onChange={(value) => handleChangeItemLayout(value as ChekiItemLayout)}
+                value={viewPreferences.browseMode}
+                onChange={handleChangeBrowseMode}
               />
             </View>
-          ) : null}
+          </View>
 
-          <View style={{ marginBottom: 16 }}>
-            <View style={{ marginBottom: 16 }}>
+          <View style={{ paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.divider }}>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '800', color: colors.heading }}>
+              {isRecordMode ? '记录设置' : '相册设置'}
+            </Text>
+
+            {!isRecordMode ? (
+              <View style={{ marginTop: 16, marginBottom: 16 }}>
+                <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                  分组方式
+                </Text>
+                <SegmentedOptions
+                  colors={colors}
+                  options={[
+                    { value: 'artist', label: '按艺人' },
+                    { value: 'date', label: '按日期' },
+                    { value: 'none', label: '不分组' },
+                  ]}
+                  value={viewPreferences.albumGrouping}
+                  onChange={(value) => handleChangeAlbumGrouping(value as ChekiAlbumGrouping)}
+                />
+              </View>
+            ) : null}
+
+            <View style={{ marginTop: isRecordMode ? 16 : 0, marginBottom: 16 }}>
               <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
                 排序
               </Text>
@@ -2111,50 +1676,60 @@ export default function ChekiLibraryScreen() {
                   { value: 'desc', label: '最新在前' },
                   { value: 'asc', label: '最早在前' },
                 ]}
-                value={viewPreferences.sortOrder}
+                value={isRecordMode ? viewPreferences.recordSortOrder : viewPreferences.albumSortOrder}
                 onChange={(value) => handleChangeSortOrder(value as ChekiSortOrder)}
               />
             </View>
-          </View>
 
-          {viewPreferences.browseMode === 'record' ? (
-            <View>
-              <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '700', color: colors.text }}>
-                    显示缩略图
-                  </Text>
-                  <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-                    关闭时显示艺人头像
-                  </Text>
-                </View>
-                <Switch
-                  key={viewPreferences.showRecordThumbnails ? 'record-thumbnails-on' : 'record-thumbnails-off'}
-                  value={viewPreferences.showRecordThumbnails}
-                  onValueChange={handleChangeRecordThumbnails}
-                  accessibilityLabel="显示缩略图"
-                  trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
-                  thumbColor={viewPreferences.showRecordThumbnails ? colors.accent : colors.card}
+            {isRecordMode ? (
+              <View>
+                <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                  记录缩略图
+                </Text>
+                <SegmentedOptions
+                  colors={colors}
+                  options={[
+                    { value: 'show', label: '显示' },
+                    { value: 'hide', label: '隐藏' },
+                  ]}
+                  value={viewPreferences.showRecordThumbnails ? 'show' : 'hide'}
+                  onChange={(value) => handleChangeRecordThumbnails(value === 'show')}
                 />
               </View>
-            </View>
-          ) : (
-            <View>
-              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                图片大小
-              </Text>
-              <SegmentedOptions
-                colors={colors}
-                options={[
-                  { value: 'large', label: '大' },
-                  { value: 'medium', label: '中' },
-                  { value: 'small', label: '小' },
-                ]}
-                value={viewPreferences.density}
-                onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
-              />
-            </View>
-          )}
+            ) : (
+              <View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                    图片大小
+                  </Text>
+                  <SegmentedOptions
+                    colors={colors}
+                    options={[
+                      { value: 'large', label: '大' },
+                      { value: 'medium', label: '中' },
+                      { value: 'small', label: '小' },
+                    ]}
+                    value={viewPreferences.density}
+                    onChange={(value) => handleChangeDensity(value as ChekiGridDensity)}
+                  />
+                </View>
+                <View>
+                  <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                    展示比例
+                  </Text>
+                  <SegmentedOptions
+                    colors={colors}
+                    options={[
+                      { value: 'uniform', label: '统一比例' },
+                      { value: 'spec', label: '按规格' },
+                    ]}
+                    value={viewPreferences.useSpecAspectRatio ? 'spec' : 'uniform'}
+                    onChange={(value) => handleChangeSpecAspectRatio(value === 'spec')}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
         </BottomSheetDialog>
     </>
   );

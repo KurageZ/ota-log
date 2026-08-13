@@ -6,6 +6,7 @@ import { getArtistDisplayText } from '../utils/artistDisplay';
 import { useAppTheme } from '../theme/appTheme';
 import { OshiAvatar, OshiBadge } from './Oshi';
 import { AppIcon } from './AppIcon';
+import { formatChineseDateWithWeekday } from '../utils/date';
 
 const RECORD_PREVIEW_WIDTH = 58;
 const PREVIEW_STACK_OFFSET = 3;
@@ -41,18 +42,16 @@ export function ChekiRecordListItem({
     .filter((preview): preview is NonNullable<typeof preview> => preview !== null);
   const visiblePreviews = previews.slice(0, PREVIEW_STACK_LIMIT);
   const additionalPreviewCount = Math.max(0, previews.length - 1);
-  const addedCount = Math.min(photoItems.length, record.quantity);
-  const imageSummary = addedCount === 0
-    ? '无图片'
-    : addedCount < record.quantity ? `${addedCount} 张有图` : null;
-  const effectiveDate = record.date ?? record.created_at.slice(0, 10);
+  const formattedDate = record.date
+    ? formatChineseDateWithWeekday(record.date)
+    : '日期未填写';
 
   return (
     <TouchableOpacity
       activeOpacity={0.78}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${effectiveDate}，${display?.title ?? '未关联艺人'}，共${record.quantity}张`}
+      accessibilityLabel={`${formattedDate}，${display?.title ?? '未关联艺人'}，共${record.quantity}张`}
       style={{
         marginBottom: 12,
         paddingHorizontal: showThumbnail ? 14 : 12,
@@ -81,8 +80,6 @@ export function ChekiRecordListItem({
                       height: previewHeight,
                       borderRadius: 10,
                       overflow: 'hidden',
-                      borderWidth: 1,
-                      borderColor: colors.divider,
                       backgroundColor: colors.cardAlt,
                     }}
                   >
@@ -121,8 +118,6 @@ export function ChekiRecordListItem({
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.divider,
                   backgroundColor: colors.cardAlt,
                 }}
               >
@@ -138,10 +133,10 @@ export function ChekiRecordListItem({
           />
         )}
 
-        <View style={{ flex: 1, minWidth: 0, minHeight: showThumbnail ? previewHeight : 64, paddingVertical: showThumbnail ? 2 : 0 }}>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <View style={{ flex: 1, minWidth: 0, minHeight: showThumbnail ? previewHeight : 64, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text
                   numberOfLines={1}
                   style={{ flexShrink: 1, fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.heading }}
@@ -150,31 +145,28 @@ export function ChekiRecordListItem({
                 </Text>
                 {isOshi ? <OshiBadge /> : null}
               </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <AppIcon name="calendar" size={13} color={colors.text} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700', color: colors.text }}>
+                  {formattedDate}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <AppIcon name="music" size={12} color={colors.textMuted} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+                  {event?.title ?? '未关联活动'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={{ fontSize: 13, lineHeight: 18, fontWeight: '800', color: colors.text }}>
+                {record.quantity} 张
+              </Text>
               <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} />
             </View>
-
-            {showThumbnail && display?.subtitle ? (
-              <Text numberOfLines={1} style={{ marginTop: 1, fontSize: 12, lineHeight: 16, color: colors.textSecondary }}>
-                {display.subtitle}
-              </Text>
-            ) : null}
-
-            <View style={{ marginTop: showThumbnail && display?.subtitle ? 4 : showThumbnail ? 3 : 4, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <AppIcon name="music" size={12} color={colors.textMuted} />
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-                {event?.title ?? '未关联活动'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={{ marginTop: 'auto', paddingTop: showThumbnail ? 8 : 5, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <AppIcon name="calendar" size={12} color={colors.textMuted} />
-            <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-              {effectiveDate}{imageSummary ? ` · ${imageSummary}` : ''}
-            </Text>
-            <Text style={{ fontSize: 12, lineHeight: 17, fontWeight: '800', color: colors.text }}>
-              {record.quantity} 张
-            </Text>
           </View>
         </View>
       </View>

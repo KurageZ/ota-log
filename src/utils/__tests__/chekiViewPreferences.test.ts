@@ -22,20 +22,47 @@ describe('chekiViewPreferences', () => {
       .toEqual(DEFAULT_CHEKI_VIEW_PREFERENCES);
   });
 
-  it('sanitizes the two-level browse preference', () => {
+  it('sanitizes the album and record view preferences', () => {
     expect(sanitizeChekiViewPreferences({
       browseMode: 'record',
-      itemLayout: 'album',
-      sortOrder: 'asc',
+      albumGrouping: 'date',
+      albumSortOrder: 'asc',
+      recordSortOrder: 'desc',
       density: 'small',
+      useSpecAspectRatio: false,
       showRecordThumbnails: false,
     })).toEqual({
       browseMode: 'record',
-      itemLayout: 'album',
-      sortOrder: 'asc',
+      albumGrouping: 'date',
+      albumSortOrder: 'asc',
+      recordSortOrder: 'desc',
       density: 'small',
+      useSpecAspectRatio: false,
       showRecordThumbnails: false,
     });
+  });
+
+  it('migrates the previous item preferences without losing user choices', () => {
+    expect(sanitizeChekiViewPreferences({
+      browseMode: 'item',
+      itemLayout: 'album',
+      sortOrder: 'asc',
+      density: 'large',
+      showRecordThumbnails: false,
+    })).toEqual({
+      browseMode: 'album',
+      albumGrouping: 'none',
+      albumSortOrder: 'asc',
+      recordSortOrder: 'asc',
+      density: 'large',
+      useSpecAspectRatio: false,
+      showRecordThumbnails: false,
+    });
+  });
+
+  it('defaults the album to large images with a uniform ratio', () => {
+    expect(DEFAULT_CHEKI_VIEW_PREFERENCES.density).toBe('large');
+    expect(DEFAULT_CHEKI_VIEW_PREFERENCES.useSpecAspectRatio).toBe(false);
   });
 
   it('falls back to defaults when stored JSON is invalid', async () => {
@@ -45,10 +72,12 @@ describe('chekiViewPreferences', () => {
 
   it('saves sanitized preferences under the v2 storage key', async () => {
     const preferences = {
-      browseMode: 'item' as const,
-      itemLayout: 'album' as const,
-      sortOrder: 'asc' as const,
+      browseMode: 'album' as const,
+      albumGrouping: 'none' as const,
+      albumSortOrder: 'asc' as const,
+      recordSortOrder: 'desc' as const,
       density: 'small' as const,
+      useSpecAspectRatio: false,
       showRecordThumbnails: false,
     };
     await saveChekiViewPreferences(preferences);
