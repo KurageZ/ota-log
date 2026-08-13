@@ -93,7 +93,7 @@ export function ChekiStackPreviewCard({
     : 0;
   const stackWidth = cardWidth + stackStep * Math.max(previewCount - 1, 0);
   const stackStart = Math.max((areaWidth - stackWidth) / 2, 0);
-  const manualText = manualSummary ?? `记录 ${manualCount} 张`;
+  const manualText = manualSummary ?? `已记录 ${manualCount} 张`;
   const manualArtistCount = manualArtistSummaries?.length ?? 0;
   const visibleManualArtists = manualArtistSummaries?.slice(0, 3) ?? [];
   const extraManualArtistCount = Math.max(0, manualArtistCount - visibleManualArtists.length);
@@ -167,7 +167,7 @@ export function ChekiStackPreviewCard({
                       backgroundColor: isDark ? withAlpha(colors.heading, 0.82) : withAlpha(colors.text, 0.82),
                     }}>
                       <Text style={{ fontSize: 10, fontWeight: '900', color: colors.card }}>
-                        {chekis.length}张
+                        {chekis.length} 张
                       </Text>
                     </View>
                   ) : null}

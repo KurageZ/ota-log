@@ -24,6 +24,7 @@
 - 首页置顶信息功能设计：`product/home-pinned-info.md`
 - 统计自定义功能设计：`product/stats-customization.md`
 - 电子切册筛选与规格重构：`product/cheki-filter-refactor.md`
+- 电子切册文案调整记录：`product/cheki-copy-refresh.md`
 - 活动详情分享功能设计：`product/event-sharing.md`
 - 活动数据结构设计：`data/activity-data-model-design.md`
 - 拍立得数据结构设计：`data/cheki-data-model-design.md`

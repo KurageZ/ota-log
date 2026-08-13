@@ -81,7 +81,7 @@ export function ChekiDatePicker({ visible, mode, value, onCancel, onConfirm, onC
       footer={(
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="确认日期"
+          accessibilityLabel="完成日期选择"
           onPress={confirm}
           activeOpacity={0.72}
           style={{
@@ -92,7 +92,7 @@ export function ChekiDatePicker({ visible, mode, value, onCancel, onConfirm, onC
             backgroundColor: colors.accent,
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>确认</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>完成</Text>
         </TouchableOpacity>
       )}
     >

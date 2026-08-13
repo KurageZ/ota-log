@@ -294,7 +294,7 @@ function ChekiDateSectionHeader({
       activeOpacity={0.7}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}，${totalCount}张拍立得，${expanded ? '收起' : '展开'}`}
+      accessibilityLabel={`${title}，${totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
       style={{ minHeight: 44, marginTop: 6, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}
     >
       <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent }} />
@@ -303,7 +303,7 @@ function ChekiDateSectionHeader({
       </Text>
       <View style={{ borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
         <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '900', color: colors.accent }}>
-          {totalCount}张
+          {totalCount} 张
         </Text>
       </View>
       <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={16} color={colors.accent} />
@@ -722,7 +722,7 @@ function ChekiSpreadStackCard({
         activeOpacity={1}
         onPress={onToggle}
         accessibilityRole="button"
-        accessibilityLabel={`${item.title}，${expanded ? '收起拍立得堆叠' : '展开拍立得堆叠'}`}
+        accessibilityLabel={`${item.title}，${item.totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
         style={{
           minHeight: 74,
           paddingHorizontal: 14,
@@ -747,7 +747,7 @@ function ChekiSpreadStackCard({
         <View style={{ alignItems: 'flex-end', gap: 5 }}>
           <View style={{ borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
             <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '900', color: colors.accent }}>
-              {item.totalCount}张
+              {item.totalCount} 张
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -796,7 +796,7 @@ function ChekiSpreadStackCard({
             backgroundColor: colors.accentSofter,
           }}>
             <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: '700', color: colors.textSecondary }}>
-              这一组只有记录。
+              这一组还没有图片。
             </Text>
           </View>
         </TouchableOpacity>
@@ -1204,7 +1204,7 @@ export default function ChekiLibraryScreen() {
           ['day', '日'],
           ['month', '月'],
           ['year', '年'],
-          ['custom', '自定范围'],
+          ['custom', '自定义'],
         ] as const).map(([mode, label]) => (
           <TouchableOpacity
             key={mode}
@@ -1233,8 +1233,8 @@ export default function ChekiLibraryScreen() {
         key: 'image_status',
         options: [
           { value: 'none', label: '无图片' },
-          { value: 'partial', label: '部分添加' },
-          { value: 'complete', label: '已完整' },
+          { value: 'partial', label: '部分有图' },
+          { value: 'complete', label: '全部有图' },
         ],
         value: recordFilterDraft.imageStatus,
         onChange: (value) => setRecordFilterDraft((current) => ({
@@ -1249,7 +1249,7 @@ export default function ChekiLibraryScreen() {
     const hasBackImage = isRecordMode ? recordFilterDraft.hasBackImage : itemFilterDraft.hasBackImage;
     const quickOptions: FilterOption[] = [
       { value: 'linked', label: '已关联活动' },
-      { value: 'with_notes', label: '已有备注' },
+      { value: 'with_notes', label: '有备注' },
       ...(!isRecordMode ? [{ value: 'favorite', label: '已收藏' }] : []),
       { value: 'with_back', label: '有背签' },
     ];
@@ -1468,7 +1468,7 @@ export default function ChekiLibraryScreen() {
         id: 'artists',
         label: appliedArtistIds.length === 1
           ? getArtistPrimaryName(artistMap.get(appliedArtistIds[0])!)
-          : `艺人 ${appliedArtistIds.length} 位`,
+          : `${appliedArtistIds.length} 位艺人`,
         onPress: () => {
           if (isRecordMode) setRecordFilters((current) => ({ ...current, artistIds: [] }));
           else setItemFilters((current) => ({ ...current, artistIds: [] }));
@@ -1478,7 +1478,7 @@ export default function ChekiLibraryScreen() {
     if (isRecordMode && recordFilters.imageStatus) {
       filters.push({
         id: 'image-status',
-        label: recordFilters.imageStatus === 'none' ? '无图片' : recordFilters.imageStatus === 'partial' ? '部分添加' : '已完整',
+        label: recordFilters.imageStatus === 'none' ? '无图片' : recordFilters.imageStatus === 'partial' ? '部分有图' : '全部有图',
         onPress: () => setRecordFilters((current) => ({ ...current, imageStatus: null })),
       });
     }
@@ -1487,7 +1487,7 @@ export default function ChekiLibraryScreen() {
         id: 'specs',
         label: itemFilters.specs.length === 1
           ? CHEKI_SPECS.find((spec) => spec.id === itemFilters.specs[0])!.label
-          : `规格 ${itemFilters.specs.length} 种`,
+          : `${itemFilters.specs.length} 种规格`,
         onPress: () => setItemFilters((current) => ({ ...current, specs: [] })),
       });
     }
@@ -1513,7 +1513,7 @@ export default function ChekiLibraryScreen() {
     if (hasNotes) {
       filters.push({
         id: 'notes',
-        label: '已有备注',
+        label: '有备注',
         onPress: () => {
           if (isRecordMode) setRecordFilters((current) => ({ ...current, hasNotes: false }));
           else setItemFilters((current) => ({ ...current, hasNotes: false }));
@@ -1576,7 +1576,7 @@ export default function ChekiLibraryScreen() {
   }, []);
 
   const handleDeleteCheki = useCallback((chekiId: string) => {
-    Alert.alert('删除拍立得', '确认删除这张拍立得？', [
+    Alert.alert('删除这张拍立得？', '删除后无法恢复。', [
       { text: '取消', style: 'cancel' },
       {
         text: '删除', style: 'destructive',
@@ -1615,14 +1615,14 @@ export default function ChekiLibraryScreen() {
         ...current,
         chekis: update(current.chekis, !nextFavorite),
       } : current);
-      Alert.alert('收藏失败', '暂时无法更新收藏状态，请稍后重试。');
+      Alert.alert('无法更新收藏', '请稍后再试。');
     }
   }, [db]);
 
   const renderHeaderActions = useCallback(() => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 4 }}>
       <TouchableOpacity
-        accessibilityLabel="切册显示设置"
+        accessibilityLabel="电子切册显示选项"
         accessibilityRole="button"
         onPress={() => setViewSettingsVisible(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1656,27 +1656,12 @@ export default function ChekiLibraryScreen() {
     <View style={{ alignItems: 'center', paddingTop: 80 }}>
       <AppIcon name="camera" size={48} color={colors.textMuted} style={{ marginBottom: 16 }} />
       <Text style={{ fontSize: 17, fontWeight: '700', color: colors.heading, marginBottom: 8 }}>
-        还没有记录哦
+        {isRecordMode ? '还没有拍立得记录' : '还没有拍立得'}
       </Text>
       <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 28, lineHeight: 20 }}>
-        可以先记录数量，也可以同时添加图片
+        {isRecordMode ? '添加第一条记录，图片可以稍后补充。' : '添加记录并保存图片后，会显示在这里。'}
       </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 }}>
-        <TouchableOpacity
-          onPress={() => router.push('/artists/new')}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            paddingHorizontal: 18,
-            paddingVertical: 10,
-            borderRadius: 12,
-            backgroundColor: isDark ? colors.card : colors.accentSofter,
-          }}
-        >
-          <AppIcon name="addPerson" size={16} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>添加艺人</Text>
-        </TouchableOpacity>
+      <View style={{ alignItems: 'center' }}>
         <TouchableOpacity
           onPress={openUnifiedCreate}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.accent }}
@@ -1686,7 +1671,7 @@ export default function ChekiLibraryScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  ), [colors, isDark, openUnifiedCreate]);
+  ), [colors, isRecordMode, openUnifiedCreate]);
 
   const renderGalleryItem = useCallback(({ item }: { item: ChekiGalleryItem }) => {
     if (item.type === 'record') {
@@ -1763,7 +1748,7 @@ export default function ChekiLibraryScreen() {
           <View style={{ alignItems: 'flex-end' }}>
             <View style={{ backgroundColor: withAlpha(colors.accent, 0.12), borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
               <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>
-                {item.group.totalCount}张
+                {item.group.totalCount} 张
               </Text>
             </View>
           </View>
@@ -1833,7 +1818,7 @@ export default function ChekiLibraryScreen() {
             columns={columns}
             onPress={() => toggleStack(item.stackKey)}
             activeOpacity={1}
-            accessibilityLabel={`${item.title}，${item.totalCount}张拍立得，${expanded ? '收起' : '展开'}`}
+            accessibilityLabel={`${item.title}，${item.totalCount} 张拍立得，${expanded ? '收起' : '展开'}`}
             chrome="bare"
           />
         </Animated.View>
@@ -1990,7 +1975,7 @@ export default function ChekiLibraryScreen() {
             <SearchFilterBar
               keyword={keyword}
               onKeywordChange={setKeyword}
-              placeholder="输入关键词搜索"
+              placeholder="搜索艺人、活动或备注"
               onOpenFilter={() => {
                 if (isRecordMode) {
                   setRecordFilterDraft(cloneChekiRecordFilters(recordFilters));
@@ -2009,7 +1994,8 @@ export default function ChekiLibraryScreen() {
       ListEmptyComponent={
         hasAnyFilter ? (
           <FilteredEmptyState
-            title="没有符合条件的记录"
+            title={isRecordMode ? '没有符合条件的记录' : '没有符合条件的拍立得'}
+            message="尝试其他关键词或筛选条件。"
             onClear={clearFilter}
             isDark={isDark}
           />
@@ -2076,7 +2062,7 @@ export default function ChekiLibraryScreen() {
 
       <BottomSheetDialog
           visible={viewSettingsVisible}
-          title="视图设置"
+          title="显示选项"
           onClose={() => setViewSettingsVisible(false)}
           maxHeightRatio={0.52}
           scrollable
@@ -2084,13 +2070,13 @@ export default function ChekiLibraryScreen() {
         >
           <View style={{ marginBottom: 16 }}>
             <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-              浏览内容
+              浏览方式
             </Text>
             <SegmentedOptions
               colors={colors}
               options={[
-                { value: 'item', label: '拍立得' },
-                { value: 'record', label: '记录' },
+                { value: 'item', label: '单张拍立得' },
+                { value: 'record', label: '拍立得记录' },
               ]}
               value={viewPreferences.browseMode}
               onChange={(value) => handleChangeBrowseMode(value as ChekiBrowseMode)}
@@ -2100,7 +2086,7 @@ export default function ChekiLibraryScreen() {
           {viewPreferences.browseMode === 'item' ? (
             <View style={{ marginBottom: 16 }}>
               <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                拍立得布局
+                排列方式
               </Text>
               <SegmentedOptions
                 colors={colors}
@@ -2133,16 +2119,13 @@ export default function ChekiLibraryScreen() {
 
           {viewPreferences.browseMode === 'record' ? (
             <View>
-              <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                记录
-              </Text>
               <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '700', color: colors.text }}>
                     显示缩略图
                   </Text>
                   <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-                    关闭后显示艺人头像
+                    关闭时显示艺人头像
                   </Text>
                 </View>
                 <Switch
@@ -2202,7 +2185,7 @@ export default function ChekiLibraryScreen() {
       {galleryList}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
-          accessibilityLabel="切册视图设置"
+          accessibilityLabel="电子切册显示选项"
           icon={getAppIconSFSymbol('viewSettings')}
           onPress={() => setViewSettingsVisible(true)}
         />
