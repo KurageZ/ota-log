@@ -515,6 +515,7 @@ export default function ChekiLibraryScreen() {
     endDate: endDateParam,
     preset: presetParam,
     scope: scopeParamRaw,
+    browse: browseParam,
   } = useLocalSearchParams<{
     artist_id?: string | string[];
     event_id?: string;
@@ -525,6 +526,7 @@ export default function ChekiLibraryScreen() {
     endDate?: string;
     preset?: string;
     scope?: string;
+    browse?: string;
   }>();
   const db = useDB();
   const { colors, isDark } = useAppTheme();
@@ -541,6 +543,7 @@ export default function ChekiLibraryScreen() {
   const filterStartDate = startDateParam && /^\d{4}-\d{2}-\d{2}$/.test(startDateParam) ? startDateParam : undefined;
   const filterEndDate = endDateParam && /^\d{4}-\d{2}-\d{2}$/.test(endDateParam) ? endDateParam : undefined;
   const scopeParam = scopeParamRaw === 'favorite' || scopeParamRaw === 'oshi' ? scopeParamRaw : undefined;
+  const opensInRecordMode = browseParam === 'record';
   const selectedArtistIds = useMemo(() => parseArtistIdsParam(filterArtistParam), [filterArtistParam]);
   const hasRecordDeepLink = Boolean(
     filterArtistParam
@@ -548,7 +551,8 @@ export default function ChekiLibraryScreen() {
     || filterDate
     || filterStartDate
     || filterYear
-    || presetParam === 'all',
+    || presetParam === 'all'
+    || opensInRecordMode
   );
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -1641,6 +1645,31 @@ export default function ChekiLibraryScreen() {
                 onChange={handleChangeBrowseMode}
               />
             </View>
+            {!isRecordMode ? (
+              <View
+                accessibilityRole="alert"
+                style={{
+                  marginTop: 12,
+                  paddingHorizontal: 13,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  backgroundColor: colors.infoSoft,
+                }}
+              >
+                <AppIcon name="image" size={20} color={colors.info} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: '800', color: colors.text }}>
+                    相册仅展示已添加图片的拍立得
+                  </Text>
+                  <Text style={{ marginTop: 3, fontSize: 12.5, lineHeight: 19, color: colors.textSecondary }}>
+                    没有图片的记录不会出现在这里，请切换到「记录」查看全部记录。
+                  </Text>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           <View style={{ paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.divider }}>

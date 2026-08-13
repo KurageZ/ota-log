@@ -62,6 +62,20 @@ export default function ToolboxScreen() {
           </MenuCard>
         </View>
 
+        <View style={{ marginBottom: 16 }}>
+          <SectionLabel label="数据导入" />
+          <MenuCard>
+            <MenuItem
+              icon="backupRestore"
+              label="导入 Chekiroku"
+              subtitle="增量添加记录，匹配艺人可同步收藏状态"
+              tint={toolTints.artistImport}
+              isLast
+              onPress={() => router.push('/tools/chekiroku-import')}
+            />
+          </MenuCard>
+        </View>
+
         <View>
           <SectionLabel label="外部工具" />
           <MenuCard>
