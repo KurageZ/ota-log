@@ -2,7 +2,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import { Cheki, ChekiCalendarDaySummary, CreateChekiInput, UpdateChekiInput } from '../types/models';
 import { generateId } from '../utils/uuid';
 import { periodLikeParam, toISODateTime } from '../utils/date';
-import { DEFAULT_CHEKI_ASPECT_RATIO } from '../db/chekiV2Schema';
+import { DEFAULT_CHEKI_SPEC } from '../domain/chekiSpec';
 
 const PHOTO_PROJECTION = `SELECT
   i.id,
@@ -15,6 +15,7 @@ const PHOTO_PROJECTION = `SELECT
   i.unit_price AS price,
   i.notes,
   i.is_favorite,
+  i.spec,
   i.created_at
 FROM cheki_items i
 JOIN cheki_records r ON r.id = i.record_id
@@ -358,9 +359,9 @@ export class ChekiRepository {
       );
       await this.db.runAsync(
         `INSERT INTO cheki_items
-           (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+           (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
          VALUES (?, ?, 0, ?, ?, 0, ?, ?, ?)`,
-        [itemId, recordId, input.price ?? 0, DEFAULT_CHEKI_ASPECT_RATIO, input.notes ?? null, now, now],
+        [itemId, recordId, input.price ?? 0, DEFAULT_CHEKI_SPEC, input.notes ?? null, now, now],
       );
       await this.db.runAsync(
         `INSERT INTO cheki_item_images
@@ -381,6 +382,7 @@ export class ChekiRepository {
       price: input.price ?? null,
       notes: input.notes ?? null,
       is_favorite: 0,
+      spec: DEFAULT_CHEKI_SPEC,
       created_at: now,
     };
   }

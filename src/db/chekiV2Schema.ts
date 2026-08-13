@@ -1,4 +1,34 @@
-export const DEFAULT_CHEKI_ASPECT_RATIO = 54 / 86;
+import { DEFAULT_CHEKI_SPEC } from '../domain/chekiSpec';
+
+export const CHEKI_SPEC_CHECK_SQL = `spec IN (
+  'three_inch_portrait',
+  'three_inch_landscape',
+  'five_inch_portrait',
+  'five_inch_landscape',
+  'square'
+)`;
+
+export function createChekiItemsTableSql(tableName = 'cheki_items'): string {
+  return `CREATE TABLE IF NOT EXISTS ${tableName} (
+    id          TEXT PRIMARY KEY,
+    record_id   TEXT NOT NULL
+                REFERENCES cheki_records(id) ON DELETE CASCADE,
+    sort_order  INTEGER NOT NULL,
+    unit_price  INTEGER NOT NULL DEFAULT 0
+                CHECK (
+                  unit_price >= 0
+                  AND unit_price = CAST(unit_price AS INTEGER)
+                ),
+    spec        TEXT NOT NULL DEFAULT '${DEFAULT_CHEKI_SPEC}'
+                CHECK (${CHEKI_SPEC_CHECK_SQL}),
+    is_favorite INTEGER NOT NULL DEFAULT 0
+                CHECK (is_favorite IN (0, 1)),
+    notes       TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE (record_id, sort_order)
+  )`;
+}
 
 export const CHEKI_V2_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS cheki_records (
@@ -12,25 +42,7 @@ export const CHEKI_V2_SCHEMA_STATEMENTS = [
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
   )`,
-  `CREATE TABLE IF NOT EXISTS cheki_items (
-    id                   TEXT PRIMARY KEY,
-    record_id            TEXT NOT NULL
-                         REFERENCES cheki_records(id) ON DELETE CASCADE,
-    sort_order           INTEGER NOT NULL,
-    unit_price           INTEGER NOT NULL DEFAULT 0
-                         CHECK (
-                           unit_price >= 0
-                           AND unit_price = CAST(unit_price AS INTEGER)
-                         ),
-    display_aspect_ratio REAL NOT NULL DEFAULT (54.0 / 86.0)
-                         CHECK (display_aspect_ratio > 0),
-    is_favorite          INTEGER NOT NULL DEFAULT 0
-                         CHECK (is_favorite IN (0, 1)),
-    notes                TEXT,
-    created_at           TEXT NOT NULL,
-    updated_at           TEXT NOT NULL,
-    UNIQUE (record_id, sort_order)
-  )`,
+  createChekiItemsTableSql(),
   `CREATE TABLE IF NOT EXISTS cheki_item_images (
     id         TEXT PRIMARY KEY,
     item_id    TEXT NOT NULL

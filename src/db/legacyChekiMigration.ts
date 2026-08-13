@@ -1,5 +1,5 @@
 import { ChekiItem, ChekiItemImage, ChekiRecord } from '../types/models';
-import { DEFAULT_CHEKI_ASPECT_RATIO } from './chekiV2Schema';
+import { DEFAULT_CHEKI_SPEC } from '../domain/chekiSpec';
 
 export interface LegacyChekiRow {
   id: string;
@@ -170,7 +170,7 @@ export function migrateLegacyChekiData(
           record_id: recordId,
           sort_order: sortOrder,
           unit_price: candidate.unitPrices[index] ?? 0,
-          display_aspect_ratio: DEFAULT_CHEKI_ASPECT_RATIO,
+          spec: DEFAULT_CHEKI_SPEC,
           is_favorite: 0,
           notes: isPhotoItem ? candidate.notes : null,
           created_at: candidate.createdAt,

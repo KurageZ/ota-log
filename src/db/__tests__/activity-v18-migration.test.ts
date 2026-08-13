@@ -66,9 +66,33 @@ function createV17ActivityDb(): Database.Database {
     CREATE TABLE cheki_records (
       id TEXT PRIMARY KEY,
       event_id TEXT REFERENCES events(id) ON DELETE SET NULL,
+      artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL,
+      date TEXT,
       quantity INTEGER NOT NULL,
+      notes TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+    CREATE TABLE cheki_items (
+      id TEXT PRIMARY KEY,
+      record_id TEXT NOT NULL REFERENCES cheki_records(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL,
+      unit_price INTEGER NOT NULL DEFAULT 0,
+      display_aspect_ratio REAL NOT NULL DEFAULT (54.0 / 86.0),
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (record_id, sort_order)
+    );
+    CREATE TABLE cheki_item_images (
+      id TEXT PRIMARY KEY,
+      item_id TEXT NOT NULL REFERENCES cheki_items(id) ON DELETE CASCADE,
+      side TEXT NOT NULL CHECK (side IN ('front', 'back')),
+      photo_uri TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (item_id, side)
     );
     CREATE TABLE important_dates (
       id TEXT PRIMARY KEY,
@@ -121,6 +145,10 @@ function createV17ActivityDb(): Database.Database {
     .run('expense', 'event-v17', 'transport', 88, '2026-08-01T00:00:00.000Z');
   db.prepare('INSERT INTO cheki_records (id, event_id, quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
     .run('cheki-record', 'event-v17', 1, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
+  db.prepare(`INSERT INTO cheki_items
+    (id, record_id, sort_order, unit_price, display_aspect_ratio, created_at, updated_at)
+    VALUES ('cheki-item', 'cheki-record', 0, 0, 54.0 / 86.0, ?, ?)`)
+    .run('2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z');
   db.prepare('INSERT INTO important_dates (id, linked_event_id) VALUES (?, ?)')
     .run('important-date', 'event-v17');
   db.pragma('user_version = 17');
@@ -137,7 +165,7 @@ describe('Activity v18 migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(20);
+    expect(db.pragma('user_version', { simple: true })).toBe(21);
     expect(columns(db, 'events')).toEqual([
       'id', 'title', 'event_type', 'status', 'review_score', 'notes', 'details',
       'url', 'setlist_text', 'actual_expense', 'trip_id', 'created_at', 'updated_at',

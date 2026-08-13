@@ -55,9 +55,9 @@ describe('Cheki repositories', () => {
         VALUES
           ('record-' || NEW.id, NEW.event_id, NEW.artist_id, NEW.date, 1, NULL, NEW.created_at, NEW.created_at);
         INSERT INTO cheki_items
-          (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+          (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
         VALUES
-          (NEW.id, 'record-' || NEW.id, 0, CAST(ROUND(COALESCE(NEW.price, 0)) AS INTEGER), 54.0 / 86.0, 0, NEW.notes, NEW.created_at, NEW.created_at);
+          (NEW.id, 'record-' || NEW.id, 0, CAST(ROUND(COALESCE(NEW.price, 0)) AS INTEGER), 'three_inch_portrait', 0, NEW.notes, NEW.created_at, NEW.created_at);
         INSERT INTO cheki_item_images
           (id, item_id, side, photo_uri, created_at, updated_at)
         VALUES
@@ -81,14 +81,14 @@ describe('Cheki repositories', () => {
         VALUES
           (NEW.id, NEW.event_id, NEW.artist_id, NEW.date, NEW.count, NULL, NEW.created_at, NEW.updated_at);
         INSERT INTO cheki_items
-          (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+          (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
         SELECT
           NEW.id || '-item-' || n,
           NEW.id,
           n - 1,
           CAST(ROUND(COALESCE(NEW.total_price, 0)) AS INTEGER) / NEW.count
             + CASE WHEN n <= CAST(ROUND(COALESCE(NEW.total_price, 0)) AS INTEGER) % NEW.count THEN 1 ELSE 0 END,
-          54.0 / 86.0,
+          'three_inch_portrait',
           0,
           NULL,
           NEW.created_at,

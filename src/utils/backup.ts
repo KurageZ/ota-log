@@ -10,8 +10,9 @@ import { materializePresetArtistAvatars } from './presetArtistMedia';
 import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
 import { generateId } from './uuid';
 import { normalizeArtistConfirmationMode } from './artistConfirmation';
+import { normalizeChekiSpec } from '../domain/chekiSpec';
 
-const BACKUP_VERSION = 7;
+const BACKUP_VERSION = 8;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -618,14 +619,14 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
       for (const item of itemsToRestore) {
         await db.rawDb.runAsync(
           `INSERT INTO cheki_items
-             (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+             (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             String(item.id),
             String(item.record_id),
             Number(item.sort_order),
             Number(item.unit_price ?? 0),
-            Number(item.display_aspect_ratio),
+            normalizeChekiSpec(item.spec),
             Number(item.is_favorite ?? 0),
             item.notes ?? null,
             String(item.created_at),
@@ -829,6 +830,12 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       };
       break;
     case 7:
+      normalized = {
+        version: BACKUP_VERSION,
+        data: candidate.data as ImportDataShape,
+      };
+      break;
+    case 8:
       normalized = {
         version: candidate.version,
         data: candidate.data as ImportDataShape,

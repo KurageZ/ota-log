@@ -26,7 +26,7 @@ describe('User config v19 migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(20);
+    expect(db.pragma('user_version', { simple: true })).toBe(21);
     expect(db.prepare(`SELECT name, avatar_uri, avatar_emoji, oshi_artist_id,
       artist_confirmation_mode, updated_at FROM user_config WHERE id = 'default'`).get())
       .toEqual({

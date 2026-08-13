@@ -169,11 +169,11 @@ describe('backup artist background metadata support', () => {
       (id, quantity, created_at, updated_at)
       VALUES ('record', 2, ?, ?)`).run(now, now);
     rawDb.prepare(`INSERT INTO cheki_items
-      (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, created_at, updated_at)
-      VALUES ('item', 'record', 0, 40, ?, 1, ?, ?)`).run(54 / 86, now, now);
+      (id, record_id, sort_order, unit_price, spec, is_favorite, created_at, updated_at)
+      VALUES ('item', 'record', 0, 40, 'three_inch_portrait', 1, ?, ?)`).run(now, now);
     rawDb.prepare(`INSERT INTO cheki_items
-      (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, created_at, updated_at)
-      VALUES ('item-blank', 'record', 1, 40, ?, 0, ?, ?)`).run(54 / 86, now, now);
+      (id, record_id, sort_order, unit_price, spec, is_favorite, created_at, updated_at)
+      VALUES ('item-blank', 'record', 1, 40, 'three_inch_portrait', 0, ?, ?)`).run(now, now);
     rawDb.prepare(`INSERT INTO cheki_item_images
       (id, item_id, side, photo_uri, created_at, updated_at)
       VALUES ('front', 'item', 'front', 'file:///front.jpg', ?, ?)`).run(now, now);

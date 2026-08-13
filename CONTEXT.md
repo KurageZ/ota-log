@@ -49,7 +49,7 @@ A user-owned record of one cheki entry batch, including its optional artist and 
 _Avoid_: Photo cheki record, manual cheki entry, no-photo record
 
 **Cheki Item**:
-One identifiable physical cheki within a Cheki Record. It owns that cheki's non-negative integer unit price and anchors its optional front and back images so the two sides remain associated.
+One identifiable physical cheki within a Cheki Record. It owns that cheki's non-negative integer unit price and controlled Spec, and anchors its optional front and back images so the two sides remain associated.
 _Avoid_: Cheki image, front photo record, back photo record
 
 **Favorite Cheki Item**:
@@ -60,9 +60,9 @@ _Avoid_: Favorite Cheki Record, favorite image
 One front or back image associated with a Cheki Item. Both sides use the presentation ratio owned by their shared Cheki Item.
 _Avoid_: Cheki Item, edited source image
 
-**Cheki Item Presentation**:
-The display width-to-height ratio applied to both images of one Cheki Item, defaulting to the three-inch cheki ratio. It does not change the source image files.
-_Avoid_: Per-side image ratio, physical cheki size, destructive crop
+**Cheki Item Spec**:
+The single controlled physical format of one Cheki Item, combining its size family and orientation. Image presentation ratio is derived from the Spec and applies to both sides without changing the source files.
+_Avoid_: Cheki Item Presentation, arbitrary aspect ratio, per-side spec, spec tag
 
 **Cheki Record Date**:
 The calendar date assigned to a Cheki Record as a whole. It is not the image capture time or image import time.

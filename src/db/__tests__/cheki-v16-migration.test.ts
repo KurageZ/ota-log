@@ -96,7 +96,7 @@ describe('v16 through v19 migration', () => {
     const db = createV16Database();
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(20);
+    expect(db.pragma('user_version', { simple: true })).toBe(21);
     expect(db.prepare('SELECT quantity, date, created_at, updated_at FROM cheki_records').get())
       .toEqual({
         quantity: 5,
@@ -138,7 +138,14 @@ describe('v16 through v19 migration', () => {
       )
       AND name NOT LIKE 'sqlite_autoindex_%'
       ORDER BY type, name`;
-    expect(upgraded.prepare(query).all()).toEqual(fresh.prepare(query).all());
+    const normalizeSchemaSql = (rows: unknown[]) => rows.map((row) => {
+      const value = row as { sql?: string };
+      return typeof value.sql === 'string'
+        ? { ...value, sql: value.sql.replace('CREATE TABLE "cheki_items"', 'CREATE TABLE cheki_items') }
+        : value;
+    });
+    expect(normalizeSchemaSql(upgraded.prepare(query).all()))
+      .toEqual(normalizeSchemaSql(fresh.prepare(query).all()));
     upgraded.close();
     fresh.close();
   });

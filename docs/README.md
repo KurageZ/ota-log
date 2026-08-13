@@ -23,6 +23,7 @@
 - UI/UX 设计：`product/ui-ux.md`
 - 首页置顶信息功能设计：`product/home-pinned-info.md`
 - 统计自定义功能设计：`product/stats-customization.md`
+- 电子切册筛选与规格重构：`product/cheki-filter-refactor.md`
 - 活动详情分享功能设计：`product/event-sharing.md`
 - 活动数据结构设计：`data/activity-data-model-design.md`
 - 拍立得数据结构设计：`data/cheki-data-model-design.md`
@@ -31,6 +32,7 @@
 - 决策记录模板：`decisions/0000-template.md`
 - 当前进度：`progress/now.md`
 - 拍立得新版 UI 验收清单：`progress/cheki-v2-ui-checklist.md`
+- 电子切册筛选与规格重构 QA：`progress/cheki-filter-refactor-qa.md`
 - 测试验证工作流：`workflows/testing.md`
 - 发版工作流：`workflows/release.md`
 - 私有艺人构建工作流：`workflows/private-artist-build.md`

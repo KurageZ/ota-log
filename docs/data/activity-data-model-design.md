@@ -3,7 +3,7 @@
 状态：数据层已在 Migration v18 实现；创建、编辑和详情页已接入多场次与扁平时间表，其余入口待后续提交。
 最近更新：2026-08-06。
 
-本文档描述 ota-log 下一代活动数据结构。当前数据库基线是 Migration v20；活动结构在 Migration v18 定型，并在 v20 统一时间语义。已实现 schema 的事实来源仍为：
+本文档描述 ota-log 下一代活动数据结构。当前数据库基线是 Migration v21；活动结构在 Migration v18 定型，并在 v20 统一时间语义。已实现 schema 的事实来源仍为：
 
 - `src/db/schema.ts`
 - `src/db/migrations.ts`

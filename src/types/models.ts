@@ -100,6 +100,7 @@ export interface Cheki {
   price: number | null;
   notes: string | null;
   is_favorite: 0 | 1;
+  spec?: import('../domain/chekiSpec').ChekiSpec;
   created_at: string;
 }
 
@@ -130,7 +131,7 @@ export interface ChekiItem {
   record_id: string;
   sort_order: number;
   unit_price: number;
-  display_aspect_ratio: number;
+  spec: import('../domain/chekiSpec').ChekiSpec;
   is_favorite: 0 | 1;
   notes: string | null;
   created_at: string;

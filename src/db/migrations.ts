@@ -1,7 +1,8 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { SCHEMA_STATEMENTS } from './schema';
 import { insertBundledArtists } from './bundledArtistCatalog';
-import { CHEKI_V2_SCHEMA_STATEMENTS } from './chekiV2Schema';
+import { CHEKI_V2_SCHEMA_STATEMENTS, createChekiItemsTableSql } from './chekiV2Schema';
+import { DEFAULT_CHEKI_SPEC } from '../domain/chekiSpec';
 import {
   LegacyChekiManualEntryRow,
   LegacyChekiRow,
@@ -16,7 +17,7 @@ import {
   createEventsV2TableSql,
 } from './activityV2Schema';
 
-export const CURRENT_VERSION = 20;
+export const CURRENT_VERSION = 21;
 
 interface LegacyEventV17Row {
   id: string;
@@ -136,14 +137,14 @@ async function migrateChekiV2(db: SQLiteDatabase): Promise<void> {
     for (const item of migrated.items) {
       await db.runAsync(
         `INSERT INTO cheki_items
-           (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+           (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           item.id,
           item.record_id,
           item.sort_order,
           item.unit_price,
-          item.display_aspect_ratio,
+          item.spec,
           item.is_favorite,
           item.notes,
           item.created_at,
@@ -296,6 +297,39 @@ async function migrateActivityTimeSemantics(db: SQLiteDatabase): Promise<void> {
   });
 }
 
+async function migrateChekiItemSpec(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync('PRAGMA foreign_keys = OFF');
+  try {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DROP TRIGGER IF EXISTS trg_cheki_items_quantity_before_insert');
+      await db.runAsync('DROP TRIGGER IF EXISTS trg_cheki_items_quantity_before_move');
+      await db.runAsync('DROP TRIGGER IF EXISTS trg_cheki_records_quantity_before_update');
+      await db.runAsync(createChekiItemsTableSql('cheki_items_v21'));
+      await db.runAsync(
+        `INSERT INTO cheki_items_v21
+           (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
+         SELECT
+           id, record_id, sort_order, unit_price, ?, is_favorite, notes, created_at, updated_at
+         FROM cheki_items`,
+        [DEFAULT_CHEKI_SPEC],
+      );
+      await db.runAsync('DROP TABLE cheki_items');
+      await db.runAsync('ALTER TABLE cheki_items_v21 RENAME TO cheki_items');
+      for (const statement of CHEKI_V2_SCHEMA_STATEMENTS) {
+        await db.runAsync(statement);
+      }
+    });
+  } finally {
+    await db.runAsync('PRAGMA foreign_keys = ON');
+  }
+  const foreignKeyErrors = await db.getAllAsync<Record<string, unknown>>(
+    'PRAGMA foreign_key_check',
+  );
+  if (foreignKeyErrors.length > 0) {
+    throw new Error('Cheki item spec migration foreign key verification failed');
+  }
+}
+
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
@@ -428,6 +462,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 20) {
       await migrateActivityTimeSemantics(db);
+    }
+    if (version < 21) {
+      await migrateChekiItemSpec(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

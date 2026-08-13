@@ -17,7 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../../../src/components/AppIcon';
 import { FormCard, FormFieldLabel, FormSectionLabel } from '../../../../src/components/FormPrimitives';
 import { useDB } from '../../../../src/context/DBContext';
-import { DEFAULT_CHEKI_ASPECT_RATIO } from '../../../../src/db/chekiV2Schema';
+import {
+  CHEKI_SPECS,
+  DEFAULT_CHEKI_SPEC,
+  getChekiSpecAspectRatio,
+  getChekiSpecLabel,
+  type ChekiSpec,
+} from '../../../../src/domain/chekiSpec';
 import type { ChekiImageSide } from '../../../../src/types/models';
 import type { ChekiItemWithImages } from '../../../../src/repositories/ChekiRecordRepository';
 import { useAppTheme } from '../../../../src/theme/appTheme';
@@ -32,17 +38,6 @@ import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 import { withAlpha } from '../../../../src/utils/color';
 
 const CHEKI_IMPORT_MAX_DIMENSION = Platform.OS === 'android' ? 1600 : 2000;
-
-const ASPECT_RATIO_PRESETS = [
-  { id: 'mini-portrait', label: '迷你竖版', ratio: DEFAULT_CHEKI_ASPECT_RATIO },
-  { id: 'mini-landscape', label: '迷你横版', ratio: 86 / 54 },
-  { id: 'square', label: '方形', ratio: 1 },
-  { id: 'wide-landscape', label: '宽幅横版', ratio: 108 / 86 },
-] as const;
-
-function approximatelyEqual(left: number, right: number): boolean {
-  return Math.abs(left - right) < 0.0001;
-}
 
 function sideLabel(side: ChekiImageSide): string {
   return side === 'front' ? '正面' : '背面';
@@ -66,10 +61,8 @@ export default function EditChekiItemScreen() {
   const [unitPrice, setUnitPrice] = useState('0');
   const [notes, setNotes] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState(DEFAULT_CHEKI_ASPECT_RATIO);
-  const [customRatio, setCustomRatio] = useState(false);
-  const [customWidth, setCustomWidth] = useState('54');
-  const [customHeight, setCustomHeight] = useState('86');
+  const [spec, setSpec] = useState<ChekiSpec>(DEFAULT_CHEKI_SPEC);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
   const cleanupPendingImports = useCallback(async (uris?: string[]) => {
     const targets = uris ?? Array.from(pendingImportedUrisRef.current);
@@ -96,28 +89,20 @@ export default function EditChekiItemScreen() {
       }
       const nextFront = nextItem.images.find((image) => image.side === 'front')?.photo_uri ?? null;
       const nextBack = nextItem.images.find((image) => image.side === 'back')?.photo_uri ?? null;
-      const hasPreset = ASPECT_RATIO_PRESETS.some((preset) => (
-        approximatelyEqual(preset.ratio, nextItem.display_aspect_ratio)
-      ));
       setItem(nextItem);
       setFrontUri(nextFront);
       setBackUri(nextBack);
       setUnitPrice(String(nextItem.unit_price));
       setNotes(nextItem.notes ?? '');
       setIsFavorite(nextItem.is_favorite === 1);
-      setAspectRatio(nextItem.display_aspect_ratio);
-      setCustomRatio(!hasPreset);
-      if (!hasPreset) {
-        setCustomWidth(String(Number(nextItem.display_aspect_ratio.toFixed(3))));
-        setCustomHeight('1');
-      }
+      setSpec(nextItem.spec);
       initialSnapshotRef.current = JSON.stringify({
         frontUri: nextFront,
         backUri: nextBack,
         unitPrice: String(nextItem.unit_price),
         notes: nextItem.notes ?? '',
         isFavorite: nextItem.is_favorite === 1,
-        aspectRatio: nextItem.display_aspect_ratio,
+        spec: nextItem.spec,
       });
       setLoading(false);
     })();
@@ -126,21 +111,14 @@ export default function EditChekiItemScreen() {
     };
   }, [db, id]);
 
-  const parsedCustomRatio = useMemo(() => {
-    const width = Number(customWidth);
-    const height = Number(customHeight);
-    return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
-      ? width / height
-      : null;
-  }, [customHeight, customWidth]);
-  const effectiveAspectRatio = customRatio ? parsedCustomRatio : aspectRatio;
+  const effectiveAspectRatio = getChekiSpecAspectRatio(spec);
   const snapshot = JSON.stringify({
     frontUri,
     backUri,
     unitPrice,
     notes,
     isFavorite,
-    aspectRatio: effectiveAspectRatio,
+    spec,
   });
   const isDirty = !loading && initialSnapshotRef.current !== snapshot;
   const parsedUnitPrice = unitPrice.trim() === ''
@@ -257,10 +235,6 @@ export default function EditChekiItemScreen() {
 
   const save = useCallback(async () => {
     if (!item || saving) return;
-    if (effectiveAspectRatio == null) {
-      Alert.alert('展示比例无效', '宽和高都需要填写大于 0 的数字。');
-      return;
-    }
     if (!unitPriceValid || parsedUnitPrice == null) {
       Alert.alert('请输入有效的单价', '单价只支持大于或等于 0 的整数。');
       return;
@@ -271,7 +245,7 @@ export default function EditChekiItemScreen() {
       const originalBack = item.images.find((image) => image.side === 'back')?.photo_uri ?? null;
       await db.chekiRecords.updateItemWithImages(item.id, {
         unitPrice: parsedUnitPrice,
-        displayAspectRatio: effectiveAspectRatio,
+        spec,
         isFavorite,
         notes: notes.trim() || null,
         images: {
@@ -289,7 +263,7 @@ export default function EditChekiItemScreen() {
     } finally {
       setSaving(false);
     }
-  }, [backUri, db, effectiveAspectRatio, frontUri, isFavorite, item, notes, parsedUnitPrice, saving, unitPriceValid]);
+  }, [backUri, db, frontUri, isFavorite, item, notes, parsedUnitPrice, saving, spec, unitPriceValid]);
 
   const deleteItem = useCallback(() => {
     if (!item || saving) return;
@@ -343,7 +317,8 @@ export default function EditChekiItemScreen() {
           <Image
             source={{ uri }}
             resizeMethod="resize"
-            style={{ width: '100%', aspectRatio: effectiveAspectRatio ?? DEFAULT_CHEKI_ASPECT_RATIO, borderRadius: 12, backgroundColor: colors.cardAlt }}
+            resizeMode="contain"
+            style={{ width: '100%', aspectRatio: effectiveAspectRatio, borderRadius: 12, backgroundColor: colors.cardAlt }}
           />
           {importingSide === side ? (
             <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.scrim }}>
@@ -431,61 +406,43 @@ export default function EditChekiItemScreen() {
             />
           </View>
 
-          <View style={{ height: 1, marginVertical: 16, backgroundColor: colors.divider }} />
-          <FormFieldLabel>显示比例</FormFieldLabel>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {ASPECT_RATIO_PRESETS.map((preset) => {
-              const selected = !customRatio && approximatelyEqual(aspectRatio, preset.ratio);
-              return (
-                <TouchableOpacity
-                  key={preset.id}
-                  onPress={() => {
-                    setCustomRatio(false);
-                    setAspectRatio(preset.ratio);
-                  }}
-                  activeOpacity={0.72}
-                  style={{ minHeight: 36, paddingHorizontal: 12, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: selected ? colors.accent : colors.inputBorder }}
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>{preset.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              onPress={() => setCustomRatio(true)}
-              activeOpacity={0.72}
-              style={{ minHeight: 36, paddingHorizontal: 12, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: customRatio ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: customRatio ? colors.accent : colors.inputBorder }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: customRatio ? colors.onAccent : colors.text }}>自定义</Text>
-            </TouchableOpacity>
-          </View>
-          {customRatio ? (
-            <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ marginBottom: 6, fontSize: 11, color: colors.textSecondary }}>宽</Text>
-                <TextInput
-                  value={customWidth}
-                  onChangeText={setCustomWidth}
-                  keyboardType="decimal-pad"
-                  placeholder="54"
-                  placeholderTextColor={colors.placeholder}
-                  style={{ minHeight: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: parsedCustomRatio ? colors.inputBorder : colors.danger, backgroundColor: colors.input, fontSize: 15, color: colors.text }}
-                />
-              </View>
-              <Text style={{ marginTop: 20, fontSize: 14, color: colors.textMuted }}>:</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ marginBottom: 6, fontSize: 11, color: colors.textSecondary }}>高</Text>
-                <TextInput
-                  value={customHeight}
-                  onChangeText={setCustomHeight}
-                  keyboardType="decimal-pad"
-                  placeholder="86"
-                  placeholderTextColor={colors.placeholder}
-                  style={{ minHeight: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: parsedCustomRatio ? colors.inputBorder : colors.danger, backgroundColor: colors.input, fontSize: 15, color: colors.text }}
-                />
-              </View>
-            </View>
-          ) : null}
         </FormCard>
+
+        <FormSectionLabel label="高级信息" />
+        <TouchableOpacity
+          onPress={() => setAdvancedExpanded((current) => !current)}
+          activeOpacity={0.72}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: advancedExpanded }}
+          style={{ minHeight: 52, paddingHorizontal: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>拍立得规格</Text>
+            <Text style={{ marginTop: 3, fontSize: 12, color: colors.textSecondary }}>{getChekiSpecLabel(spec)}</Text>
+          </View>
+          <AppIcon name="disclosure" variant={advancedExpanded ? 'down' : 'forward'} size={16} color={colors.chevron} />
+        </TouchableOpacity>
+        {advancedExpanded ? (
+          <FormCard style={{ marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {CHEKI_SPECS.map((option) => {
+                const selected = option.id === spec;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() => setSpec(option.id)}
+                    activeOpacity={0.72}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    style={{ minHeight: 44, paddingHorizontal: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: selected ? colors.accent : colors.inputBorder }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </FormCard>
+        ) : null}
 
         <FormSectionLabel label="价格" />
         <FormCard>

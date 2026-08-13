@@ -175,7 +175,7 @@ describe('ChekiRecordRepository', () => {
 
     await repository.updateItemWithImages(item.id, {
       unitPrice: 30,
-      displayAspectRatio: 1,
+      spec: 'square',
       isFavorite: true,
       notes: 'signed on the back',
       images: { front: 'file:///new-front.jpg', back: null },
@@ -184,7 +184,7 @@ describe('ChekiRecordRepository', () => {
     const updated = await repository.findItemById(item.id);
     expect(updated).toMatchObject({
       unit_price: 30,
-      display_aspect_ratio: 1,
+      spec: 'square',
       is_favorite: 1,
       notes: 'signed on the back',
     });
@@ -192,6 +192,65 @@ describe('ChekiRecordRepository', () => {
       .toEqual([['front', 'file:///new-front.jpg']]);
     await expect(repository.removeItemImage(item.id, 'front'))
       .rejects.toThrow('front image cannot be removed');
+  });
+
+  test('filters records by full-record image status, notes, and back images', async () => {
+    const empty = await repository.createRecord({ quantity: 2 });
+    const partial = await repository.createRecordWithItems({
+      quantity: 2,
+      items: [{ frontUri: 'file:///partial.jpg', notes: 'item note' }],
+    });
+    const complete = await repository.createRecordWithItems({
+      quantity: 1,
+      notes: 'record note',
+      items: [{ frontUri: 'file:///complete.jpg', backUri: 'file:///complete-back.jpg' }],
+    });
+
+    await expect(repository.findRecords({ imageStatus: 'none' })).resolves.toEqual([
+      expect.objectContaining({ id: empty.id }),
+    ]);
+    await expect(repository.findRecords({ imageStatus: 'partial' })).resolves.toEqual([
+      expect.objectContaining({ id: partial.id }),
+    ]);
+    await expect(repository.findRecords({ imageStatus: 'complete' })).resolves.toEqual([
+      expect.objectContaining({ id: complete.id }),
+    ]);
+    expect((await repository.findRecords({ hasNotes: true })).map((record) => record.id).sort())
+      .toEqual([complete.id, partial.id].sort());
+    expect((await repository.findRecords({ hasBackImage: true })).map((record) => record.id))
+      .toEqual([complete.id]);
+  });
+
+  test('filters only visible items and applies all item conditions to the same item', async () => {
+    const record = await repository.createRecordWithItems({
+      artist_id: null,
+      event_id: null,
+      date: '2026-08-01',
+      quantity: 3,
+      items: [
+        {
+          frontUri: 'file:///square.jpg',
+          backUri: 'file:///square-back.jpg',
+          spec: 'square',
+          notes: 'signed',
+        },
+        { frontUri: 'file:///wide.jpg', spec: 'five_inch_landscape' },
+        { spec: 'square', notes: 'no image' },
+      ],
+    });
+    await repository.setItemFavorite(record.items[0].id, true);
+
+    const matches = await repository.findBrowseItems({
+      specs: ['square'],
+      hasNotes: true,
+      isFavorite: true,
+      hasBackImage: true,
+    });
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ id: record.items[0].id, spec: 'square' });
+    expect(matches[0].record.id).toBe(record.id);
+    await expect(repository.findBrowseItems({ specs: ['square'], hasLinkedEvent: true }))
+      .resolves.toEqual([]);
   });
 
   test('allows a back-only item to become image-less without deleting the physical item', async () => {

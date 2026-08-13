@@ -25,7 +25,7 @@ describe('Activity v20 time semantics migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(20);
+    expect(db.pragma('user_version', { simple: true })).toBe(21);
     expect(db.prepare(`SELECT open_time, start_time FROM event_sessions
       WHERE id = 'legacy-session'`).get()).toEqual({
       open_time: '18:30',

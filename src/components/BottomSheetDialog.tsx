@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   Text,
   TouchableOpacity,
@@ -9,10 +9,12 @@ import {
 } from 'react-native';
 import {
   BottomSheetBackdrop,
+  BottomSheetFooter,
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetView,
   type BottomSheetBackdropProps,
+  type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../theme/appTheme';
@@ -31,6 +33,32 @@ interface BottomSheetDialogProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   enablePanDownToClose?: boolean;
   showCloseButton?: boolean;
+  footer?: ReactNode;
+}
+
+export function BottomSheetActionFooter({
+  animatedFooterPosition,
+  children,
+}: BottomSheetFooterProps & { children: ReactNode }) {
+  const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <BottomSheetFooter animatedFooterPosition={animatedFooterPosition} bottomInset={0}>
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 10,
+          paddingBottom: Math.max(insets.bottom, 12),
+          borderTopWidth: 1,
+          borderTopColor: colors.divider,
+          backgroundColor: colors.screen,
+        }}
+      >
+        {children}
+      </View>
+    </BottomSheetFooter>
+  );
 }
 
 export function BottomSheetDialog({
@@ -46,6 +74,7 @@ export function BottomSheetDialog({
   contentContainerStyle,
   enablePanDownToClose = true,
   showCloseButton = true,
+  footer,
 }: BottomSheetDialogProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -92,6 +121,10 @@ export function BottomSheetDialog({
     />
   );
 
+  const renderFooter = useCallback((props: BottomSheetFooterProps) => (
+    <BottomSheetActionFooter {...props}>{footer}</BottomSheetActionFooter>
+  ), [footer]);
+
   const header = (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
       <Text style={{ flex: 1, fontSize: 18, lineHeight: 23, fontWeight: '800', color: colors.heading }}>
@@ -135,6 +168,7 @@ export function BottomSheetDialog({
       enableBlurKeyboardOnGesture
       android_keyboardInputMode="adjustResize"
       backdropComponent={renderBackdrop}
+      footerComponent={footer ? renderFooter : undefined}
       backgroundStyle={{
         backgroundColor: colors.screen,
         borderTopLeftRadius: 24,
@@ -152,16 +186,20 @@ export function BottomSheetDialog({
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          enableFooterMarginAdjustment={Boolean(footer)}
           contentContainerStyle={contentContainerStyle}
         >
-          <View style={{ paddingBottom: insets.bottom }}>
+          <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}
             {children}
           </View>
         </BottomSheetScrollView>
       ) : (
-        <BottomSheetView style={contentContainerStyle}>
-          <View style={{ paddingBottom: insets.bottom }}>
+        <BottomSheetView
+          enableFooterMarginAdjustment={Boolean(footer)}
+          style={contentContainerStyle}
+        >
+          <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}
             {children}
           </View>

@@ -1,5 +1,6 @@
 import { Artist, Cheki, ChekiManualEntry, Event } from '../types/models';
 import { ChekiViewerItem } from '../types/chekiViewer';
+import { normalizeChekiSpec } from '../domain/chekiSpec';
 import { getArtistPrimaryName } from './artistDisplay';
 import { getArtistSearchText } from './filter';
 
@@ -304,6 +305,7 @@ export function buildChekiViewerItems(
       price: cheki.price,
       notes: cheki.notes,
       isFavorite: cheki.is_favorite === 1,
+      spec: normalizeChekiSpec(cheki.spec),
       artistId: cheki.artist_id,
       artistName: cheki.artist_id ? (artistMap.get(cheki.artist_id) ? getArtistPrimaryName(artistMap.get(cheki.artist_id)!) : '未知艺人') : null,
       eventId: cheki.event_id,

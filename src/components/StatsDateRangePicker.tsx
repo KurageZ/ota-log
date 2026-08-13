@@ -126,6 +126,27 @@ export function StatsDateRangePicker({
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.accent }}>全部时间</Text>
         </TouchableOpacity>
       )}
+      footer={(
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="应用日期范围"
+          disabled={!canConfirm}
+          onPress={() => {
+            if (validRange) onConfirm(validRange.startDate!, validRange.endDate!);
+          }}
+          activeOpacity={0.72}
+          style={{
+            minHeight: 48,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 12,
+            backgroundColor: colors.accent,
+            opacity: canConfirm ? 1 : 0.4,
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>应用</Text>
+        </TouchableOpacity>
+      )}
     >
       <View style={{ flexDirection: stackDateInputs ? 'column' : 'row', gap: 10, marginBottom: 10 }}>
         {[
@@ -202,26 +223,6 @@ export function StatsDateRangePicker({
         }}
         accessibilityLabel="日期范围选择器"
       />
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="应用日期范围"
-        disabled={!canConfirm}
-        onPress={() => {
-          if (validRange) onConfirm(validRange.startDate!, validRange.endDate!);
-        }}
-        activeOpacity={0.72}
-        style={{
-          minHeight: 48,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: 10,
-          borderRadius: 12,
-          backgroundColor: colors.accent,
-          opacity: canConfirm ? 1 : 0.4,
-        }}
-      >
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>应用</Text>
-      </TouchableOpacity>
     </BottomSheetDialog>
   );
 }

@@ -4,6 +4,7 @@ import { formatDate } from '../utils/date';
 import { useAppTheme } from '../theme/appTheme';
 import { ChekiViewerItem } from '../types/chekiViewer';
 import { FullscreenImageViewer, type FullscreenImageTransitionOrigin } from './FullscreenImageViewer';
+import { getChekiSpecLabel } from '../domain/chekiSpec';
 
 interface ChekiViewerModalProps {
   visible: boolean;
@@ -87,6 +88,15 @@ function ChekiDetails({ item, showPrice }: { item: ChekiViewerItem; showPrice: b
         <DetailBlock
           label="图片"
           value={item.side === 'front' ? '正面' : '背面'}
+          labelColor={detailLabelColor}
+          textColor={colors.white}
+          backgroundColor={detailBlockBackgroundColor}
+        />
+      ) : null}
+      {item.spec ? (
+        <DetailBlock
+          label="规格"
+          value={getChekiSpecLabel(item.spec)}
           labelColor={detailLabelColor}
           textColor={colors.white}
           backgroundColor={detailBlockBackgroundColor}

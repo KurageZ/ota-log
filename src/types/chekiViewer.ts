@@ -6,6 +6,7 @@ export interface ChekiViewerItem {
   backPhotoUri?: string | null;
   side?: 'front' | 'back';
   isFavorite?: boolean;
+  spec?: import('../domain/chekiSpec').ChekiSpec;
   date: string | null;
   price: number | null;
   notes: string | null;

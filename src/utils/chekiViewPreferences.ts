@@ -1,27 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChekiGridDensity } from './cheki';
 
-export const CHEKI_VIEW_PREFERENCES_STORAGE_KEY = 'ota-log.cheki-view-preferences.v1';
+export const CHEKI_VIEW_PREFERENCES_STORAGE_KEY = 'ota-log.cheki-view-preferences.v2';
 
-export type ChekiViewMode = 'artist' | 'record' | 'album';
+export type ChekiBrowseMode = 'item' | 'record';
+export type ChekiItemLayout = 'artist' | 'album';
 export type ChekiSortOrder = 'desc' | 'asc';
 
 export interface ChekiViewPreferences {
-  mode: ChekiViewMode;
+  browseMode: ChekiBrowseMode;
+  itemLayout: ChekiItemLayout;
   sortOrder: ChekiSortOrder;
   density: ChekiGridDensity;
   showRecordThumbnails: boolean;
 }
 
 export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
-  mode: 'artist',
+  browseMode: 'item',
+  itemLayout: 'artist',
   sortOrder: 'desc',
   density: 'medium',
   showRecordThumbnails: true,
 };
 
-function isMode(value: unknown): value is ChekiViewMode {
-  return value === 'artist' || value === 'record' || value === 'album';
+function isBrowseMode(value: unknown): value is ChekiBrowseMode {
+  return value === 'item' || value === 'record';
+}
+
+function isItemLayout(value: unknown): value is ChekiItemLayout {
+  return value === 'artist' || value === 'album';
 }
 
 function isSortOrder(value: unknown): value is ChekiSortOrder {
@@ -32,38 +39,27 @@ function isDensity(value: unknown): value is ChekiGridDensity {
   return value === 'large' || value === 'medium' || value === 'small';
 }
 
-function densityFromLegacyColumns(value: unknown): ChekiGridDensity | null {
-  if (value === 3) return 'large';
-  if (value === 4) return 'medium';
-  if (value === 5) return 'small';
-  return null;
-}
-
-function modeFromLegacyPreferences(value: Record<string, unknown>): ChekiViewMode {
-  if ('mode' in value && isMode(value.mode)) return value.mode;
-  if (value.mode === 'date') return 'record';
-  if (value.organization === 'time' && value.display === 'stack') return 'record';
-  if (value.organization === 'time') return 'album';
-  return DEFAULT_CHEKI_VIEW_PREFERENCES.mode;
-}
-
 export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferences {
   if (!value || typeof value !== 'object') return DEFAULT_CHEKI_VIEW_PREFERENCES;
-
   const raw = value as Record<string, unknown>;
-  const mode = modeFromLegacyPreferences(raw);
-  const sortOrder = 'sortOrder' in raw && isSortOrder(raw.sortOrder)
-    ? raw.sortOrder
-    : DEFAULT_CHEKI_VIEW_PREFERENCES.sortOrder;
-  const legacyDensity = 'columns' in value ? densityFromLegacyColumns(value.columns) : null;
-  const density = 'density' in value && isDensity(value.density)
-    ? value.density
-    : legacyDensity ?? DEFAULT_CHEKI_VIEW_PREFERENCES.density;
-  const showRecordThumbnails = typeof raw.showRecordThumbnails === 'boolean'
-    ? raw.showRecordThumbnails
-    : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails;
-
-  return { mode, sortOrder, density, showRecordThumbnails };
+  if ('mode' in raw && !('browseMode' in raw)) return DEFAULT_CHEKI_VIEW_PREFERENCES;
+  return {
+    browseMode: isBrowseMode(raw.browseMode)
+      ? raw.browseMode
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.browseMode,
+    itemLayout: isItemLayout(raw.itemLayout)
+      ? raw.itemLayout
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.itemLayout,
+    sortOrder: isSortOrder(raw.sortOrder)
+      ? raw.sortOrder
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.sortOrder,
+    density: isDensity(raw.density)
+      ? raw.density
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.density,
+    showRecordThumbnails: typeof raw.showRecordThumbnails === 'boolean'
+      ? raw.showRecordThumbnails
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails,
+  };
 }
 
 export async function loadChekiViewPreferences(): Promise<ChekiViewPreferences> {

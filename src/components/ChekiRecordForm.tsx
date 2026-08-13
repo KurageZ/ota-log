@@ -35,6 +35,13 @@ import { AppIcon } from './AppIcon';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { FormCard, FormFieldLabel, FormSectionLabel } from './FormPrimitives';
 import { NativeTextToolbar } from './native-text-toolbar';
+import {
+  CHEKI_SPECS,
+  DEFAULT_CHEKI_SPEC,
+  getChekiSpecAspectRatio,
+  getChekiSpecLabel,
+  type ChekiSpec,
+} from '../domain/chekiSpec';
 
 const PHOTO_PICKER_SELECTION_LIMIT = 20;
 const CHEKI_IMPORT_MAX_DIMENSION = Platform.OS === 'android' ? 1600 : 2000;
@@ -124,6 +131,8 @@ export function ChekiRecordForm({
   const [date, setDate] = useState(initialDate ?? toISODate(new Date()));
   const [unitPrice, setUnitPrice] = useState('');
   const [notes, setNotes] = useState('');
+  const [newItemSpec, setNewItemSpec] = useState<ChekiSpec>(DEFAULT_CHEKI_SPEC);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [photoPickerPending, setPhotoPickerPending] = useState(false);
   const [photoImportProgress, setPhotoImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -200,10 +209,12 @@ export function ChekiRecordForm({
     date,
     unitPrice,
     notes,
+    newItemSpec,
   }), [
     artistDecision,
     date,
     notes,
+    newItemSpec,
     pendingPhotoUris,
     pendingRemovedItemIds,
     quantity,
@@ -517,7 +528,8 @@ export function ChekiRecordForm({
         const created = await db.chekiRecords.createRecordWithItems({
           ...input,
           unit_price: parsedUnitPrice ?? 0,
-          items: pendingPhotoUris.map((frontUri) => ({ frontUri })),
+          spec: newItemSpec,
+          items: pendingPhotoUris.map((frontUri) => ({ frontUri, spec: newItemSpec })),
         });
         pendingImportedPhotoUrisRef.current.clear();
         allowNavigationRef.current = true;
@@ -527,9 +539,10 @@ export function ChekiRecordForm({
           recordId,
           input,
           {
-            add: pendingPhotoUris.map((frontUri) => ({ frontUri })),
+            add: pendingPhotoUris.map((frontUri) => ({ frontUri, spec: newItemSpec })),
             removeItemIds: pendingRemovedItemIds,
             defaultUnitPrice: parsedUnitPrice ?? 0,
+            defaultSpec: newItemSpec,
           },
         );
         pendingImportedPhotoUrisRef.current.clear();
@@ -548,6 +561,7 @@ export function ChekiRecordForm({
     db,
     mode,
     notes,
+    newItemSpec,
     parsedQuantity,
     parsedUnitPrice,
     pendingPhotoUris,
@@ -634,9 +648,10 @@ export function ChekiRecordForm({
                     <Image
                       source={{ uri }}
                       resizeMethod="resize"
+                      resizeMode="contain"
                       style={{
                         width: thumbnailSize,
-                        height: thumbnailSize * 86 / 54,
+                        height: thumbnailSize / getChekiSpecAspectRatio(item.spec),
                         borderRadius: 10,
                         opacity: isRemoved ? 0.28 : 1,
                         backgroundColor: colors.cardAlt,
@@ -672,7 +687,8 @@ export function ChekiRecordForm({
                   <Image
                     source={{ uri }}
                     resizeMethod="resize"
-                    style={{ width: thumbnailSize, height: thumbnailSize * 86 / 54, borderRadius: 10, backgroundColor: colors.cardAlt }}
+                    resizeMode="contain"
+                    style={{ width: thumbnailSize, height: thumbnailSize / getChekiSpecAspectRatio(newItemSpec), borderRadius: 10, backgroundColor: colors.cardAlt }}
                   />
                   <TouchableOpacity
                     onPress={() => removePendingPhoto(uri)}
@@ -919,6 +935,51 @@ export function ChekiRecordForm({
             style={{ minHeight: 100, padding: 12, borderRadius: 10, backgroundColor: colors.input, fontSize: 14, lineHeight: 21, color: colors.text }}
           />
         </FormCard>
+
+        <FormSectionLabel label="高级信息" />
+        <TouchableOpacity
+          onPress={() => setAdvancedExpanded((current) => !current)}
+          activeOpacity={0.72}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: advancedExpanded }}
+          style={{ minHeight: 52, paddingHorizontal: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>
+              {mode === 'create' ? '拍立得规格' : '新增拍立得规格'}
+            </Text>
+            <Text style={{ marginTop: 3, fontSize: 12, color: colors.textSecondary }}>
+              {getChekiSpecLabel(newItemSpec)}
+            </Text>
+          </View>
+          <AppIcon name="disclosure" variant={advancedExpanded ? 'down' : 'forward'} size={16} color={colors.chevron} />
+        </TouchableOpacity>
+        {advancedExpanded ? (
+          <FormCard style={{ marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {CHEKI_SPECS.map((option) => {
+                const selected = option.id === newItemSpec;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() => setNewItemSpec(option.id)}
+                    activeOpacity={0.72}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    style={{ minHeight: 44, paddingHorizontal: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: selected ? colors.accent : colors.inputBorder }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {mode === 'edit' ? (
+              <Text style={{ marginTop: 10, fontSize: 12, lineHeight: 18, color: colors.textMuted }}>
+                只应用于本次新增的拍立得，不修改已有规格。
+              </Text>
+            ) : null}
+          </FormCard>
+        ) : null}
 
         <View style={{ paddingHorizontal: 4, paddingVertical: 10, alignItems: 'center' }}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>

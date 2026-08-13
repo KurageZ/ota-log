@@ -5,7 +5,11 @@ import {
   ChekiItemImage,
   ChekiRecord,
 } from '../types/models';
-import { DEFAULT_CHEKI_ASPECT_RATIO } from '../db/chekiV2Schema';
+import {
+  DEFAULT_CHEKI_SPEC,
+  isChekiSpec,
+  type ChekiSpec,
+} from '../domain/chekiSpec';
 import { generateId } from '../utils/uuid';
 import { toISODateTime } from '../utils/date';
 
@@ -15,6 +19,7 @@ export interface CreateChekiRecordInput {
   date?: string | null;
   quantity: number;
   unit_price?: number;
+  spec?: ChekiSpec;
   notes?: string | null;
 }
 
@@ -24,7 +29,7 @@ export interface AddChekiItemInput {
   frontUri?: string;
   backUri?: string;
   unitPrice?: number;
-  displayAspectRatio?: number;
+  spec?: ChekiSpec;
   notes?: string | null;
 }
 
@@ -36,11 +41,12 @@ export interface ChekiRecordItemChanges {
   add?: AddChekiItemInput[];
   removeItemIds?: string[];
   defaultUnitPrice?: number;
+  defaultSpec?: ChekiSpec;
 }
 
 export interface UpdateChekiItemInput {
   unitPrice?: number;
-  displayAspectRatio?: number;
+  spec?: ChekiSpec;
   notes?: string | null;
 }
 
@@ -59,10 +65,34 @@ export interface ChekiRecordWithItems extends ChekiRecord {
 
 export interface ChekiRecordFilter {
   artistId?: string;
+  artistIds?: string[];
   eventId?: string;
   date?: string;
+  dateFrom?: string;
+  dateTo?: string;
   year?: number;
   month?: number;
+  imageStatus?: 'none' | 'partial' | 'complete';
+  hasLinkedEvent?: boolean;
+  hasNotes?: boolean;
+  hasBackImage?: boolean;
+}
+
+export interface ChekiItemFilter {
+  artistIds?: string[];
+  eventId?: string;
+  date?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  specs?: ChekiSpec[];
+  hasLinkedEvent?: boolean;
+  hasNotes?: boolean;
+  isFavorite?: boolean;
+  hasBackImage?: boolean;
+}
+
+export interface ChekiBrowseItem extends ChekiItemWithImages {
+  record: ChekiRecord;
 }
 
 export interface ChekiStatistics {
@@ -88,9 +118,9 @@ function assertUnitPrice(unitPrice: number | undefined): void {
   }
 }
 
-function assertAspectRatio(ratio: number): void {
-  if (!Number.isFinite(ratio) || ratio <= 0) {
-    throw new Error('Cheki item display aspect ratio must be greater than 0');
+function assertSpec(spec: ChekiSpec | undefined): void {
+  if (spec != null && !isChekiSpec(spec)) {
+    throw new Error('Cheki item spec is invalid');
   }
 }
 
@@ -121,6 +151,7 @@ export class ChekiRecordRepository {
         createdItems.push(await this.insertItem(record.id, {
           ...item,
           unitPrice: item.unitPrice ?? input.unit_price ?? 0,
+          spec: item.spec ?? input.spec ?? DEFAULT_CHEKI_SPEC,
         }));
       }
       created = { ...record, items: createdItems };
@@ -265,6 +296,7 @@ export class ChekiRecordRepository {
       while (remainingItems.length < targetQuantity) {
         remainingItems.push(await this.insertItem(id, {
           unitPrice: changes.defaultUnitPrice ?? 0,
+          spec: changes.defaultSpec ?? DEFAULT_CHEKI_SPEC,
         }));
       }
 
@@ -277,7 +309,7 @@ export class ChekiRecordRepository {
         const item = itemsToPopulate[index];
         await this.updateItem(target.id, {
           unitPrice: item.unitPrice,
-          displayAspectRatio: item.displayAspectRatio,
+          spec: item.spec,
           notes: item.notes,
         });
         if (item.frontUri) await this.addOrReplaceItemImage(target.id, 'front', item.frontUri);
@@ -305,8 +337,8 @@ export class ChekiRecordRepository {
     input: AddChekiItemInput,
   ): Promise<ChekiItemWithImages> {
     assertUnitPrice(input.unitPrice);
-    const ratio = input.displayAspectRatio ?? DEFAULT_CHEKI_ASPECT_RATIO;
-    assertAspectRatio(ratio);
+    assertSpec(input.spec);
+    const spec = input.spec ?? DEFAULT_CHEKI_SPEC;
 
     const record = await this.db.getFirstAsync<ChekiRecord>(
       'SELECT * FROM cheki_records WHERE id = ?',
@@ -330,7 +362,7 @@ export class ChekiRecordRepository {
       record_id: recordId,
       sort_order: nextOrder?.next_order ?? 0,
       unit_price: input.unitPrice ?? 0,
-      display_aspect_ratio: ratio,
+      spec,
       is_favorite: 0,
       notes: input.notes ?? null,
       created_at: now,
@@ -338,14 +370,14 @@ export class ChekiRecordRepository {
     };
     await this.db.runAsync(
       `INSERT INTO cheki_items
-         (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
+         (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         item.id,
         item.record_id,
         item.sort_order,
         item.unit_price,
-        item.display_aspect_ratio,
+        item.spec,
         item.is_favorite,
         item.notes,
         item.created_at,
@@ -382,10 +414,10 @@ export class ChekiRecordRepository {
       fields.push('unit_price = ?');
       values.push(input.unitPrice);
     }
-    if ('displayAspectRatio' in input && input.displayAspectRatio != null) {
-      assertAspectRatio(input.displayAspectRatio);
-      fields.push('display_aspect_ratio = ?');
-      values.push(input.displayAspectRatio);
+    if ('spec' in input && input.spec != null) {
+      assertSpec(input.spec);
+      fields.push('spec = ?');
+      values.push(input.spec);
     }
     if ('notes' in input) {
       fields.push('notes = ?');
@@ -530,6 +562,10 @@ export class ChekiRecordRepository {
       clauses.push('artist_id = ?');
       params.push(filter.artistId);
     }
+    if (filter.artistIds && filter.artistIds.length > 0) {
+      clauses.push(`artist_id IN (${filter.artistIds.map(() => '?').join(', ')})`);
+      params.push(...filter.artistIds);
+    }
     if (filter.eventId) {
       clauses.push('event_id = ?');
       params.push(filter.eventId);
@@ -538,6 +574,14 @@ export class ChekiRecordRepository {
       clauses.push("strftime('%Y-%m-%d', COALESCE(date, created_at)) = ?");
       params.push(filter.date);
     }
+    if (filter.dateFrom) {
+      clauses.push("strftime('%Y-%m-%d', COALESCE(date, created_at)) >= ?");
+      params.push(filter.dateFrom);
+    }
+    if (filter.dateTo) {
+      clauses.push("strftime('%Y-%m-%d', COALESCE(date, created_at)) <= ?");
+      params.push(filter.dateTo);
+    }
     if (filter.year != null) {
       clauses.push(`strftime('${filter.month == null ? '%Y' : '%Y-%m'}', COALESCE(date, created_at)) = ?`);
       params.push(
@@ -545,6 +589,39 @@ export class ChekiRecordRepository {
           ? String(filter.year)
           : `${filter.year}-${String(filter.month).padStart(2, '0')}`,
       );
+    }
+    if (filter.hasLinkedEvent) clauses.push('event_id IS NOT NULL');
+    if (filter.hasNotes) {
+      clauses.push(`(
+        NULLIF(TRIM(notes), '') IS NOT NULL
+        OR EXISTS (
+          SELECT 1 FROM cheki_items note_item
+          WHERE note_item.record_id = cheki_records.id
+            AND NULLIF(TRIM(note_item.notes), '') IS NOT NULL
+        )
+      )`);
+    }
+    if (filter.hasBackImage) {
+      clauses.push(`EXISTS (
+        SELECT 1
+        FROM cheki_items back_item
+        JOIN cheki_item_images back_image ON back_image.item_id = back_item.id
+        WHERE back_item.record_id = cheki_records.id
+          AND back_image.side = 'back'
+      )`);
+    }
+    if (filter.imageStatus) {
+      const imageItemCountSql = `(
+        SELECT COUNT(DISTINCT status_item.id)
+        FROM cheki_items status_item
+        JOIN cheki_item_images status_image ON status_image.item_id = status_item.id
+        WHERE status_item.record_id = cheki_records.id
+      )`;
+      if (filter.imageStatus === 'none') clauses.push(`${imageItemCountSql} = 0`);
+      if (filter.imageStatus === 'partial') {
+        clauses.push(`${imageItemCountSql} > 0 AND ${imageItemCountSql} < quantity`);
+      }
+      if (filter.imageStatus === 'complete') clauses.push(`${imageItemCountSql} = quantity`);
     }
     const records = await this.db.getAllAsync<ChekiRecord>(
       `SELECT * FROM cheki_records
@@ -560,6 +637,111 @@ export class ChekiRecordRepository {
       else byRecord.set(item.record_id, [item]);
     }
     return records.map((record) => ({ ...record, items: byRecord.get(record.id) ?? [] }));
+  }
+
+  async findBrowseItems(filter: ChekiItemFilter = {}): Promise<ChekiBrowseItem[]> {
+    const clauses = [
+      'EXISTS (SELECT 1 FROM cheki_item_images visible_image WHERE visible_image.item_id = i.id)',
+    ];
+    const params: Array<string | number> = [];
+    if (filter.artistIds && filter.artistIds.length > 0) {
+      clauses.push(`r.artist_id IN (${filter.artistIds.map(() => '?').join(', ')})`);
+      params.push(...filter.artistIds);
+    }
+    if (filter.eventId) {
+      clauses.push('r.event_id = ?');
+      params.push(filter.eventId);
+    }
+    if (filter.date) {
+      clauses.push("strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) = ?");
+      params.push(filter.date);
+    }
+    if (filter.dateFrom) {
+      clauses.push("strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) >= ?");
+      params.push(filter.dateFrom);
+    }
+    if (filter.dateTo) {
+      clauses.push("strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) <= ?");
+      params.push(filter.dateTo);
+    }
+    if (filter.specs && filter.specs.length > 0) {
+      filter.specs.forEach(assertSpec);
+      clauses.push(`i.spec IN (${filter.specs.map(() => '?').join(', ')})`);
+      params.push(...filter.specs);
+    }
+    if (filter.hasLinkedEvent) clauses.push('r.event_id IS NOT NULL');
+    if (filter.hasNotes) clauses.push("NULLIF(TRIM(i.notes), '') IS NOT NULL");
+    if (filter.isFavorite) clauses.push('i.is_favorite = 1');
+    if (filter.hasBackImage) {
+      clauses.push(`EXISTS (
+        SELECT 1 FROM cheki_item_images back_image
+        WHERE back_image.item_id = i.id AND back_image.side = 'back'
+      )`);
+    }
+
+    const rows = await this.db.getAllAsync<ChekiItem & {
+      parent_event_id: string | null;
+      parent_artist_id: string | null;
+      parent_date: string | null;
+      parent_quantity: number;
+      parent_notes: string | null;
+      parent_created_at: string;
+      parent_updated_at: string;
+    }>(
+      `SELECT i.*,
+         r.event_id AS parent_event_id,
+         r.artist_id AS parent_artist_id,
+         r.date AS parent_date,
+         r.quantity AS parent_quantity,
+         r.notes AS parent_notes,
+         r.created_at AS parent_created_at,
+         r.updated_at AS parent_updated_at
+       FROM cheki_items i
+       JOIN cheki_records r ON r.id = i.record_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY COALESCE(r.date, r.created_at) DESC, r.created_at DESC,
+                i.sort_order, i.created_at, i.id`,
+      params,
+    );
+    if (rows.length === 0) return [];
+    const images = await this.db.getAllAsync<ChekiItemImage>(
+      `SELECT * FROM cheki_item_images
+       WHERE item_id IN (${rows.map(() => '?').join(', ')})
+       ORDER BY item_id, CASE side WHEN 'front' THEN 0 ELSE 1 END, created_at, id`,
+      rows.map((item) => item.id),
+    );
+    const imagesByItem = new Map<string, ChekiItemImage[]>();
+    for (const image of images) {
+      const current = imagesByItem.get(image.item_id);
+      if (current) current.push(image);
+      else imagesByItem.set(image.item_id, [image]);
+    }
+    return rows.map((row) => {
+      const {
+        parent_event_id,
+        parent_artist_id,
+        parent_date,
+        parent_quantity,
+        parent_notes,
+        parent_created_at,
+        parent_updated_at,
+        ...item
+      } = row;
+      return {
+        ...item,
+        images: imagesByItem.get(item.id) ?? [],
+        record: {
+          id: item.record_id,
+          event_id: parent_event_id,
+          artist_id: parent_artist_id,
+          date: parent_date,
+          quantity: parent_quantity,
+          notes: parent_notes,
+          created_at: parent_created_at,
+          updated_at: parent_updated_at,
+        },
+      };
+    });
   }
 
   async findItemById(id: string): Promise<ChekiItemWithImages | null> {

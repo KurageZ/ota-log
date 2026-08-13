@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   BottomSheetBackdrop,
+  type BottomSheetFooterProps,
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetTextInput,
@@ -19,6 +20,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
 import { Artist } from '../types/models';
 import { ArtistOptionRow } from './ArtistOptionRow';
+import { BottomSheetActionFooter } from './BottomSheetDialog';
 
 export interface FilterOption {
   value: string;
@@ -29,6 +31,22 @@ export interface FilterOption {
   artist?: Artist;
   parentName?: string;
   isOshi?: boolean;
+}
+
+/** 分区标题下的一组独立 chip 行；不设置 title 时该组 chips 直接展示 */
+export interface FilterChipGroup {
+  key: string;
+  options: FilterOption[];
+  title?: string;
+  value?: string | null;
+  values?: string[];
+  multiple?: boolean;
+  onChange?: (value: string | null) => void;
+  onValuesChange?: (values: string[]) => void;
+  /** 「全部」chip 的文案，默认「全部」 */
+  allLabel?: string;
+  /** 设置后在该组开头显示「全部」chip */
+  showAllChip?: boolean;
 }
 
 export interface FilterSection {
@@ -46,6 +64,10 @@ export interface FilterSection {
   input?: { placeholder?: string };
   /** 设置后，该分区顶部显示一个搜索框，用于在 options 中本地过滤（单选，value 为选项 value） */
   search?: { placeholder?: string };
+  /** 标题下方、选择器/已选中区域上方的附加内容（例如批量快捷 chip） */
+  beforeContent?: ReactNode;
+  /** 设置后，该分区改为渲染多组独立 chip 行，不再渲染 options 的默认 chips */
+  chipGroups?: FilterChipGroup[];
 }
 
 interface FilterSheetProps {
@@ -55,6 +77,7 @@ interface FilterSheetProps {
   header?: ReactNode;
   onReset: () => void;
   onClose: () => void;
+  onApply?: () => void;
 }
 
 function Chip({
@@ -73,8 +96,11 @@ function Chip({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.78}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={{
-        height: 34,
+        minHeight: 44,
         paddingHorizontal: 14,
         borderRadius: 99,
         alignItems: 'center',
@@ -188,7 +214,7 @@ function SearchOptionRow({
   );
 }
 
-export function FilterSheet({ visible, sections, isDark, header, onReset, onClose }: FilterSheetProps) {
+export function FilterSheet({ visible, sections, isDark, header, onReset, onClose, onApply }: FilterSheetProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -266,9 +292,9 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
     onReset();
   };
 
-  const handleClose = () => {
+  const handleApply = () => {
     flushInputDrafts();
-    onClose();
+    onApply?.();
   };
 
   const handleDismiss = () => {
@@ -289,6 +315,26 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
     />
   );
 
+  const renderFooter = (props: BottomSheetFooterProps) => (
+    <BottomSheetActionFooter {...props}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="应用筛选"
+        onPress={handleApply}
+        activeOpacity={0.72}
+        style={{
+          minHeight: 48,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.accent,
+        }}
+      >
+        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>应用</Text>
+      </TouchableOpacity>
+    </BottomSheetActionFooter>
+  );
+
   return (
     <BottomSheetModal
       ref={sheetModalRef}
@@ -296,12 +342,15 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
       enableDismissOnClose
       enablePanDownToClose
       maxDynamicContentSize={maxSheetHeight}
-      bottomInset={insets.bottom}
+      // Keep the sheet background flush with the viewport; the scroll content
+      // already owns the safe-area padding below.
+      bottomInset={0}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       enableBlurKeyboardOnGesture
       android_keyboardInputMode="adjustResize"
       backdropComponent={renderBackdrop}
+      footerComponent={onApply ? renderFooter : undefined}
       backgroundStyle={{
         backgroundColor: screen,
         borderTopLeftRadius: 24,
@@ -318,10 +367,11 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
       <BottomSheetScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        enableFooterMarginAdjustment={Boolean(onApply)}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, 12) + 20,
+          paddingBottom: onApply ? 20 : Math.max(insets.bottom, 12) + 20,
         }}
       >
         <View
@@ -331,9 +381,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
             <Text style={{ fontSize: 14, fontWeight: '700', color: subText }}>重置</Text>
           </TouchableOpacity>
           <Text style={{ fontSize: 16, fontWeight: '800', color: heading }}>筛选</Text>
-          <TouchableOpacity onPress={handleClose} hitSlop={8}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>关闭</Text>
-          </TouchableOpacity>
+          <View style={{ width: 42 }} />
         </View>
 
         {header}
@@ -377,6 +425,10 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
               <Text style={{ fontSize: 13, fontWeight: '700', color: subText, marginBottom: 10 }}>
                 {section.title}
               </Text>
+
+              {section.beforeContent ? (
+                <View style={{ marginBottom: 10 }}>{section.beforeContent}</View>
+              ) : null}
 
               {section.input ? (
                 <BottomSheetTextInput
@@ -452,7 +504,61 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                 />
               ) : null}
 
-              {showSearchList ? (
+              {section.chipGroups ? (
+                <View style={{ gap: 12 }}>
+                  {section.chipGroups.map((group) => {
+                    const groupSelected = group.values ?? (group.value != null ? [group.value] : []);
+                    const groupSelectedSet = new Set(groupSelected);
+                    return (
+                      <View key={group.key}>
+                        {group.title ? (
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>
+                            {group.title}
+                          </Text>
+                        ) : null}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                          {group.showAllChip ? (
+                            <Chip
+                              label={group.allLabel ?? '全部'}
+                              active={groupSelected.length === 0}
+                              isDark={isDark}
+                              onPress={() => {
+                                if (group.multiple) group.onValuesChange?.([]);
+                                else group.onChange?.(null);
+                              }}
+                            />
+                          ) : null}
+                          {group.options.map((option) => {
+                            const active = group.multiple
+                              ? groupSelectedSet.has(option.value)
+                              : group.value === option.value;
+                            return (
+                              <Chip
+                                key={option.value}
+                                label={option.label}
+                                active={active}
+                                isDark={isDark}
+                                onPress={() => {
+                                  if (group.multiple) {
+                                    const next = active
+                                      ? groupSelected.filter((value) => value !== option.value)
+                                      : [...groupSelected, option.value];
+                                    group.onValuesChange?.(next);
+                                  } else if (active) {
+                                    group.onChange?.(null);
+                                  } else {
+                                    group.onChange?.(option.value);
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : showSearchList ? (
                 <View
                   style={{
                     borderRadius: 10,
@@ -509,24 +615,41 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                 </View>
               ) : displayedOptions.length > 0 || showAllChip ? (
                 // 限制最多三行（chip 34 + gap 8），超出部分裁掉，靠搜索/输入找其余项
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, maxHeight: 118, overflow: 'hidden' }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                   {showAllChip ? (
                     <Chip
                       label={section.allLabel ?? '全部'}
-                      active={section.value == null}
+                      active={selectedValues.length === 0}
                       isDark={isDark}
-                      onPress={() => setSectionValue(section, null)}
+                      onPress={() => {
+                        if (section.multiple) section.onValuesChange?.([]);
+                        else setSectionValue(section, null);
+                      }}
                     />
                   ) : null}
-                  {displayedOptions.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      active={section.value === option.value}
-                      isDark={isDark}
-                      onPress={() => setSectionValue(section, option.value)}
-                    />
-                  ))}
+                  {displayedOptions.map((option) => {
+                    const active = section.multiple ? selectedSet.has(option.value) : section.value === option.value;
+                    return (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        active={active}
+                        isDark={isDark}
+                        onPress={() => {
+                          if (section.multiple) {
+                            const next = active
+                              ? selectedValues.filter((value) => value !== option.value)
+                              : [...selectedValues, option.value];
+                            section.onValuesChange?.(next);
+                          } else if (active) {
+                            setSectionValue(section, null);
+                          } else {
+                            setSectionValue(section, option.value);
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </View>
               ) : null}
             </View>

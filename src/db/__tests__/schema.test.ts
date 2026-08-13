@@ -102,7 +102,7 @@ describe('Fresh database schema', () => {
       'notes', 'created_at', 'updated_at',
     ]);
     expect(columns(db, 'cheki_items')).toEqual([
-      'id', 'record_id', 'sort_order', 'unit_price', 'display_aspect_ratio', 'is_favorite',
+      'id', 'record_id', 'sort_order', 'unit_price', 'spec', 'is_favorite',
       'notes', 'created_at', 'updated_at',
     ]);
     expect(columns(db, 'cheki_item_images')).toEqual([
@@ -130,13 +130,13 @@ describe('Fresh database schema', () => {
       VALUES (?, 'artist', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`);
     insertRecord.run('record', 2);
     const insertItem = db.prepare(`INSERT INTO cheki_items
-      (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, created_at, updated_at)
+      (id, record_id, sort_order, unit_price, spec, is_favorite, created_at, updated_at)
       VALUES (?, 'record', ?, ?, ?, ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`);
-    expect(() => insertItem.run('negative-price', 0, -1, 54 / 86, 0)).toThrow();
-    expect(() => insertItem.run('fractional-price', 0, 1.5, 54 / 86, 0)).toThrow();
-    expect(() => insertItem.run('zero-ratio', 0, 0, 0, 0)).toThrow();
-    expect(() => insertItem.run('bad-favorite', 0, 0, 54 / 86, 2)).toThrow();
-    insertItem.run('item', 0, 20, 54 / 86, 0);
+    expect(() => insertItem.run('negative-price', 0, -1, 'three_inch_portrait', 0)).toThrow();
+    expect(() => insertItem.run('fractional-price', 0, 1.5, 'three_inch_portrait', 0)).toThrow();
+    expect(() => insertItem.run('bad-spec', 0, 0, 'custom', 0)).toThrow();
+    expect(() => insertItem.run('bad-favorite', 0, 0, 'three_inch_portrait', 2)).toThrow();
+    insertItem.run('item', 0, 20, 'three_inch_portrait', 0);
     const insertImage = db.prepare(`INSERT INTO cheki_item_images
       (id, item_id, side, photo_uri, created_at, updated_at)
       VALUES (?, 'item', ?, ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`);

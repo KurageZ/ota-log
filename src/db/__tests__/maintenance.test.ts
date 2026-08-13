@@ -89,8 +89,8 @@ function insertSeedData(db: Database.Database): void {
   insertChekiRecord(db, 'cheki-seed', 'artist-seed');
   db.prepare(
     `INSERT INTO cheki_items
-       (id, record_id, sort_order, unit_price, display_aspect_ratio, is_favorite, notes, created_at, updated_at)
-     VALUES ('item-seed', 'cheki-seed', 0, 0, 54.0 / 86.0, 0, NULL, ?, ?)`,
+       (id, record_id, sort_order, unit_price, spec, is_favorite, notes, created_at, updated_at)
+     VALUES ('item-seed', 'cheki-seed', 0, 0, 'three_inch_portrait', 0, NULL, ?, ?)`,
   ).run(NOW, NOW);
   db.prepare(
     `INSERT INTO cheki_item_images

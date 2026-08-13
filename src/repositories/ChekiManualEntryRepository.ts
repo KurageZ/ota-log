@@ -6,7 +6,7 @@ import {
 } from '../types/models';
 import { generateId } from '../utils/uuid';
 import { periodLikeParam, toISODateTime } from '../utils/date';
-import { DEFAULT_CHEKI_ASPECT_RATIO } from '../db/chekiV2Schema';
+import { DEFAULT_CHEKI_SPEC } from '../domain/chekiSpec';
 
 const MANUAL_PROJECTION = `SELECT
   r.id,
@@ -270,10 +270,10 @@ export class ChekiManualEntryRepository {
       for (let index = 0; index < entry.count; index += 1) {
         await this.db.runAsync(
           `INSERT INTO cheki_items
-             (id, record_id, sort_order, unit_price, display_aspect_ratio,
+             (id, record_id, sort_order, unit_price, spec,
               is_favorite, notes, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
-          [generateId(), entry.id, index, unitPrices[index], DEFAULT_CHEKI_ASPECT_RATIO, now, now],
+          [generateId(), entry.id, index, unitPrices[index], DEFAULT_CHEKI_SPEC, now, now],
         );
       }
     });
@@ -331,10 +331,10 @@ export class ChekiManualEntryRepository {
       for (let index = currentItems.length; index < nextCount; index += 1) {
         await this.db.runAsync(
           `INSERT INTO cheki_items
-             (id, record_id, sort_order, unit_price, display_aspect_ratio,
+             (id, record_id, sort_order, unit_price, spec,
               is_favorite, notes, created_at, updated_at)
            VALUES (?, ?, ?, 0, ?, 0, NULL, ?, ?)`,
-          [generateId(), id, index, DEFAULT_CHEKI_ASPECT_RATIO, now, now],
+          [generateId(), id, index, DEFAULT_CHEKI_SPEC, now, now],
         );
       }
       const finalItems = await this.db.getAllAsync<{ id: string }>(

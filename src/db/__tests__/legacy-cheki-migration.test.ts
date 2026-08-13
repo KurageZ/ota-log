@@ -47,15 +47,15 @@ describe('legacy cheki v2 data migration', () => {
       id: item.id,
       order: item.sort_order,
       unitPrice: item.unit_price,
-      ratio: item.display_aspect_ratio,
+      spec: item.spec,
       favorite: item.is_favorite,
       notes: item.notes,
     }))).toEqual([
-      { id: 'generated-1', order: 0, unitPrice: 4, ratio: 54 / 86, favorite: 0, notes: null },
-      { id: 'generated-2', order: 1, unitPrice: 3, ratio: 54 / 86, favorite: 0, notes: null },
-      { id: 'generated-3', order: 2, unitPrice: 3, ratio: 54 / 86, favorite: 0, notes: null },
-      { id: 'photo-a', order: 3, unitPrice: 0, ratio: 54 / 86, favorite: 0, notes: 'A' },
-      { id: 'photo-b', order: 4, unitPrice: 12, ratio: 54 / 86, favorite: 0, notes: 'B' },
+      { id: 'generated-1', order: 0, unitPrice: 4, spec: 'three_inch_portrait', favorite: 0, notes: null },
+      { id: 'generated-2', order: 1, unitPrice: 3, spec: 'three_inch_portrait', favorite: 0, notes: null },
+      { id: 'generated-3', order: 2, unitPrice: 3, spec: 'three_inch_portrait', favorite: 0, notes: null },
+      { id: 'photo-a', order: 3, unitPrice: 0, spec: 'three_inch_portrait', favorite: 0, notes: 'A' },
+      { id: 'photo-b', order: 4, unitPrice: 12, spec: 'three_inch_portrait', favorite: 0, notes: 'B' },
     ]);
     expect(migrated.images.map((image) => ({
       item: image.item_id, side: image.side, uri: image.photo_uri,

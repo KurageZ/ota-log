@@ -24,6 +24,11 @@ import { ChekiViewerModal } from '../../../../src/components/ChekiViewerModal';
 import { FormSectionLabel } from '../../../../src/components/FormPrimitives';
 import { OshiAvatar } from '../../../../src/components/Oshi';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
+import {
+  DEFAULT_CHEKI_SPEC,
+  formatChekiSpecDistribution,
+  getChekiSpecAspectRatio,
+} from '../../../../src/domain/chekiSpec';
 
 function getItemPreviewUri(item: ChekiRecordWithItems['items'][number]): string | null {
   return item.images.find((image) => image.side === 'front')?.photo_uri
@@ -90,6 +95,7 @@ export default function ChekiRecordDetailScreen() {
         backPhotoUri,
         side: frontPhotoUri ? 'front' as const : 'back' as const,
         isFavorite: item.is_favorite === 1,
+        spec: item.spec,
         date: record.date,
         price: item.unit_price,
         notes: item.notes,
@@ -194,11 +200,11 @@ export default function ChekiRecordDetailScreen() {
   }
 
   const itemWidth = Math.floor((width - 32 - 16) / 3);
-  const itemHeight = Math.round(itemWidth * 86 / 54);
   const photoItems = record.items.filter((item) => item.images.length > 0);
   const hasMissingImages = photoItems.length < record.quantity;
   const totalPrice = record.items.reduce((sum, item) => sum + item.unit_price, 0);
   const artistName = artist ? getArtistPrimaryName(artist) : '未关联艺人';
+  const specDistribution = formatChekiSpecDistribution(record.items.map((item) => item.spec));
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -259,6 +265,12 @@ export default function ChekiRecordDetailScreen() {
               </Text>
               {event ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
             </TouchableOpacity>
+            <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <AppIcon name="image" size={15} color={colors.textMuted} />
+              <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
+                {specDistribution}
+              </Text>
+            </View>
           </View>
 
           <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider, flexDirection: 'row' }}>
@@ -305,10 +317,10 @@ export default function ChekiRecordDetailScreen() {
                     <Image
                       source={{ uri }}
                       resizeMethod="resize"
-                      resizeMode="cover"
+                      resizeMode="contain"
                       style={{
                         width: itemWidth,
-                        height: itemHeight,
+                        height: itemWidth / getChekiSpecAspectRatio(item.spec),
                         borderRadius: 10,
                         backgroundColor: colors.cardAlt,
                       }}
@@ -342,7 +354,7 @@ export default function ChekiRecordDetailScreen() {
                   accessibilityLabel="添加图片"
                   style={{
                     width: itemWidth,
-                    height: itemHeight,
+                    height: itemWidth / getChekiSpecAspectRatio(DEFAULT_CHEKI_SPEC),
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: 10,
