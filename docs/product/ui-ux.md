@@ -294,6 +294,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 
 - 搜索容器最小高度 44，圆角 10。
 - 有 active filter chip 时搜索框自动换行，chip 最高 26px。
+- 页面可通过 `showActiveFilters={false}` 保持纯搜索输入；此时搜索框固定为 44px，高亮筛选按钮并用数量 badge 表达筛选状态。
 - 筛选按钮 44x44，激活时背景 `accent`，右上显示红色数量 badge。
 - active filter chip 使用 `accent` 透明底和 `accentBorder`。
 
@@ -470,13 +471,15 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - 顶部使用明确页面标题，例如「艺人管理」「电子切册」。
 - iOS 独立 Stack 的普通滚动页保持底部 edge-to-edge，不用外层 `SafeAreaView` 隔出固定空白；滚动容器使用 `contentInsetAdjustmentBehavior="automatic"`，内容末尾间距保留在可滚动区域内。Android 继续使用底部安全区保护。
 - 搜索和筛选统一走 `SearchFilterBar` + `FilterSheet`。
-- 已生效筛选应在搜索框内以 chip 展示，可点击移除。
+- 已生效筛选默认在搜索框内以 chip 展示，可点击移除；电子切册例外，只通过筛选按钮激活态与数量 badge 表达，避免条件挤压搜索输入。
 - 空态要说明下一步，例如新建活动、导入艺人、添加拍立得，而不是只写「暂无数据」。
 - 大列表优先使用 `FlatList` 或虚拟化结构，不要用长 `ScrollView`。
 
 电子切册页特殊要求：
 
 - 作为底部 tab 主页时，底部入口名使用「切册」，页面标题使用「电子切册」。
+- 搜索框保持固定高度，不显示筛选 chip，placeholder 使用「搜索艺人、活动或备注等关键词」。搜索覆盖艺人名称/简称/所属团体、活动标题、Record 备注、Item 备注和明确日期格式；多关键词使用 AND 语义，不搜索价格、数量、收藏、背签、图片状态或规格等结构化属性。
+- 相册与记录共用会话级关键词，但分别保留各自筛选。搜索或筛选生效且存在结果时，相册显示「N 张拍立得」，记录显示「N 条记录」；空结果不回显关键词。有关键词时空态只清除搜索，只有筛选时才清除当前模式筛选。
 - iOS 使用原生大标题和 NativeTabs；普通 `ScrollView` 向下滚动时由系统最小化 tab bar，`FlatList` 页面受 Expo 当前集成限制，不强制模拟同一行为。Android 使用 `AndroidCompactTabHeader` / `AndroidLargeTabTitle`，滚动时标题收起并驱动底部 tab bar 收起。
 - iOS 与 Android 的右上角「显示选项」统一打开 Bottom Sheet，选项立即生效并持久化；浏览模式使用「相册 / 记录」，不显示 Record / Item 等数据模型术语。新增拍立得仍使用独立的最右侧 `plus` 按钮。
 - 有图拍立得和记录要一起呈现和统计。

@@ -16,8 +16,11 @@ interface SearchFilterBarProps {
   onOpenFilter: () => void;
   buttonLabel?: string;
   activeFilters?: ActiveFilterChip[];
+  showActiveFilters?: boolean;
+  clearButtonBehavior?: 'native' | 'custom';
   /** 已生效的筛选条件数量，用于按钮上的红点角标 */
   activeCount: number;
+  filterExpanded?: boolean;
   isDark: boolean;
 }
 
@@ -28,13 +31,17 @@ export function SearchFilterBar({
   onOpenFilter,
   buttonLabel,
   activeFilters = [],
+  showActiveFilters = true,
+  clearButtonBehavior = 'native',
   activeCount,
+  filterExpanded = false,
   isDark,
 }: SearchFilterBarProps) {
   const { colors } = useAppTheme();
   const hasActive = activeCount > 0;
   const hasButtonLabel = Boolean(buttonLabel?.trim());
-  const hasFilterChips = activeFilters.length > 0;
+  const visibleActiveFilters = showActiveFilters ? activeFilters : [];
+  const hasFilterChips = visibleActiveFilters.length > 0;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
       <View
@@ -43,7 +50,7 @@ export function SearchFilterBar({
           flexDirection: 'row',
           alignItems: 'center',
           alignContent: 'center',
-          flexWrap: 'wrap',
+          flexWrap: hasFilterChips ? 'wrap' : 'nowrap',
           gap: 8,
           backgroundColor: isDark ? colors.input : colors.cardMuted,
           borderRadius: 10,
@@ -56,9 +63,11 @@ export function SearchFilterBar({
         }}
       >
         <AppIcon name="search" size={16} color={colors.placeholder} />
-        {activeFilters.map((filter) => (
+        {visibleActiveFilters.map((filter) => (
           <TouchableOpacity
             key={filter.id}
+            accessibilityRole="button"
+            accessibilityLabel={`移除筛选：${filter.label}`}
             onPress={filter.onPress}
             activeOpacity={filter.onPress ? 0.72 : 1}
             style={{
@@ -75,25 +84,18 @@ export function SearchFilterBar({
               borderColor: withAlpha(colors.accentBorder, isDark ? 0.55 : 0.65),
             }}
           >
-            <Text
-              numberOfLines={1}
-              style={{
-                flexShrink: 1,
-                fontSize: 11.5,
-                fontWeight: '700',
-                color: colors.accentText,
-              }}
-            >
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 11.5, fontWeight: '700', color: colors.accentText }}>
               {filter.label}
             </Text>
             {filter.onPress ? <AppIcon name="close" size={11} color={colors.accentText} /> : null}
           </TouchableOpacity>
         ))}
         <TextInput
+          accessibilityLabel={placeholder ?? '搜索'}
           style={{
             flexGrow: 1,
             flexShrink: 1,
-            minWidth: hasFilterChips ? 28 : 120,
+            minWidth: hasFilterChips ? 28 : 0,
             height: hasFilterChips ? 32 : 42,
             paddingVertical: 0,
             fontSize: 14,
@@ -106,13 +108,28 @@ export function SearchFilterBar({
           placeholderTextColor={colors.placeholder}
           value={keyword}
           onChangeText={onKeywordChange}
-          clearButtonMode="while-editing"
+          clearButtonMode={clearButtonBehavior === 'custom' ? 'never' : 'while-editing'}
           returnKeyType="search"
           autoCorrect={false}
         />
+        {clearButtonBehavior === 'custom' && keyword.length > 0 ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="清除搜索"
+            onPress={() => onKeywordChange('')}
+            activeOpacity={0.72}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ width: 28, height: 42, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <AppIcon name="closeCircle" size={17} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={hasActive ? `筛选，已启用 ${activeCount} 项条件` : '筛选'}
+        accessibilityState={{ expanded: filterExpanded }}
         onPress={onOpenFilter}
         activeOpacity={0.78}
         style={{

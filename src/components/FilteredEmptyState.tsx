@@ -6,6 +6,7 @@ interface FilteredEmptyStateProps {
   title: string;
   message?: string;
   onClear: () => void;
+  clearLabel?: string;
   isDark: boolean;
   paddingTop?: number;
 }
@@ -14,6 +15,7 @@ export function FilteredEmptyState({
   title,
   message = '换个搜索或筛选条件试试',
   onClear,
+  clearLabel = '清除筛选',
   paddingTop = 60,
 }: FilteredEmptyStateProps) {
   const { colors } = useAppTheme();
@@ -29,12 +31,12 @@ export function FilteredEmptyState({
       </Text>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="清除全部筛选条件"
+        accessibilityLabel={clearLabel}
         onPress={onClear}
         activeOpacity={0.76}
         style={{
           marginTop: 18,
-          minHeight: 38,
+          minHeight: 44,
           paddingHorizontal: 16,
           borderRadius: 10,
           borderWidth: 1,
@@ -47,7 +49,7 @@ export function FilteredEmptyState({
         }}
       >
         <AppIcon name="clearFilters" size={16} color={colors.accent} />
-        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>清除筛选</Text>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>{clearLabel}</Text>
       </TouchableOpacity>
     </View>
   );
