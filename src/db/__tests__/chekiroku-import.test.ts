@@ -119,7 +119,12 @@ describe('Chekiroku import application', () => {
       importedAt: '2026-08-13T00:00:00.000Z',
     });
     await applyChekirokuImportPlan(adapter, firstPlan);
-    const currentArtists = rawDb.prepare('SELECT * FROM artists').all() as Artist[];
+    const currentArtists = rawDb.prepare(
+      `SELECT artists.*, affiliation.parent_artist_id AS parent_id
+       FROM artists
+       LEFT JOIN artist_basic_affiliations affiliation
+         ON affiliation.member_artist_id = artists.id`,
+    ).all() as Artist[];
     const secondPlan = buildChekirokuImportPlan(createSnapshot(), currentArtists, {
       createId: createTestIdFactory(),
       importedAt: '2026-08-13T00:01:00.000Z',

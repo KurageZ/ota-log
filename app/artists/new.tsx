@@ -10,7 +10,7 @@ import { AppIcon } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { FormCard, FormFieldLabel, FormSectionLabel } from '../../src/components/FormPrimitives';
 import { useDB } from '../../src/context/DBContext';
-import { Artist } from '../../src/types/models';
+import { Artist, ArtistType } from '../../src/types/models';
 import { copyToDocuments } from '../../src/utils/copyToDocuments';
 import { ArtistSearchPicker } from '../../src/components/ArtistSearchPicker';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
@@ -23,6 +23,7 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { extractArtistBackgroundColor } from '../../src/utils/artistBackdrop';
 import { withAlpha } from '../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+import { ArtistTypeSelector } from '../../src/components/ArtistTypeSelector';
 
 const MAX_ARTIST_BACKGROUND_BYTES = 5 * 1024 * 1024;
 const ARTIST_BACKGROUND_ASPECT_RATIO = 4 / 5;
@@ -34,6 +35,8 @@ export default function NewArtistScreen() {
   const [name, setName] = useState('');
   const [shortName, setShortName] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);
+  const [artistType, setArtistType] = useState<ArtistType | null>(null);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [backgroundPickedUri, setBackgroundPickedUri] = useState<string | null>(null);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null);
@@ -156,7 +159,8 @@ export default function NewArtistScreen() {
       await db.artists.create({
         name: trimmed,
         short_name: shortName.trim() || null,
-        parent_id: parentId,
+        artist_type: artistType,
+        parent_id: artistType == null ? parentId : null,
         avatar_uri: finalAvatar,
         background_uri: backgroundPickedUri,
         background_color: backgroundPickedUri ? backgroundColor : null,
@@ -379,14 +383,14 @@ export default function NewArtistScreen() {
             </View>
           </FormCard>
 
-          {allArtists.length > 0 && (
+          {artistType == null && allArtists.some((artist) => artist.artist_type == null) && (
             <>
               <FormSectionLabel label="所属关系" />
               <FormCard>
                 <FormFieldLabel>所属团体</FormFieldLabel>
 
               <ArtistSearchPicker
-                artists={allArtists}
+                artists={allArtists.filter((artist) => artist.artist_type == null)}
                 selectedArtists={selectedParent ? [selectedParent] : []}
                 selectedIds={parentId ? [parentId] : []}
                 oshiArtistId={oshiArtistId}
@@ -405,6 +409,35 @@ export default function NewArtistScreen() {
               </FormCard>
             </>
           )}
+
+          <TouchableOpacity
+            onPress={() => setAdvancedExpanded((value) => !value)}
+            accessibilityState={{ expanded: advancedExpanded }}
+            style={{
+              marginTop: 18, paddingVertical: 12, flexDirection: 'row',
+              alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '700' }}>
+              {advancedExpanded ? '收起高级内容' : '展开高级内容'}
+            </Text>
+            <AppIcon name="chevron" variant={advancedExpanded ? 'up' : 'down'} size={16} color={colors.accent} />
+          </TouchableOpacity>
+          {advancedExpanded ? (
+            <>
+              <FormSectionLabel label="高级内容" />
+              <FormCard>
+                <FormFieldLabel>艺人类型</FormFieldLabel>
+                <ArtistTypeSelector
+                  value={artistType}
+                  onChange={(value) => {
+                    setArtistType(value);
+                    if (value != null) setParentId(null);
+                  }}
+                />
+              </FormCard>
+            </>
+          ) : null}
         </KeyboardAwareScrollView>
       </SafeAreaView>
     </>

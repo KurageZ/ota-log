@@ -9,16 +9,13 @@ export function getOshiMatchSource(
   eventArtists: Artist[],
   oshiArtistId: string,
   oshiArtist: Artist | null,
+  isAttributed = false,
 ): OshiMatchSource {
   if (eventArtists.some((artist) => artist.id === oshiArtistId)) {
     return 'direct';
   }
 
-  if (eventArtists.some((artist) => artist.parent_id === oshiArtistId)) {
-    return 'member-of-oshi';
-  }
-
-  if (oshiArtist?.parent_id && eventArtists.some((artist) => artist.id === oshiArtist.parent_id)) {
+  if (isAttributed && oshiArtist?.artist_type === 'person') {
     return 'oshi-member-group';
   }
 

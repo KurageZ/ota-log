@@ -655,19 +655,11 @@ export default function ChekiLibraryScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // 指定艺人筛选：每个已选艺人都包含本人 + 沿 parent_id 递归向上的所属团体（与统计/单推口径一致）
+  // 拍立得只按 Record 直接关联的艺人筛选，不沿任何所属关系归因。
   const filterArtistIds = useMemo<Set<string> | null>(() => {
     if (appliedArtistIds.length === 0) return null;
-    const ids = new Set<string>();
-    for (const selectedArtistId of appliedArtistIds) {
-      let cursor: string | null = selectedArtistId;
-      while (cursor && !ids.has(cursor)) {
-        ids.add(cursor);
-        cursor = artistMap.get(cursor)?.parent_id ?? null;
-      }
-    }
-    return ids;
-  }, [appliedArtistIds, artistMap]);
+    return new Set(appliedArtistIds);
+  }, [appliedArtistIds]);
 
   const matchesArtist = useCallback((artistId: string | null) => {
     if (!filterArtistIds) return true;

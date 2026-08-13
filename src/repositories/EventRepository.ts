@@ -32,19 +32,6 @@ export interface EventFilter {
 }
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 
-/**
- * 递归 CTE：给定艺人 id（占位符 ?），展开「本人 + 沿 parent_id 递归向上的各级所属团体」。
- * 结果列名为 aid，可用 `... IN (SELECT aid FROM artist_lineage)` 匹配。
- * 占位符顺序：调用方需将 artistId 作为该 CTE 对应位置的参数。
- */
-const ARTIST_LINEAGE_CTE = `WITH RECURSIVE artist_lineage(aid) AS (
-  SELECT id FROM artists WHERE id = ?
-  UNION
-  SELECT a.parent_id FROM artists a
-  JOIN artist_lineage ON artist_lineage.aid = a.id
-  WHERE a.parent_id IS NOT NULL
-)`;
-
 interface YearStatusCountsRow {
   completed: number;
   planned: number;
@@ -395,7 +382,7 @@ export class EventRepository {
        FROM artists a
        JOIN event_artists ea ON ea.artist_id = a.id
        JOIN event_first_summaries e ON e.id = ea.event_id
-       WHERE a.parent_id IS NULL
+       WHERE a.artist_type = 'group'
          AND e.status = 'completed'
          ${period.sql}
        GROUP BY a.id, a.name, a.avatar_uri
@@ -569,14 +556,7 @@ export class EventRepository {
   ): Promise<EventGroupRatingItem[]> {
     const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const rows = await this.db.getAllAsync<GroupRatingRow>(
-      `WITH RECURSIVE artist_roots(artist_id, root_id) AS (
-         SELECT id, id FROM artists WHERE parent_id IS NULL
-         UNION ALL
-         SELECT child.id, artist_roots.root_id
-         FROM artists child
-         JOIN artist_roots ON child.parent_id = artist_roots.artist_id
-       ),
-       rated_events AS (
+      `WITH rated_events AS (
          SELECT e.id, e.review_score, e.event_date
          FROM event_first_summaries e
          WHERE e.status = 'completed'
@@ -584,10 +564,11 @@ export class EventRepository {
            ${period.sql}
        ),
        group_events AS (
-         SELECT DISTINCT rated_events.id, rated_events.review_score, rated_events.event_date, artist_roots.root_id
+         SELECT DISTINCT rated_events.id, rated_events.review_score, rated_events.event_date, ea.artist_id AS root_id
          FROM rated_events
          JOIN event_artists ea ON ea.event_id = rated_events.id
-         JOIN artist_roots ON artist_roots.artist_id = ea.artist_id
+         JOIN artists group_artist ON group_artist.id = ea.artist_id
+         WHERE group_artist.artist_type = 'group'
        )
        SELECT
          root.id AS artist_id,
@@ -628,14 +609,13 @@ export class EventRepository {
   async countCompletedByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<number> {
     const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     const row = await this.db.getFirstAsync<OshiArtistCountRow>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT COUNT(DISTINCT e.id) AS count
+      `SELECT COUNT(DISTINCT e.id) AS count
        FROM event_first_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
        WHERE e.status = 'completed'
          ${period.sql}
-         AND ea.artist_id IN (SELECT aid FROM artist_lineage)`,
-      [artistId, ...period.params]
+         AND attribution.artist_id = ?`,
+      [...period.params, artistId]
     );
     return row?.count ?? 0;
   }
@@ -643,27 +623,25 @@ export class EventRepository {
   async findRecentCompletedByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<Event | null> {
     const period = eventPeriodClause(year, month, 'e.event_date', startDate, endDate);
     return this.db.getFirstAsync<Event>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT DISTINCT e.*
+      `SELECT DISTINCT e.*
        FROM event_first_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
        WHERE e.status = 'completed'
          ${period.sql}
-         AND ea.artist_id IN (SELECT aid FROM artist_lineage)
+         AND attribution.artist_id = ?
        ORDER BY e.event_date DESC, e.created_at DESC
        LIMIT 1`,
-      [artistId, ...period.params]
+      [...period.params, artistId]
     );
   }
 
   async findNextPlannedByArtistId(artistId: string): Promise<Event | null> {
     return this.db.getFirstAsync<Event>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT DISTINCT e.*
+      `SELECT DISTINCT e.*
        FROM event_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
        WHERE e.status = 'planned'
-         AND ea.artist_id IN (SELECT aid FROM artist_lineage)
+         AND attribution.artist_id = ?
        ORDER BY e.event_date ASC, e.event_time ASC, e.created_at ASC
        LIMIT 1`,
       [artistId]
@@ -672,15 +650,14 @@ export class EventRepository {
 
   async getMonthlyCompletedCountsByArtistYear(year: number, artistId: string): Promise<number[]> {
     const rows = await this.db.getAllAsync<MonthlyCountRow>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT substr(e.event_date, 6, 2) AS month, COUNT(DISTINCT e.id) AS count
+      `SELECT substr(e.event_date, 6, 2) AS month, COUNT(DISTINCT e.id) AS count
        FROM event_first_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
        WHERE e.status = 'completed'
          AND e.event_date LIKE ? || '-%'
-         AND ea.artist_id IN (SELECT aid FROM artist_lineage)
+         AND attribution.artist_id = ?
        GROUP BY substr(e.event_date, 6, 2)`,
-      [artistId, String(year)]
+      [String(year), artistId]
     );
     const monthMap = new Map(rows.map((row) => [row.month, row.count]));
     return Array.from({ length: 12 }, (_, index) => {
@@ -695,16 +672,15 @@ export class EventRepository {
     artistId: string,
   ): Promise<Array<{ date: string; count: number }>> {
     return this.db.getAllAsync<{ date: string; count: number }>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT e.event_date AS date, COUNT(DISTINCT e.id) AS count
+      `SELECT e.event_date AS date, COUNT(DISTINCT e.id) AS count
        FROM event_first_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
        WHERE e.status = 'completed'
          AND e.event_date >= ? AND e.event_date <= ?
-         AND ea.artist_id IN (SELECT aid FROM artist_lineage)
+         AND attribution.artist_id = ?
        GROUP BY e.event_date
        ORDER BY e.event_date`,
-      [artistId, startDate, endDate],
+      [startDate, endDate, artistId],
     );
   }
 
@@ -849,11 +825,9 @@ export class EventRepository {
     }
     const artistIds = filter.artistIds?.length ? [...new Set(filter.artistIds)] : filter.artistId ? [filter.artistId] : [];
     for (const artistId of artistIds) {
-      // 匹配艺人本人 + 沿 parent_id 递归向上的所属团体（与单推/收藏口径一致）
       conditions.push(`e.id IN (
-        ${ARTIST_LINEAGE_CTE}
-        SELECT ea.event_id FROM event_artists ea
-        WHERE ea.artist_id IN (SELECT aid FROM artist_lineage)
+        SELECT attribution.event_id FROM event_artist_attributions attribution
+        WHERE attribution.artist_id = ?
       )`);
       params.push(artistId);
     }
@@ -883,30 +857,18 @@ export class EventRepository {
       params.push(filter.minScore);
     }
     if (filter.artistScope === 'favorite') {
-      // 收藏艺人本人 + 沿 parent_id 递归向上的所属团体（匹配团体出演的活动）
-      withClauses.push(`scope_lineage(aid) AS (
-        SELECT id FROM artists WHERE is_favorite = 1
-        UNION
-        SELECT a.parent_id FROM artists a
-        JOIN scope_lineage ON scope_lineage.aid = a.id
-        WHERE a.parent_id IS NOT NULL
-      )`);
       conditions.push(`e.id IN (
-        SELECT ea.event_id FROM event_artists ea
-        WHERE ea.artist_id IN (SELECT aid FROM scope_lineage)
+        SELECT attribution.event_id
+        FROM event_artist_attributions attribution
+        JOIN artists favorite_artist ON favorite_artist.id = attribution.artist_id
+        WHERE favorite_artist.is_favorite = 1
       )`);
     } else if (filter.artistScope === 'oshi') {
-      // 单推本人 + 递归向上的所属团体
-      withClauses.push(`scope_lineage(aid) AS (
-        SELECT oshi_artist_id FROM user_config WHERE id = 'default' AND oshi_artist_id IS NOT NULL
-        UNION
-        SELECT a.parent_id FROM artists a
-        JOIN scope_lineage ON scope_lineage.aid = a.id
-        WHERE a.parent_id IS NOT NULL
-      )`);
       conditions.push(`e.id IN (
-        SELECT ea.event_id FROM event_artists ea
-        WHERE ea.artist_id IN (SELECT aid FROM scope_lineage)
+        SELECT attribution.event_id
+        FROM event_artist_attributions attribution
+        JOIN user_config config
+          ON config.id = 'default' AND config.oshi_artist_id = attribution.artist_id
       )`);
     }
     if (filter.year != null) {
@@ -972,19 +934,22 @@ export class EventRepository {
 
   async findDistinctArtistIds(): Promise<string[]> {
     const rows = await this.db.getAllAsync<{ artist_id: string }>(
-      `WITH RECURSIVE attended_artist_ids(artist_id) AS (
-         SELECT artist_id
-         FROM event_artists
-         UNION
-         SELECT a.id
-         FROM artists a
-         JOIN attended_artist_ids attended ON a.parent_id = attended.artist_id
-       )
-       SELECT artist_id
-       FROM attended_artist_ids
+      `SELECT DISTINCT artist_id
+       FROM event_artist_attributions
        ORDER BY artist_id`
     );
     return rows.map((row) => row.artist_id);
+  }
+
+  async isArtistAttributedToEvent(eventId: string, artistId: string): Promise<boolean> {
+    const row = await this.db.getFirstAsync<{ matched: number }>(
+      `SELECT 1 AS matched
+       FROM event_artist_attributions
+       WHERE event_id = ? AND artist_id = ?
+       LIMIT 1`,
+      [eventId, artistId],
+    );
+    return row != null;
   }
 
   async create(input: CreateEventInput): Promise<Event> {
@@ -1224,9 +1189,9 @@ export class EventRepository {
 
   async findByArtistId(artistId: string): Promise<Event[]> {
     return this.db.getAllAsync<Event>(
-      `SELECT e.* FROM event_summaries e
-       JOIN event_artists ea ON ea.event_id = e.id
-       WHERE ea.artist_id = ?
+      `SELECT DISTINCT e.* FROM event_summaries e
+       JOIN event_artist_attributions attribution ON attribution.event_id = e.id
+       WHERE attribution.artist_id = ?
        ORDER BY e.event_date DESC`,
       [artistId]
     );
@@ -1234,8 +1199,11 @@ export class EventRepository {
 
   async getArtists(eventId: string): Promise<Artist[]> {
     return this.db.getAllAsync<Artist>(
-      `SELECT a.* FROM artists a
+      `SELECT a.*, affiliation.parent_artist_id AS parent_id
+       FROM artists a
        JOIN event_artists ea ON ea.artist_id = a.id
+       LEFT JOIN artist_basic_affiliations affiliation
+         ON affiliation.member_artist_id = a.id
        WHERE ea.event_id = ?
        ORDER BY ea.sort_order ASC, a.name ASC`,
       [eventId]

@@ -4,6 +4,42 @@ This glossary defines product-domain language for ota_log. It keeps overloaded u
 
 ## Language
 
+**Artist**:
+A local record for an activity participant. An Artist may be identified as a Person or Group, or may have no Artist Type and retain only generic capabilities and direct associations.
+_Avoid_: Performer type, mandatory person, mandatory group
+
+**Artist Type**:
+The optional classification of an Artist as either Person or Group. An unset type is absence of classification, not a third artist type; setting a type enables type-specific membership behavior and indirect association queries.
+_Avoid_: Artist role, unknown artist type, unclassified artist type
+
+**Person**:
+An Artist Type for an individual who may have one or more dated Group Memberships, including concurrent or repeated memberships.
+_Avoid_: Member, solo artist
+
+**Group**:
+An Artist Type for an Artist that may receive Person members. A Group does not itself participate as a member of another Group.
+_Avoid_: Parent artist, folder, organization hierarchy
+
+**Basic Affiliation**:
+An undated association between two Artists whose Artist Types are both unset. Each member may have at most one parent, each parent may have many members, and acyclic nesting is allowed; it does not classify either Artist, interact with typed Artists, or participate in indirect association queries.
+_Avoid_: Group Membership, inferred group, inferred person
+
+**Group Membership**:
+A dated association between one explicitly typed Person and one explicitly typed Group. Its optional start and end dates form an inclusive interval; the same Person may have concurrent memberships in different Groups and multiple non-overlapping membership periods in the same Group.
+_Avoid_: Parent artist, permanent group, artist hierarchy
+
+**Current Group Membership**:
+A Group Membership whose inclusive date interval contains the device-local current date. It is a derived state rather than a stored membership type.
+_Avoid_: Primary group, active flag, upcoming membership
+
+**Artist Activity Association**:
+The association used when querying Activities for an Artist. A direct Activity association always applies; a Person also receives an indirect association from a Group only when an Activity Session date range overlaps that Person's formal Group Membership. Basic Affiliations never create indirect associations.
+_Avoid_: Permanent parent inheritance, Basic Affiliation activity match
+
+**Artist Cheki Association**:
+The direct association between a Cheki Record and one Artist. Group Memberships and Basic Affiliations never cause Cheki Records, quantities, or spending to be inherited by another Artist.
+_Avoid_: Group cheki inheritance, membership-based cheki attribution
+
 **Activity**:
 A user-owned local record for viewing event information and later review. It is intentionally a useful, lossy representation rather than a canonical mirror of the real-world event. Every Activity has at least one dated Activity Session; manually created and imported activities share the same lifecycle, and an imported activity does not continue following its external source after creation.
 _Avoid_: Canonical activity metadata, public activity record, user activity record

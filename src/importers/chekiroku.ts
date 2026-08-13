@@ -715,11 +715,21 @@ export async function applyChekirokuImportPlan(
       }
       await db.runAsync(
         `INSERT INTO artists
-          (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
-         VALUES (?, ?, NULL, ?, NULL, NULL, NULL, NULL, ?, ?)`,
-        [artist.id, artist.name, artist.parentId, artist.isFavorite ? 1 : 0, plan.importedAt],
+          (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+         VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
+        [artist.id, artist.name, artist.isFavorite ? 1 : 0, plan.importedAt],
       );
       createdArtists += 1;
+    }
+
+    for (const artist of plan.artists) {
+      if (artist.reuseExisting || !artist.parentId) continue;
+      await db.runAsync(
+        `INSERT INTO artist_basic_affiliations
+          (member_artist_id, parent_artist_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?)`,
+        [artist.id, artist.parentId, plan.importedAt, plan.importedAt],
+      );
     }
 
     let createdItems = 0;

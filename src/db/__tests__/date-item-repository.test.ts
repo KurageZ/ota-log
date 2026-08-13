@@ -30,12 +30,12 @@ describe('DateItemRepository', () => {
 
     rawDb.prepare(
       `INSERT INTO artists
-         (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+         (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('artist-1', '小春', null, null, 'file:///koharu.jpg', null, null, null, 1, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
       `INSERT INTO artists
-         (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+         (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('artist-2', '小夏', null, null, null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(

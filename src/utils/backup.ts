@@ -12,7 +12,7 @@ import { generateId } from './uuid';
 import { normalizeArtistConfirmationMode } from './artistConfirmation';
 import { normalizeChekiSpec } from '../domain/chekiSpec';
 
-const BACKUP_VERSION = 8;
+const BACKUP_VERSION = 9;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -26,7 +26,9 @@ interface ImportantDateArtistRow { important_date_id: string; artist_id: string 
 type Row = Record<string, string | number | null>;
 
 interface BackupData {
-  artists: Awaited<ReturnType<Repositories['artists']['findAll']>>;
+  artists: Row[];
+  artist_basic_affiliations: Row[];
+  artist_group_memberships: Row[];
   trips: Awaited<ReturnType<Repositories['trips']['findAll']>>;
   events: Row[];
   event_sessions: Row[];
@@ -70,6 +72,8 @@ interface FullBackupManifest {
 
 interface ImportDataShape {
   artists?: Row[];
+  artist_basic_affiliations?: Row[];
+  artist_group_memberships?: Row[];
   trips?: Row[];
   events?: Row[];
   event_sessions?: Row[];
@@ -109,6 +113,8 @@ export function normalizeLegacyBackupActivitySessions(sessions: Row[]): Row[] {
 export async function buildBackupData(db: Repositories): Promise<BackupData> {
   const [
     artists,
+    basicAffiliations,
+    groupMemberships,
     trips,
     events,
     eventSessions,
@@ -124,7 +130,9 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     importantDateAnniversaries,
     scheduledReminderState,
   ] = await Promise.all([
-    db.artists.findAll(),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM artists'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM artist_basic_affiliations'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM artist_group_memberships'),
     db.trips.findAll(),
     db.rawDb.getAllAsync<Row>('SELECT * FROM events'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM event_sessions'),
@@ -144,6 +152,8 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
 
   return {
     artists,
+    artist_basic_affiliations: basicAffiliations,
+    artist_group_memberships: groupMemberships,
     trips,
     events,
     event_sessions: eventSessions,
@@ -186,8 +196,10 @@ function collectReferencedMediaUris(payload: BackupPayload): string[] {
     }
   }
   for (const artist of payload.data.artists) {
-    if (isBackupLocalFileUri(artist.avatar_uri)) uris.add(artist.avatar_uri);
-    if (isBackupLocalFileUri(artist.background_uri)) uris.add(artist.background_uri);
+    const avatarUri = typeof artist.avatar_uri === 'string' ? artist.avatar_uri : null;
+    const backgroundUri = typeof artist.background_uri === 'string' ? artist.background_uri : null;
+    if (isBackupLocalFileUri(avatarUri)) uris.add(avatarUri);
+    if (isBackupLocalFileUri(backgroundUri)) uris.add(backgroundUri);
   }
   if (isBackupLocalFileUri(payload.data.user_config.avatar_uri)) {
     uris.add(payload.data.user_config.avatar_uri);
@@ -350,6 +362,45 @@ function replaceMediaUris<T extends Row>(
   });
 }
 
+export function buildRestoredBackupData(
+  data: ImportDataShape,
+  uriMap: Map<string, string>,
+): ImportDataShape {
+  return {
+    artists: replaceMediaUris(
+      replaceMediaUris(data.artists, 'avatar_uri', uriMap),
+      'background_uri',
+      uriMap,
+    ),
+    // Keep this undefined for v1-v8 payloads so restoreBackupData can rebuild
+    // legacy parent_id projections as basic affiliations.
+    artist_basic_affiliations: data.artist_basic_affiliations,
+    artist_group_memberships: data.artist_group_memberships ?? [],
+    trips: data.trips ?? [],
+    events: data.events ?? [],
+    event_sessions: data.event_sessions ?? [],
+    event_timetable_entries: data.event_timetable_entries ?? [],
+    event_artists: data.event_artists,
+    expenses: data.expenses ?? [],
+    cheki: replaceMediaUris(data.cheki, 'photo_uri', uriMap),
+    cheki_manual_entries: data.cheki_manual_entries ?? [],
+    cheki_records: data.cheki_records ?? [],
+    cheki_items: data.cheki_items ?? [],
+    cheki_item_images: replaceMediaUris(data.cheki_item_images, 'photo_uri', uriMap),
+    photos: replaceMediaUris(data.photos, 'local_uri', uriMap),
+    user_config: typeof data.user_config?.avatar_uri === 'string'
+      ? {
+          ...data.user_config,
+          avatar_uri: uriMap.get(data.user_config.avatar_uri) ?? data.user_config.avatar_uri,
+        }
+      : data.user_config,
+    important_dates: data.important_dates ?? [],
+    important_date_artists: data.important_date_artists,
+    important_date_anniversary_rules: data.important_date_anniversary_rules ?? [],
+    scheduled_reminder_state: data.scheduled_reminder_state ?? [],
+  };
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === 'string' && error) return error;
@@ -376,6 +427,8 @@ function buildEventDatesById(events: Row[], sessions: Row[]): Map<string, string
 export async function restoreBackupData(db: Repositories, data: ImportDataShape): Promise<void> {
   const {
     artists = [],
+    artist_basic_affiliations,
+    artist_group_memberships = [],
     trips = [],
     events = [],
     event_sessions = [],
@@ -437,6 +490,8 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
         DELETE FROM event_timetable_entries;
         DELETE FROM event_sessions;
         DELETE FROM event_artists;
+        DELETE FROM artist_group_memberships;
+        DELETE FROM artist_basic_affiliations;
         DELETE FROM photos;
         DELETE FROM expenses;
         DELETE FROM cheki_item_images;
@@ -450,13 +505,15 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
 
       for (const a of artists) {
         await db.rawDb.runAsync(
-          `INSERT OR REPLACE INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+          `INSERT OR REPLACE INTO artists
+            (id, name, short_name, artist_type, avatar_uri, background_uri,
+             background_color, url, is_favorite, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             String(a.id),
             String(a.name),
             a.short_name ?? null,
-            a.parent_id ?? null,
+            a.artist_type === 'person' || a.artist_type === 'group' ? a.artist_type : null,
             a.avatar_uri ?? null,
             a.background_uri ?? null,
             a.background_color ?? null,
@@ -464,6 +521,44 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
             Number(a.is_favorite ?? 0),
             String(a.created_at),
           ]
+        );
+      }
+
+      const basicAffiliationsToRestore = artist_basic_affiliations ?? artists
+        .filter((artist) => typeof artist.parent_id === 'string')
+        .map((artist) => ({
+          member_artist_id: artist.id,
+          parent_artist_id: artist.parent_id,
+          created_at: artist.created_at,
+          updated_at: artist.created_at,
+        }));
+      for (const relation of basicAffiliationsToRestore) {
+        await db.rawDb.runAsync(
+          `INSERT INTO artist_basic_affiliations
+            (member_artist_id, parent_artist_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?)`,
+          [
+            String(relation.member_artist_id),
+            String(relation.parent_artist_id),
+            String(relation.created_at),
+            String(relation.updated_at ?? relation.created_at),
+          ],
+        );
+      }
+      for (const membership of artist_group_memberships) {
+        await db.rawDb.runAsync(
+          `INSERT INTO artist_group_memberships
+            (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            String(membership.id),
+            String(membership.person_artist_id),
+            String(membership.group_artist_id),
+            membership.start_date ?? null,
+            membership.end_date ?? null,
+            String(membership.created_at),
+            String(membership.updated_at),
+          ],
         );
       }
 
@@ -837,6 +932,12 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       break;
     case 8:
       normalized = {
+        version: BACKUP_VERSION,
+        data: candidate.data as ImportDataShape,
+      };
+      break;
+    case 9:
+      normalized = {
         version: candidate.version,
         data: candidate.data as ImportDataShape,
       };
@@ -926,39 +1027,7 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
       throw new Error(`备份缺少 ${unmappedLocalMediaUris.length} 个图片文件`);
     }
 
-    const restoredData: ImportDataShape = {
-      artists: replaceMediaUris(
-        replaceMediaUris(payload.data.artists as unknown as Row[] | undefined, 'avatar_uri', uriMap),
-        'background_uri',
-        uriMap,
-      ),
-      trips: (payload.data.trips as unknown as Row[] | undefined) ?? [],
-      events: (payload.data.events as unknown as Row[] | undefined) ?? [],
-      event_sessions: (payload.data.event_sessions as unknown as Row[] | undefined) ?? [],
-      event_timetable_entries: (payload.data.event_timetable_entries as unknown as Row[] | undefined) ?? [],
-      event_artists: payload.data.event_artists,
-      expenses: (payload.data.expenses as unknown as Row[] | undefined) ?? [],
-      cheki: replaceMediaUris(payload.data.cheki as unknown as Row[] | undefined, 'photo_uri', uriMap),
-      cheki_manual_entries: (payload.data.cheki_manual_entries as unknown as Row[] | undefined) ?? [],
-      cheki_records: (payload.data.cheki_records as unknown as Row[] | undefined) ?? [],
-      cheki_items: (payload.data.cheki_items as unknown as Row[] | undefined) ?? [],
-      cheki_item_images: replaceMediaUris(
-        payload.data.cheki_item_images as unknown as Row[] | undefined,
-        'photo_uri',
-        uriMap,
-      ),
-      photos: replaceMediaUris(payload.data.photos as unknown as Row[] | undefined, 'local_uri', uriMap),
-      user_config: typeof payload.data.user_config?.avatar_uri === 'string'
-        ? {
-            ...(payload.data.user_config as unknown as Row),
-            avatar_uri: uriMap.get(payload.data.user_config.avatar_uri) ?? payload.data.user_config.avatar_uri,
-          }
-        : (payload.data.user_config as unknown as Row),
-      important_dates: (payload.data.important_dates as unknown as Row[] | undefined) ?? [],
-      important_date_artists: payload.data.important_date_artists,
-      important_date_anniversary_rules: (payload.data.important_date_anniversary_rules as unknown as Row[] | undefined) ?? [],
-      scheduled_reminder_state: (payload.data.scheduled_reminder_state as unknown as Row[] | undefined) ?? [],
-    };
+    const restoredData = buildRestoredBackupData(payload.data, uriMap);
 
     await restoreBackupData(db, restoredData);
     return true;

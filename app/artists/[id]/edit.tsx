@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppIcon } from '../../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../../src/components/native-text-toolbar';
 import { useDB } from '../../../src/context/DBContext';
-import { Artist } from '../../../src/types/models';
+import { Artist, ArtistGroupMembershipWithArtist, ArtistType } from '../../../src/types/models';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { copyToDocuments } from '../../../src/utils/copyToDocuments';
 import { ArtistSearchPicker } from '../../../src/components/ArtistSearchPicker';
@@ -24,9 +24,16 @@ import { useAppTheme } from '../../../src/theme/appTheme';
 import { extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
 import { withAlpha } from '../../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
+import { ArtistTypeSelector } from '../../../src/components/ArtistTypeSelector';
+import { toISODate } from '../../../src/utils/date';
+import { generateId } from '../../../src/utils/uuid';
 
 const MAX_ARTIST_BACKGROUND_BYTES = 5 * 1024 * 1024;
 const ARTIST_BACKGROUND_ASPECT_RATIO = 4 / 5;
+
+type EditableArtistMembership = ArtistGroupMembershipWithArtist & {
+  isDraft?: boolean;
+};
 
 export default function EditArtistScreen() {
   const db = useDB();
@@ -37,6 +44,12 @@ export default function EditArtistScreen() {
   const [name, setName] = useState('');
   const [shortName, setShortName] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);
+  const [artistType, setArtistType] = useState<ArtistType | null>(null);
+  const [originalArtistType, setOriginalArtistType] = useState<ArtistType | null>(null);
+  const [typeHasExistingRelations, setTypeHasExistingRelations] = useState(false);
+  const [memberships, setMemberships] = useState<EditableArtistMembership[]>([]);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [typedSearch, setTypedSearch] = useState('');
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [backgroundPickedUri, setBackgroundPickedUri] = useState<string | null>(null);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null);
@@ -69,6 +82,13 @@ export default function EditArtistScreen() {
     () => Object.fromEntries(allArtists.map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [allArtists],
   );
+  const currentMemberships = useMemo(() => {
+    const today = toISODate(new Date());
+    return memberships.filter((membership) => (
+      (membership.start_date == null || membership.start_date <= today)
+      && (membership.end_date == null || membership.end_date >= today)
+    ));
+  }, [memberships]);
   const memberCandidateArtists = useMemo(() => {
     if (!memberMode) return allArtists;
 
@@ -93,6 +113,8 @@ export default function EditArtistScreen() {
       if (!artist) { router.back(); return; }
       setName(artist.name);
       setShortName(artist.short_name ?? '');
+      setArtistType(artist.artist_type);
+      setOriginalArtistType(artist.artist_type);
       setParentId(artist.parent_id);
       setUrl(artist.url ?? '');
       if (artist.avatar_uri) {
@@ -109,9 +131,19 @@ export default function EditArtistScreen() {
       const members = all.filter((candidate) => candidate.parent_id === id);
       setMemberIds(members.map((member) => member.id));
       setMemberMode(members.length > 0);
+      setTypeHasExistingRelations(Boolean(artist.parent_id) || members.length > 0);
       // Exclude self from parent options
       setAllArtists(all.filter((a) => a.id !== id));
       setOshiArtistId(config.oshi_artist_id);
+      if (artist.artist_type === 'person') {
+        const loadedMemberships = await db.artists.findMembershipsForPerson(id);
+        setMemberships(loadedMemberships);
+        setTypeHasExistingRelations(loadedMemberships.length > 0);
+      } else if (artist.artist_type === 'group') {
+        const loadedMemberships = await db.artists.findMembershipsForGroup(id);
+        setMemberships(loadedMemberships);
+        setTypeHasExistingRelations(loadedMemberships.length > 0);
+      }
       setLoading(false);
     };
     load();
@@ -215,14 +247,29 @@ export default function EditArtistScreen() {
       await db.artists.update(id, {
         name: trimmed,
         short_name: shortName.trim() || null,
-        parent_id: parentId,
+        artist_type: artistType,
+        parent_id: artistType == null ? parentId : null,
         avatar_uri: finalAvatar,
         background_uri: backgroundPickedUri,
         background_color: backgroundPickedUri ? backgroundColor : null,
         url: url.trim() || null,
       });
-      if (memberMode) {
+      if (artistType == null && memberMode) {
         await db.artists.setMembers(id, memberIds);
+      } else if (artistType === 'person') {
+        await db.artists.replaceMembershipsForPerson(id, memberships.map((membership) => ({
+          id: membership.isDraft ? undefined : membership.id,
+          group_artist_id: membership.group_artist_id,
+          start_date: membership.start_date,
+          end_date: membership.end_date,
+        })));
+      } else if (artistType === 'group') {
+        await db.artists.replaceMembershipsForGroup(id, memberships.map((membership) => ({
+          id: membership.isDraft ? undefined : membership.id,
+          person_artist_id: membership.person_artist_id,
+          start_date: membership.start_date,
+          end_date: membership.end_date,
+        })));
       }
       router.back();
     } catch (e) {
@@ -255,6 +302,39 @@ export default function EditArtistScreen() {
         ? current.filter((memberId) => memberId !== artist.id)
         : [...current, artist.id]
     ));
+  };
+
+  const toggleTypedRelationship = (artist: Artist) => {
+    const today = toISODate(new Date());
+    const existingIndex = memberships.findIndex((membership) => (
+      membership.artist.id === artist.id
+      && (membership.start_date == null || membership.start_date <= today)
+      && (membership.end_date == null || membership.end_date >= today)
+    ));
+    if (existingIndex >= 0) {
+      Alert.alert('结束成员关系', `将最后在团日期设为 ${today}，并保留历史履历。`, [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '结束关系',
+          onPress: () => setMemberships((current) => current.map((membership, index) => (
+            index === existingIndex ? { ...membership, end_date: today } : membership
+          ))),
+        },
+      ]);
+      return;
+    }
+    const now = new Date().toISOString();
+    setMemberships((current) => [...current, {
+      id: generateId(),
+      isDraft: true,
+      person_artist_id: artistType === 'person' ? id : artist.id,
+      group_artist_id: artistType === 'group' ? id : artist.id,
+      start_date: null,
+      end_date: null,
+      created_at: now,
+      updated_at: now,
+      artist,
+    }]);
   };
 
 
@@ -481,27 +561,122 @@ export default function EditArtistScreen() {
 
           <FormSectionLabel label="所属关系" />
           <FormCard style={{ marginBottom: 24 }}>
-            <FormFieldLabel>{memberMode ? '成员' : '所属团体'}</FormFieldLabel>
-            <ArtistSearchPicker
-              artists={memberMode ? memberCandidateArtists : allArtists}
-              selectedArtists={memberMode ? selectedMembers : (selectedParent ? [selectedParent] : [])}
-              selectedIds={memberMode ? memberIds : (parentId ? [parentId] : [])}
-              oshiArtistId={oshiArtistId}
-              isDark={isDark}
-              searchValue={memberMode ? memberSearch : parentSearch}
-              onSearchChange={memberMode ? setMemberSearch : setParentSearch}
-              placeholder={memberMode ? '搜索并选择艺人...' : '搜索团体 / 组合...'}
-              maxHeight={200}
-              parentNameMap={artistNameMap}
-              selectedLabel={memberMode ? '已选成员' : undefined}
-              selectedOverflowLabel={memberMode ? ((_, total) => `展开全部 ${total} 位成员`) : undefined}
-              onSelectArtist={memberMode ? toggleMember : ((artist) => {
-                setParentId(artist.id);
-                setParentSearch('');
-              })}
-              onRemoveArtist={memberMode ? toggleMember : (() => setParentId(null))}
-            />
+            {artistType == null ? (
+              <>
+                <FormFieldLabel>{memberMode ? '成员' : '所属'}</FormFieldLabel>
+                <ArtistSearchPicker
+                  artists={(memberMode ? memberCandidateArtists : allArtists).filter((artist) => artist.artist_type == null)}
+                  selectedArtists={memberMode ? selectedMembers : (selectedParent ? [selectedParent] : [])}
+                  selectedIds={memberMode ? memberIds : (parentId ? [parentId] : [])}
+                  oshiArtistId={oshiArtistId}
+                  isDark={isDark}
+                  searchValue={memberMode ? memberSearch : parentSearch}
+                  onSearchChange={memberMode ? setMemberSearch : setParentSearch}
+                  placeholder={memberMode ? '搜索并选择成员...' : '搜索所属...'}
+                  maxHeight={200}
+                  parentNameMap={artistNameMap}
+                  selectedLabel={memberMode ? '已选成员' : undefined}
+                  selectedOverflowLabel={memberMode ? ((_, total) => `展开全部 ${total} 位成员`) : undefined}
+                  onSelectArtist={memberMode ? toggleMember : ((artist) => {
+                    setParentId(artist.id);
+                    setParentSearch('');
+                  })}
+                  onRemoveArtist={memberMode ? toggleMember : (() => setParentId(null))}
+                />
+              </>
+            ) : (
+              <>
+                <FormFieldLabel>{artistType === 'person' ? '当前所属团体' : '当前成员'}</FormFieldLabel>
+                <ArtistSearchPicker
+                  artists={allArtists.filter((artist) => artist.artist_type === (artistType === 'person' ? 'group' : 'person'))}
+                  selectedArtists={currentMemberships.map((membership) => membership.artist)}
+                  selectedIds={currentMemberships.map((membership) => membership.artist.id)}
+                  oshiArtistId={oshiArtistId}
+                  isDark={isDark}
+                  searchValue={typedSearch}
+                  onSearchChange={setTypedSearch}
+                  placeholder={artistType === 'person' ? '搜索团体...' : '搜索个人成员...'}
+                  maxHeight={200}
+                  parentNameMap={artistNameMap}
+                  onSelectArtist={toggleTypedRelationship}
+                  onRemoveArtist={toggleTypedRelationship}
+                />
+              </>
+            )}
           </FormCard>
+
+          <TouchableOpacity
+            onPress={() => setAdvancedExpanded((value) => !value)}
+            accessibilityState={{ expanded: advancedExpanded }}
+            style={{ paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '700' }}>
+              {advancedExpanded ? '收起高级内容' : '展开高级内容'}
+            </Text>
+            <AppIcon name="chevron" variant={advancedExpanded ? 'up' : 'down'} size={16} color={colors.accent} />
+          </TouchableOpacity>
+
+          {advancedExpanded ? (
+            <>
+              <FormSectionLabel label="高级内容" />
+              <FormCard style={{ marginBottom: 16 }}>
+                <FormFieldLabel>艺人类型</FormFieldLabel>
+                <ArtistTypeSelector
+                  value={artistType}
+                  onChange={(value) => {
+                    if (value !== originalArtistType && typeHasExistingRelations) {
+                      Alert.alert(
+                        '暂时无法更改类型',
+                        originalArtistType == null
+                          ? '这条记录已有普通所属关系。请前往“设置 → 数据与备份 → 艺人类型转换”，与关联记录一起转换。'
+                          : '这条记录已有正式所属履历。请先移除全部履历后再更改类型。',
+                      );
+                      return;
+                    }
+                    setArtistType(value);
+                    if (value != null) {
+                      setParentId(null);
+                      setMemberMode(false);
+                      setMemberIds([]);
+                    }
+                    setMemberships([]);
+                  }}
+                />
+              </FormCard>
+              {artistType != null && memberships.length > 0 ? (
+                <FormCard style={{ marginBottom: 24 }}>
+                  <FormFieldLabel>{artistType === 'person' ? '所属履历' : '成员履历'}</FormFieldLabel>
+                  {memberships.map((membership, index) => (
+                    <View key={membership.id} style={{ marginTop: index === 0 ? 0 : 14 }}>
+                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 8 }}>
+                        {getArtistPrimaryName(membership.artist)}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TextInput
+                          style={{ ...inputStyle, flex: 1 }}
+                          placeholder="入团日期"
+                          placeholderTextColor={colors.placeholder}
+                          value={membership.start_date ?? ''}
+                          onChangeText={(value) => setMemberships((current) => current.map((item, itemIndex) => (
+                            itemIndex === index ? { ...item, start_date: value.trim() || null } : item
+                          )))}
+                        />
+                        <TextInput
+                          style={{ ...inputStyle, flex: 1 }}
+                          placeholder="最后在团日期"
+                          placeholderTextColor={colors.placeholder}
+                          value={membership.end_date ?? ''}
+                          onChangeText={(value) => setMemberships((current) => current.map((item, itemIndex) => (
+                            itemIndex === index ? { ...item, end_date: value.trim() || null } : item
+                          )))}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </FormCard>
+              ) : null}
+            </>
+          ) : null}
 
           <TouchableOpacity
             onPress={handleDelete}

@@ -18,7 +18,7 @@ describe('Fresh database schema', () => {
     db.pragma('foreign_keys = ON');
     for (const statement of SCHEMA_STATEMENTS) db.exec(statement);
     db.exec(`INSERT INTO artists
-      (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
       VALUES ('artist', 'Artist', NULL, NULL, NULL, NULL, NULL, NULL, 0, '2026-01-01T00:00:00.000Z')`);
   });
 
@@ -34,6 +34,17 @@ describe('Fresh database schema', () => {
   });
 
   test('creates the activity v2 root, sessions, timetable, and compatibility views', () => {
+    expect(columns(db, 'artists')).toEqual([
+      'id', 'name', 'short_name', 'artist_type', 'avatar_uri', 'background_uri',
+      'background_color', 'url', 'is_favorite', 'created_at',
+    ]);
+    expect(columns(db, 'artist_basic_affiliations')).toEqual([
+      'member_artist_id', 'parent_artist_id', 'created_at', 'updated_at',
+    ]);
+    expect(columns(db, 'artist_group_memberships')).toEqual([
+      'id', 'person_artist_id', 'group_artist_id', 'start_date', 'end_date',
+      'created_at', 'updated_at',
+    ]);
     expect(columns(db, 'events')).toEqual([
       'id', 'title', 'event_type', 'status', 'review_score', 'notes', 'details',
       'url', 'setlist_text', 'actual_expense', 'trip_id', 'created_at', 'updated_at',
@@ -58,7 +69,51 @@ describe('Fresh database schema', () => {
     expect(names(db, 'view')).toEqual(expect.arrayContaining([
       'event_first_summaries',
       'event_summaries',
+      'event_artist_attributions',
     ]));
+  });
+
+  test('enforces artist type and relationship invariants', () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    const insertArtist = db.prepare(`INSERT INTO artists
+      (id, name, artist_type, created_at) VALUES (?, ?, ?, ?)`);
+    insertArtist.run('unset-parent', 'Unset Parent', null, now);
+    insertArtist.run('unset-child', 'Unset Child', null, now);
+    insertArtist.run('person', 'Person', 'person', now);
+    insertArtist.run('group', 'Group', 'group', now);
+
+    db.prepare(`INSERT INTO artist_basic_affiliations
+      (member_artist_id, parent_artist_id, created_at, updated_at)
+      VALUES ('unset-child', 'unset-parent', ?, ?)`).run(now, now);
+    expect(() => db.prepare(`INSERT INTO artist_basic_affiliations
+      (member_artist_id, parent_artist_id, created_at, updated_at)
+      VALUES ('unset-parent', 'unset-child', ?, ?)`).run(now, now)).toThrow('basic affiliation cycle');
+    expect(() => db.prepare(`INSERT INTO artist_basic_affiliations
+      (member_artist_id, parent_artist_id, created_at, updated_at)
+      VALUES ('person', 'unset-parent', ?, ?)`).run(now, now)).toThrow(
+      'basic affiliations require unset artist types',
+    );
+
+    db.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES ('membership', 'person', 'group', '2025-01-01', '2025-12-31', ?, ?)`).run(now, now);
+    expect(() => db.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES ('invalid-calendar-date', 'person', 'group', '2026-02-31', NULL, ?, ?)`).run(now, now))
+      .toThrow();
+    expect(() => db.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES ('invalid-date-format', 'person', 'group', '2026/01/01', NULL, ?, ?)`).run(now, now))
+      .toThrow();
+    expect(() => db.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES ('overlap', 'person', 'group', '2025-12-31', NULL, ?, ?)`).run(now, now))
+      .toThrow('group membership periods overlap');
+    db.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES ('adjacent', 'person', 'group', '2026-01-01', NULL, ?, ?)`).run(now, now);
+    expect(() => db.prepare("UPDATE artists SET artist_type = NULL WHERE id = 'person'").run())
+      .toThrow('artist type conflicts with existing relationships');
   });
 
   test('enforces activity session and timetable aggregate constraints', () => {

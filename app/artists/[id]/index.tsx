@@ -26,8 +26,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Extrapolation,
   interpolate,
-  runOnJS,
-  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -35,14 +33,14 @@ import Animated, {
 
 import { EventCard } from '../../../src/components/EventCard';
 import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
-import { AppIcon, type AppIconName } from '../../../src/components/AppIcon';
+import { AppIcon, type AppIconName, type AppIconVariant } from '../../../src/components/AppIcon';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
 import { ChekiViewerModal } from '../../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../../src/types/chekiViewer';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
 import { useDB } from '../../../src/context/DBContext';
 import { useAppTheme } from '../../../src/theme/appTheme';
-import { Artist, Cheki, ChekiManualEntry, Event } from '../../../src/types/models';
+import { Artist, ArtistGroupMembershipWithArtist, Cheki, ChekiManualEntry, Event } from '../../../src/types/models';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { deriveArtistBackdropPalette, extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
 import { buildChekiViewerItems, getChekiManualCount } from '../../../src/utils/cheki';
@@ -50,9 +48,11 @@ import { buildEventMonthSections } from '../../../src/utils/eventSections';
 import { sortArtistsWithOshi } from '../../../src/utils/filter';
 import { showDeleteFailedAlert } from '../../../src/utils/failureAlert';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
+import { toISODate } from '../../../src/utils/date';
 
 const ARTIST_HERO_SCREEN_RATIO = 0.7;
 const ARTIST_HERO_MAX_WIDTH_RATIO = 1.6;
+const ARTIST_HERO_CONTENT_OFFSET = 96;
 const BACKDROP_TRANSITION_HEIGHT = 96;
 const TAB_KEYS = ['events', 'cheki'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
@@ -104,7 +104,9 @@ export default function ArtistDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [parentArtist, setParentArtist] = useState<Artist | null>(null);
+  const [currentGroupCount, setCurrentGroupCount] = useState(0);
   const [members, setMembers] = useState<Artist[]>([]);
+  const [memberships, setMemberships] = useState<ArtistGroupMembershipWithArtist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [eventMap, setEventMap] = useState<Map<string, Event>>(new Map());
@@ -113,7 +115,7 @@ export default function ArtistDetailScreen() {
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('events');
-  const [showStickyTabs, setShowStickyTabs] = useState(false);
+  const [showMoreAttributes, setShowMoreAttributes] = useState(false);
 
   const scrollY = useSharedValue(0);
   const eventsScrollY = useSharedValue(0);
@@ -150,7 +152,9 @@ export default function ArtistDetailScreen() {
     if (!id) {
       setArtist(null);
       setParentArtist(null);
+      setCurrentGroupCount(0);
       setMembers([]);
+      setMemberships([]);
       setEvents([]);
       setChekiList([]);
       setManualEntries([]);
@@ -187,26 +191,37 @@ export default function ArtistDetailScreen() {
     }
     setChekiList(chekis);
     setManualEntries(manuals);
-    setMembers(sortArtistsWithOshi(memberArtists, config.oshi_artist_id));
+    const today = toISODate(new Date());
+    const typedMembers = currentArtist?.artist_type === 'group'
+      ? await db.artists.findCurrentMembers(id, today)
+      : [];
+    setMembers(sortArtistsWithOshi(
+      currentArtist?.artist_type === 'group' ? typedMembers : memberArtists,
+      config.oshi_artist_id,
+    ));
+    const artistMemberships = currentArtist?.artist_type === 'person'
+      ? await db.artists.findMembershipsForPerson(id)
+      : currentArtist?.artist_type === 'group'
+        ? await db.artists.findMembershipsForGroup(id)
+        : [];
+    setMemberships(artistMemberships);
+    setShowMoreAttributes(false);
     setOshiArtistId(config.oshi_artist_id);
     setEventMap(new Map(allEvents.map((event) => [event.id, event])));
 
-    let resolvedEvents = artistEvents;
-    if (currentArtist?.parent_id) {
-      const [parentEvents, parent] = await Promise.all([
-        db.events.findByArtistId(currentArtist.parent_id),
-        db.artists.findById(currentArtist.parent_id),
-      ]);
-      const merged = [...artistEvents, ...parentEvents];
-      const seen = new Set<string>();
-      resolvedEvents = merged.filter((event) => (seen.has(event.id) ? false : (seen.add(event.id), true)));
-      resolvedEvents.sort((a, b) => b.event_date.localeCompare(a.event_date));
-      setParentArtist(parent);
+    if (currentArtist?.artist_type === 'person') {
+      const groups = await db.artists.findCurrentGroups(id, today);
+      setParentArtist(groups[0] ?? null);
+      setCurrentGroupCount(groups.length);
+    } else if (currentArtist?.parent_id) {
+      setParentArtist(await db.artists.findById(currentArtist.parent_id));
+      setCurrentGroupCount(1);
     } else {
       setParentArtist(null);
+      setCurrentGroupCount(0);
     }
 
-    setEvents(resolvedEvents);
+    setEvents(artistEvents);
     setLoading(false);
   }, [db, id]);
 
@@ -281,10 +296,15 @@ export default function ArtistDetailScreen() {
       screenWidth * ARTIST_HERO_MAX_WIDTH_RATIO,
     ))
     : 0;
-  const heroDisplayHeight = hasBackground ? heroHeight + BACKDROP_TRANSITION_HEIGHT : 0;
-  const stickyTabsThreshold = heroDisplayHeight - compactHeaderHeight;
-  const headerFadeStart = hasBackground ? Math.max(120, heroDisplayHeight - compactHeaderHeight - 104) : 40;
-  const headerFadeEnd = hasBackground ? Math.max(headerFadeStart + 68, heroDisplayHeight - compactHeaderHeight - 28) : 108;
+  const heroDisplayHeight = hasBackground
+    ? heroHeight + BACKDROP_TRANSITION_HEIGHT
+    : 0;
+  const headerFadeStart = hasBackground
+    ? Math.max(120, heroDisplayHeight - compactHeaderHeight - 104 - ARTIST_HERO_CONTENT_OFFSET)
+    : 40;
+  const headerFadeEnd = hasBackground
+    ? Math.max(headerFadeStart + 68, heroDisplayHeight - compactHeaderHeight - 28 - ARTIST_HERO_CONTENT_OFFSET)
+    : 108;
 
   const compactHeaderBackgroundStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [0, 1], Extrapolation.CLAMP),
@@ -293,21 +313,11 @@ export default function ArtistDetailScreen() {
     opacity: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [0, 1], Extrapolation.CLAMP),
     transform: [{ translateY: interpolate(scrollY.value, [headerFadeStart, headerFadeEnd], [8, 0], Extrapolation.CLAMP) }],
   }));
-  useAnimatedReaction(
-    () => hasBackground && scrollY.value >= stickyTabsThreshold,
-    (shouldShow, wasShowing) => {
-      if (shouldShow !== wasShowing) {
-        runOnJS(setShowStickyTabs)(shouldShow);
-      }
-    },
-    [hasBackground, stickyTabsThreshold],
-  );
   const handleSelectTab = useCallback((tab: TabKey) => {
     const nextScrollY = tab === 'events' ? eventsScrollY.value : chekiScrollY.value;
     scrollY.value = nextScrollY;
-    setShowStickyTabs(hasBackground && nextScrollY >= stickyTabsThreshold);
     setActiveTab(tab);
-  }, [chekiScrollY, eventsScrollY, hasBackground, scrollY, stickyTabsThreshold]);
+  }, [chekiScrollY, eventsScrollY, scrollY]);
 
   const chekiCellW = Math.floor((screenWidth - 32 - 16) / 3);
   const chekiCellH = Math.round((chekiCellW * 86) / 54);
@@ -424,6 +434,140 @@ export default function ArtistDetailScreen() {
   const backdropEmptyTextColor = pDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
   const chekiListIsDark = hasBackground ? pDark : isDark;
   const chekiManualTone = hasBackground && pDark ? 'glass' : 'default';
+  const historyLabel = artist.artist_type === 'group' ? '成员履历' : '所属履历';
+  const hasHiddenAttributes = Boolean(artist.artist_type || artist.url);
+  const today = toISODate(new Date());
+
+  const renderMetaToggle = (overlay: boolean) => {
+    if (!hasHiddenAttributes) return null;
+    const label = showMoreAttributes ? '收起资料' : '更多资料';
+    const variant: AppIconVariant = showMoreAttributes ? 'up' : 'down';
+
+    return overlay ? (
+      <HeroMetaAction
+        icon="disclosure"
+        variant={variant}
+        label={label}
+        iconColor={heroActionIcon}
+        textColor={heroActionText}
+        onPress={() => setShowMoreAttributes((current) => !current)}
+      />
+    ) : (
+      <MetaPill
+        icon="disclosure"
+        iconVariant={variant}
+        label={label}
+        tone="group"
+        overlayMode={false}
+        onPress={() => setShowMoreAttributes((current) => !current)}
+      />
+    );
+  };
+
+  const renderArtistAttributes = () => {
+    if (!showMoreAttributes || !hasHiddenAttributes) return null;
+
+    return (
+      <View testID="artist-attributes-card" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <View
+          style={{
+            backgroundColor: cardBg,
+            borderRadius: 16,
+            borderWidth: lowerCardBorderWidth,
+            borderColor: hasBackground ? backdropDivider : colors.divider,
+            overflow: 'hidden',
+          }}
+        >
+          {artist.artist_type ? (
+            <View>
+              <View
+                style={{
+                  minHeight: 44,
+                  paddingHorizontal: 14,
+                  paddingTop: 13,
+                  paddingBottom: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: backdropText }}>
+                  {historyLabel}
+                </Text>
+                <Text style={{ fontSize: 12, color: backdropTextSecondary }}>
+                  {memberships.length > 0 ? `${memberships.length} 条` : '暂无记录'}
+                </Text>
+              </View>
+              {memberships.length === 0 ? (
+                <Text style={{ paddingHorizontal: 14, paddingBottom: 14, fontSize: 13, color: backdropTextSecondary }}>
+                  还没有{historyLabel}
+                </Text>
+              ) : memberships.map((membership) => {
+                const membershipIsCurrent = (membership.start_date == null || membership.start_date <= today)
+                  && (membership.end_date == null || membership.end_date >= today);
+                return (
+                  <TouchableOpacity
+                    key={membership.id}
+                    activeOpacity={0.72}
+                    accessibilityRole="button"
+                    accessibilityLabel={`查看${membership.artist.name}`}
+                    onPress={() => router.push(`/artists/${membership.artist.id}`)}
+                    style={{
+                      minHeight: 60,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderTopWidth: 1,
+                      borderTopColor: hasBackground ? backdropDivider : colors.divider,
+                    }}
+                  >
+                    <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
+                    <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                        <Text numberOfLines={1} style={{ flexShrink: 1, color: backdropText, fontSize: 14, fontWeight: '700' }}>
+                          {membership.artist.name}
+                        </Text>
+                        {membershipIsCurrent ? (
+                          <Text style={{ color: hasBackground ? backdropTextSecondary : colors.accent, fontSize: 11, fontWeight: '700' }}>
+                            当前
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={{ marginTop: 3, color: backdropTextSecondary, fontSize: 12 }}>
+                        {membership.start_date ?? '更早'} — {membership.end_date ?? '至今'}
+                      </Text>
+                    </View>
+                    <AppIcon name="disclosure" variant="forward" size={15} color={backdropChevron} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
+          {artist.artist_type && artist.url ? (
+            <View style={{ height: 1, backgroundColor: hasBackground ? backdropDivider : colors.divider }} />
+          ) : null}
+          {artist.url ? (
+            <TouchableOpacity
+              activeOpacity={0.72}
+              accessibilityRole="link"
+              accessibilityLabel="打开艺人链接"
+              onPress={() => Linking.openURL(artist.url!)}
+              style={{ minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 }}
+            >
+              <AppIcon name="link" size={18} color={hasBackground ? backdropTextSecondary : colors.accent} />
+              <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
+                <Text style={{ color: backdropText, fontSize: 14, fontWeight: '700' }}>官方链接</Text>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={{ marginTop: 3, color: backdropTextSecondary, fontSize: 12 }}>
+                  {artist.url}
+                </Text>
+              </View>
+              <AppIcon name="externalLink" size={15} color={backdropChevron} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
 
   const renderChekiListItem = ({ item }: { item: ArtistChekiListItem }) => {
     if (item.type === 'manual') {
@@ -519,7 +663,7 @@ export default function ArtistDetailScreen() {
           top: 0,
           left: 0,
           right: 0,
-          height: compactHeaderHeight + (showStickyTabs ? 60 : 0),
+          height: compactHeaderHeight,
           zIndex: 20,
         }}
       >
@@ -592,41 +736,6 @@ export default function ArtistDetailScreen() {
             usesLiquidGlass={usesLiquidGlass}
           />
         </View>
-        {showStickyTabs ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: compactHeaderHeight + 4,
-              left: 16,
-              right: 16,
-            }}
-          >
-            <TabSwitcherSurface
-              usesLiquidGlass={usesLiquidGlass}
-              overlayIsDark={pDark}
-              fallbackBackground={cardAltBg}
-              fallbackBorderWidth={lowerCardBorderWidth}
-              fallbackBorderColor={backdropDivider}
-            >
-              <TabButton
-                label={`活动 · ${events.length}`}
-                active={activeTab === 'events'}
-                onPress={() => handleSelectTab('events')}
-                activeBg={tabActiveBg}
-                activeTextColor={tabActiveText}
-                inactiveTextColor={tabInactiveText}
-              />
-              <TabButton
-                label={`拍立得 · ${totalChekiCount}`}
-                active={activeTab === 'cheki'}
-                onPress={() => handleSelectTab('cheki')}
-                activeBg={tabActiveBg}
-                activeTextColor={tabActiveText}
-                inactiveTextColor={tabInactiveText}
-              />
-            </TabSwitcherSurface>
-          </View>
-        ) : null}
       </View>
 
       <View
@@ -668,13 +777,15 @@ export default function ArtistDetailScreen() {
                     }}
                   />
                   <View
+                    testID="artist-hero-content"
                     style={{
                       flex: 1,
                       justifyContent: 'flex-end',
                       paddingTop: compactHeaderHeight + 22,
                       paddingHorizontal: 20,
-                      paddingBottom: 84,
+                      paddingBottom: 8,
                       alignItems: 'flex-start',
+                      transform: [{ translateY: -ARTIST_HERO_CONTENT_OFFSET }],
                     }}
                   >
                     <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
@@ -716,32 +827,23 @@ export default function ArtistDetailScreen() {
                       {parentArtist ? (
                         <HeroMetaAction
                           icon="artists"
-                          label={parentArtist.name}
+                          label={currentGroupCount > 1 ? `${parentArtist.name} 等 ${currentGroupCount} 个` : parentArtist.name}
                           isFlexible
                           iconColor={heroActionIcon}
                           textColor={heroActionText}
                           onPress={() => router.push(`/artists/${parentArtist.id}`)}
                         />
                       ) : null}
-                      {artist.url ? (
-                        <HeroMetaAction
-                          icon="link"
-                          label="链接"
-                          iconColor={heroActionIcon}
-                          textColor={heroActionText}
-                          onPress={() => Linking.openURL(artist.url!)}
-                        />
-                      ) : null}
+                      {renderMetaToggle(true)}
                     </View>
                   </View>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: 16,
-                      right: 16,
-                      bottom: 10,
-                    }}
-                  >
+                </ImageBackground>
+                <View
+                  testID="artist-details-region"
+                  style={{ marginTop: -ARTIST_HERO_CONTENT_OFFSET, paddingTop: 8 }}
+                >
+                  {renderArtistAttributes()}
+                  <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <TabSwitcherSurface
                       usesLiquidGlass={usesLiquidGlass}
                       overlayIsDark={pDark}
@@ -767,7 +869,7 @@ export default function ArtistDetailScreen() {
                       />
                     </TabSwitcherSurface>
                   </View>
-                </ImageBackground>
+                </View>
               </View>
               <View style={{ backgroundColor: 'transparent' }}>
                 <View
@@ -881,25 +983,18 @@ export default function ArtistDetailScreen() {
                   {parentArtist ? (
                     <MetaPill
                       icon="artists"
-                      label={parentArtist.name}
+                      label={currentGroupCount > 1 ? `${parentArtist.name} 等 ${currentGroupCount} 个` : parentArtist.name}
                       tone="group"
                       isFlexible
                       overlayMode={false}
                       onPress={() => router.push(`/artists/${parentArtist.id}`)}
                     />
                   ) : null}
-                  {artist.url ? (
-                    <MetaPill
-                      icon="link"
-                      label="链接"
-                      tone="link"
-                      overlayMode={false}
-                      onPress={() => Linking.openURL(artist.url!)}
-                    />
-                  ) : null}
+                  {renderMetaToggle(false)}
                 </View>
               </View>
 
+              {renderArtistAttributes()}
               <View
                 style={{
                   backgroundColor: 'transparent',
@@ -1038,13 +1133,15 @@ export default function ArtistDetailScreen() {
                     }}
                   />
                   <View
+                    testID="artist-hero-content"
                     style={{
                       flex: 1,
                       justifyContent: 'flex-end',
                       paddingTop: compactHeaderHeight + 22,
                       paddingHorizontal: 20,
-                      paddingBottom: 84,
+                      paddingBottom: 8,
                       alignItems: 'flex-start',
+                      transform: [{ translateY: -ARTIST_HERO_CONTENT_OFFSET }],
                     }}
                   >
                     <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-start' }}>
@@ -1086,32 +1183,23 @@ export default function ArtistDetailScreen() {
                       {parentArtist ? (
                         <HeroMetaAction
                           icon="artists"
-                          label={parentArtist.name}
+                          label={currentGroupCount > 1 ? `${parentArtist.name} 等 ${currentGroupCount} 个` : parentArtist.name}
                           isFlexible
                           iconColor={heroActionIcon}
                           textColor={heroActionText}
                           onPress={() => router.push(`/artists/${parentArtist.id}`)}
                         />
                       ) : null}
-                      {artist.url ? (
-                        <HeroMetaAction
-                          icon="link"
-                          label="链接"
-                          iconColor={heroActionIcon}
-                          textColor={heroActionText}
-                          onPress={() => Linking.openURL(artist.url!)}
-                        />
-                      ) : null}
+                      {renderMetaToggle(true)}
                     </View>
                   </View>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: 16,
-                      right: 16,
-                      bottom: 10,
-                    }}
-                  >
+                </ImageBackground>
+                <View
+                  testID="artist-details-region"
+                  style={{ marginTop: -ARTIST_HERO_CONTENT_OFFSET, paddingTop: 8 }}
+                >
+                  {renderArtistAttributes()}
+                  <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <TabSwitcherSurface
                       usesLiquidGlass={usesLiquidGlass}
                       overlayIsDark={pDark}
@@ -1137,7 +1225,7 @@ export default function ArtistDetailScreen() {
                       />
                     </TabSwitcherSurface>
                   </View>
-                </ImageBackground>
+                </View>
               </View>
               <View style={{ backgroundColor: 'transparent' }}>
                 <View
@@ -1278,25 +1366,18 @@ export default function ArtistDetailScreen() {
                   {parentArtist ? (
                     <MetaPill
                       icon="artists"
-                      label={parentArtist.name}
+                      label={currentGroupCount > 1 ? `${parentArtist.name} 等 ${currentGroupCount} 个` : parentArtist.name}
                       tone="group"
                       isFlexible
                       overlayMode={false}
                       onPress={() => router.push(`/artists/${parentArtist.id}`)}
                     />
                   ) : null}
-                  {artist.url ? (
-                    <MetaPill
-                      icon="link"
-                      label="链接"
-                      tone="link"
-                      overlayMode={false}
-                      onPress={() => Linking.openURL(artist.url!)}
-                    />
-                  ) : null}
+                  {renderMetaToggle(false)}
                 </View>
               </View>
 
+              {renderArtistAttributes()}
               <View
                 style={{
                   backgroundColor: 'transparent',
@@ -1663,6 +1744,7 @@ function TabSwitcherSurface({
 
 function HeroMetaAction({
   icon,
+  variant,
   label,
   iconColor,
   textColor,
@@ -1670,6 +1752,7 @@ function HeroMetaAction({
   onPress,
 }: {
   icon: AppIconName;
+  variant?: AppIconVariant;
   label: string;
   iconColor: string;
   textColor: string;
@@ -1691,7 +1774,7 @@ function HeroMetaAction({
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <AppIcon name={icon} size={15} color={iconColor} />
+      <AppIcon name={icon} variant={variant} size={15} color={iconColor} />
       <Text
         numberOfLines={1}
         style={{ flexShrink: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: textColor }}
@@ -1706,6 +1789,7 @@ type MetaTone = 'neutral' | 'favorite' | 'oshi' | 'group' | 'link';
 
 function MetaPill({
   icon,
+  iconVariant,
   label,
   tone,
   isFlexible = false,
@@ -1713,6 +1797,7 @@ function MetaPill({
   onPress,
 }: {
   icon: AppIconName;
+  iconVariant?: AppIconVariant;
   label: string;
   tone: MetaTone;
   isFlexible?: boolean;
@@ -1768,7 +1853,7 @@ function MetaPill({
   };
   const pillChildren = (
     <>
-      <AppIcon name={icon} size={14} color={palette.icon} />
+      <AppIcon name={icon} variant={iconVariant} size={14} color={palette.icon} />
       <Text
         numberOfLines={1}
         ellipsizeMode="tail"
@@ -1793,6 +1878,8 @@ function MetaPill({
   return (
     <TouchableOpacity
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       activeOpacity={0.75}
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       style={{

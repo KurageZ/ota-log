@@ -16,8 +16,13 @@ import {
   createEventArtistsV2TableSql,
   createEventsV2TableSql,
 } from './activityV2Schema';
+import {
+  ARTIST_ACTIVITY_ATTRIBUTION_VIEW_STATEMENTS,
+  ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS,
+  createArtistsTableSql,
+} from './artistRelationshipSchema';
 
-export const CURRENT_VERSION = 21;
+export const CURRENT_VERSION = 22;
 
 interface LegacyEventV17Row {
   id: string;
@@ -330,6 +335,87 @@ async function migrateChekiItemSpec(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+async function migrateArtistRelationships(db: SQLiteDatabase): Promise<void> {
+  const artistColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(artists)');
+  const hasParentId = artistColumns.some((column) => column.name === 'parent_id');
+  const hasArtistType = artistColumns.some((column) => column.name === 'artist_type');
+  const hasColumn = (name: string) => artistColumns.some((column) => column.name === name);
+  const legacyAffiliations = hasParentId ? await db.getAllAsync<{
+    member_artist_id: string;
+    parent_artist_id: string;
+    created_at: string;
+  }>(
+    `SELECT id AS member_artist_id, parent_id AS parent_artist_id, created_at
+     FROM artists
+     WHERE parent_id IS NOT NULL`,
+  ) : [];
+
+  await db.runAsync('PRAGMA foreign_keys = OFF');
+  try {
+    await db.withTransactionAsync(async () => {
+      if (hasParentId || !hasArtistType) {
+        await db.runAsync(createArtistsTableSql('artists_v22'));
+        await db.runAsync(
+          `INSERT INTO artists_v22
+            (id, name, short_name, artist_type, avatar_uri, background_uri,
+             background_color, url, is_favorite, created_at)
+           SELECT
+            id,
+            name,
+            ${hasColumn('short_name') ? 'short_name' : 'NULL'},
+            NULL,
+            ${hasColumn('avatar_uri') ? 'avatar_uri' : 'NULL'},
+            ${hasColumn('background_uri') ? 'background_uri' : 'NULL'},
+            ${hasColumn('background_color') ? 'background_color' : 'NULL'},
+            ${hasColumn('url') ? 'url' : 'NULL'},
+            ${hasColumn('is_favorite') ? 'is_favorite' : '0'},
+            created_at
+           FROM artists`,
+        );
+        await db.runAsync('DROP TABLE artists');
+        await db.runAsync('ALTER TABLE artists_v22 RENAME TO artists');
+      }
+
+      for (const statement of ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS) {
+        await db.runAsync(statement);
+      }
+
+      for (const relation of legacyAffiliations) {
+        await db.runAsync(
+          `INSERT INTO artist_basic_affiliations
+            (member_artist_id, parent_artist_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?)`,
+          [
+            relation.member_artist_id,
+            relation.parent_artist_id,
+            relation.created_at,
+            relation.created_at,
+          ],
+        );
+      }
+
+      for (const statement of ARTIST_ACTIVITY_ATTRIBUTION_VIEW_STATEMENTS) {
+        await db.runAsync(statement);
+      }
+    });
+  } finally {
+    await db.runAsync('PRAGMA foreign_keys = ON');
+  }
+
+  const foreignKeyErrors = await db.getAllAsync<Record<string, unknown>>(
+    'PRAGMA foreign_key_check',
+  );
+  if (foreignKeyErrors.length > 0) {
+    throw new Error('Artist relationship migration foreign key verification failed');
+  }
+  const relationCount = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM artist_basic_affiliations',
+  );
+  if ((relationCount?.count ?? 0) !== legacyAffiliations.length) {
+    throw new Error('Artist relationship migration count verification failed');
+  }
+}
+
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
@@ -465,6 +551,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 21) {
       await migrateChekiItemSpec(db);
+    }
+    if (version < 22) {
+      await migrateArtistRelationships(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

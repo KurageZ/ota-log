@@ -102,13 +102,13 @@ describe('Cheki repositories', () => {
     `);
 
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('artist-1', 'Artist One', null, null, 'file:///artist-1-avatar.jpg', null, 1, '2026-01-01T00:00:00.000Z');
+    ).run('artist-1', 'Artist One', null, 'group', 'file:///artist-1-avatar.jpg', null, 1, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('artist-2', 'Artist Two', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('artist-2', 'Artist Two', null, 'group', null, null, 0, '2026-01-01T00:00:00.000Z');
 
     rawDb.prepare(
       `INSERT INTO fixture_events
@@ -543,7 +543,7 @@ describe('Cheki repositories', () => {
   test('artist ranking includes avatars and is not capped by default', async () => {
     for (let index = 3; index <= 9; index += 1) {
       rawDb.prepare(
-        `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+        `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         `artist-${index}`,
@@ -588,7 +588,7 @@ describe('Cheki repositories', () => {
 
   test('findDistinctArtistIds combines photo and manual cheki artists', async () => {
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('artist-3', 'Artist Three', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
@@ -989,19 +989,19 @@ describe('Cheki repositories', () => {
     ).resolves.toBe(1);
   });
 
-  test('groupRootArtistsByCompletedEvents ranks only artists without parent', async () => {
+  test('groupRootArtistsByCompletedEvents ranks only explicitly typed groups', async () => {
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('group-1', 'Group One', null, null, 'file:///group-1.jpg', null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('group-1', 'Group One', null, 'group', 'file:///group-1.jpg', null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('member-1', 'Member One', null, 'group-1', null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('member-1', 'Member One', null, 'person', null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('group-2', 'Group Two', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('group-2', 'Group Two', null, 'group', null, null, 0, '2026-01-01T00:00:00.000Z');
 
     const insertEvent = rawDb.prepare(
       `INSERT INTO fixture_events
@@ -1054,13 +1054,13 @@ describe('Cheki repositories', () => {
     ]);
   });
 
-  test('rating ranking maps members to their root group and counts an event once', async () => {
+  test('rating ranking uses direct group appearances and counts an event once', async () => {
     rawDb.prepare('UPDATE events SET review_score = 5 WHERE id = ?').run('event-1');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      'member-1', 'Member One', null, 'artist-1', null, null, 0,
+      'member-1', 'Member One', null, 'person', null, null, 0,
       '2026-03-01T00:00:00.000Z',
     );
     rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
@@ -1082,7 +1082,7 @@ describe('Cheki repositories', () => {
       '2026-03-17T00:00:00.000Z', '2026-03-17T00:00:00.000Z',
     );
     rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
-      .run('member-event', 'member-1');
+      .run('member-event', 'artist-1');
     rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)')
       .run('single-high-event', 'artist-2');
 
@@ -1298,19 +1298,24 @@ describe('Cheki repositories', () => {
     await expect(ids({ artistScope: 'oshi' })).resolves.toEqual([]);
   });
 
-  test('findFiltered scope matches the group an artist belongs to (recursive)', async () => {
+  test('findFiltered scope matches a typed membership during its date range', async () => {
     const ids = async (filter: Parameters<EventRepository['findFiltered']>[0]) =>
       (await eventRepository.findFiltered(filter)).map((event) => event.id);
 
     // 团体 group-1，成员 member-1（收藏），成员所属团体出演 event-5
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('group-1', 'Group One', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('group-1', 'Group One', null, 'group', null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('member-1', 'Member One', null, 'group-1', null, null, 1, '2026-01-01T00:00:00.000Z');
+    ).run('member-1', 'Member One', null, 'person', null, null, 1, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artist_group_memberships
+        (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+       VALUES ('membership-1', 'member-1', 'group-1', '2026-01-01', NULL, ?, ?)`,
+    ).run('2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
     rawDb.prepare(
       `INSERT INTO fixture_events
@@ -1340,29 +1345,38 @@ describe('Cheki repositories', () => {
     // 指定艺人 + scope 同时生效（两个递归 CTE 共存于同一查询）
     await expect(ids({ artistId: 'group-1', artistScope: 'favorite' })).resolves.toEqual(['event-5']);
 
-    // 拍立得按艺人统计也递归：给团体 group-1 加一张拍立得，按成员 member-1 统计应计入
+    // 拍立得始终只按直接关联统计，不沿所属关系归因。
     rawDb.prepare(
       `INSERT INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('cheki-group', 'event-5', 'group-1', 'file:///g.jpg', '2026-07-01', 30, null, '2026-07-01T00:00:00.000Z');
-    await expect(chekiRepository.countByArtistYear(2026, 'member-1')).resolves.toBe(1);
+    await expect(chekiRepository.countByArtistYear(2026, 'member-1')).resolves.toBe(0);
   });
 
-  test('findDistinctArtistIds includes performers and their recursive members', async () => {
+  test('findDistinctArtistIds includes direct performers and date-matched typed members', async () => {
     await expect(eventRepository.findDistinctArtistIds()).resolves.toEqual(['artist-1']);
 
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('group-1', 'Group One', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('group-1', 'Group One', null, 'group', null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('subgroup-1', 'Subgroup One', null, 'group-1', null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('subgroup-1', 'Subgroup One', null, 'person', null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('member-1', 'Member One', null, 'subgroup-1', null, null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('member-1', 'Member One', null, 'person', null, null, 0, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artist_group_memberships
+        (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+       VALUES ('membership-subgroup', 'subgroup-1', 'group-1', NULL, NULL, ?, ?),
+              ('membership-member', 'member-1', 'group-1', NULL, NULL, ?, ?)`,
+    ).run(
+      '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+    );
 
     rawDb.prepare(`INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)`).run('event-2', 'artist-1');
     rawDb.prepare(`INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)`).run('event-2', 'artist-2');

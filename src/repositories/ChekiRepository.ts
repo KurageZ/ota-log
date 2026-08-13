@@ -22,14 +22,6 @@ JOIN cheki_records r ON r.id = i.record_id
 LEFT JOIN cheki_item_images front ON front.item_id = i.id AND front.side = 'front'
 LEFT JOIN cheki_item_images back ON back.item_id = i.id AND back.side = 'back'`;
 
-const ARTIST_LINEAGE_CTE = `WITH RECURSIVE artist_lineage(aid) AS (
-  SELECT id FROM artists WHERE id = ?
-  UNION
-  SELECT a.parent_id FROM artists a
-  JOIN artist_lineage ON artist_lineage.aid = a.id
-  WHERE a.parent_id IS NOT NULL
-)`;
-
 function periodClause(
   year?: number,
   month?: number,
@@ -256,19 +248,17 @@ export class ChekiRepository {
   async countByArtistYear(year: number | undefined, artistId: string, month?: number, startDate?: string, endDate?: string): Promise<number> {
     const period = periodClause(year, month, undefined, startDate, endDate);
     return this.scalar(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT COALESCE(SUM(r.quantity), 0) AS value
+      `SELECT COALESCE(SUM(r.quantity), 0) AS value
        FROM cheki_records r
-       WHERE r.artist_id IN (SELECT aid FROM artist_lineage) AND ${period.sql}`,
+       WHERE r.artist_id = ? AND ${period.sql}`,
       [artistId, ...period.params],
     );
   }
   async getMonthlyCountsByArtistYear(year: number, artistId: string): Promise<number[]> {
     const rows = await this.db.getAllAsync<{ month: string; count: number }>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT strftime('%m', COALESCE(r.date, r.created_at)) AS month, SUM(r.quantity) AS count
+      `SELECT strftime('%m', COALESCE(r.date, r.created_at)) AS month, SUM(r.quantity) AS count
        FROM cheki_records r
-       WHERE r.artist_id IN (SELECT aid FROM artist_lineage)
+       WHERE r.artist_id = ?
          AND strftime('%Y', COALESCE(r.date, r.created_at)) = ?
        GROUP BY month`,
       [artistId, String(year)],
@@ -282,10 +272,9 @@ export class ChekiRepository {
     artistId: string,
   ): Promise<Array<{ date: string; count: number }>> {
     return this.db.getAllAsync<{ date: string; count: number }>(
-      `${ARTIST_LINEAGE_CTE}
-       SELECT strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) AS date, SUM(r.quantity) AS count
+      `SELECT strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) AS date, SUM(r.quantity) AS count
        FROM cheki_records r
-       WHERE r.artist_id IN (SELECT aid FROM artist_lineage)
+       WHERE r.artist_id = ?
          AND strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) >= ?
          AND strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) <= ?
        GROUP BY date

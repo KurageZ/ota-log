@@ -21,10 +21,14 @@ export type ExpenseCategory =
   | 'merch'
   | 'other';
 
+export type ArtistType = 'person' | 'group';
+
 export interface Artist {
   id: string;
   name: string;
   short_name: string | null;
+  artist_type: ArtistType | null;
+  /** Compatibility projection backed by artist_basic_affiliations. */
   parent_id: string | null;
   avatar_uri: string | null;
   background_uri: string | null;
@@ -32,6 +36,27 @@ export interface Artist {
   url: string | null;
   is_favorite: number;
   created_at: string;
+}
+
+export interface ArtistBasicAffiliation {
+  member_artist_id: string;
+  parent_artist_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtistGroupMembership {
+  id: string;
+  person_artist_id: string;
+  group_artist_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtistGroupMembershipWithArtist extends ArtistGroupMembership {
+  artist: Artist;
 }
 
 export interface Event {
@@ -285,11 +310,20 @@ export type UpdateEventWithScheduleInput = Omit<CreateEventWithScheduleInput, 'e
 export interface CreateArtistInput {
   name: string;
   short_name?: string | null;
+  artist_type?: ArtistType | null;
   parent_id?: string | null;
   avatar_uri?: string | null;
   background_uri?: string | null;
   background_color?: string | null;
   url?: string | null;
+}
+
+export interface CreateArtistGroupMembershipInput {
+  id?: string;
+  person_artist_id: string;
+  group_artist_id: string;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface CreateTripInput {

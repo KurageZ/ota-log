@@ -957,6 +957,13 @@ export default function SettingsScreen() {
           <SectionLabel label="数据与备份" />
           <MenuCard>
             <MenuItem
+              icon="artists"
+              label="艺人类型转换"
+              subtitle="批量设置个人或团体，并转换普通所属关系"
+              tint={settingsTints.profile}
+              onPress={() => router.push('/settings/artist-type-conversion')}
+            />
+            <MenuItem
               icon="backupDownload"
               label="生成备份数据"
               badge={backupMenuBadge}

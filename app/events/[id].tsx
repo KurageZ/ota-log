@@ -321,6 +321,7 @@ export default function EventDetailScreen() {
   const [artistsExpanded, setArtistsExpanded] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [oshiIsAttributed, setOshiIsAttributed] = useState(false);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
   const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -398,6 +399,9 @@ export default function EventDetailScreen() {
     const loadedTimetables = await Promise.all(
       loadedSessions.map((session) => db.eventSchedules.findTimetable(session.id)),
     );
+    const isAttributed = config.oshi_artist_id
+      ? await db.events.isArtistAttributedToEvent(id, config.oshi_artist_id)
+      : false;
     setEvent(ev);
     setArtists(ar);
     setChekiList(ck);
@@ -405,6 +409,7 @@ export default function EventDetailScreen() {
     setInfoPhotos(photos);
     setAllArtists(allArs);
     setOshiArtistId(config.oshi_artist_id);
+    setOshiIsAttributed(isAttributed);
     setUserConfig(config);
     setSessions(loadedSessions);
     setTimetables(Object.fromEntries(
@@ -688,7 +693,9 @@ export default function EventDetailScreen() {
   const bg = colors.screen;
   const cardBg = colors.card;
   const oshiArtist = oshiArtistId ? (allArtistsMap.get(oshiArtistId) ?? null) : null;
-  const oshiMatchSource = oshiArtistId ? getOshiMatchSource(artists, oshiArtistId, oshiArtist) : null;
+  const oshiMatchSource = oshiArtistId
+    ? getOshiMatchSource(artists, oshiArtistId, oshiArtist, oshiIsAttributed)
+    : null;
   const oshiArtistName = oshiArtist?.short_name || oshiArtist?.name || null;
   const myRecordsSection = (
     <>

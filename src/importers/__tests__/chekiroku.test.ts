@@ -53,6 +53,7 @@ function createArtist(overrides: Partial<Artist> = {}): Artist {
     id: 'existing-member',
     name: '成员 A',
     short_name: null,
+    artist_type: null,
     parent_id: 'existing-group',
     avatar_uri: null,
     background_uri: null,

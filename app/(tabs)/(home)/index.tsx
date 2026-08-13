@@ -127,12 +127,13 @@ async function buildHeroItem(
     };
   }
 
-  const [eventArtists, oshiArtist] = await Promise.all([
+  const [eventArtists, oshiArtist, isAttributed] = await Promise.all([
     db.events.getArtists(nextEvent.id),
     db.artists.findById(config.oshi_artist_id),
+    db.events.isArtistAttributedToEvent(nextEvent.id, config.oshi_artist_id),
   ]);
 
-  const matchSource = getOshiMatchSource(eventArtists, config.oshi_artist_id, oshiArtist);
+  const matchSource = getOshiMatchSource(eventArtists, config.oshi_artist_id, oshiArtist, isAttributed);
 
   return {
     event: nextEvent,
@@ -351,14 +352,18 @@ export default function HomeScreen() {
     }));
 
     if (hero?.oshiArtist) {
-      const upcomingArtists = await Promise.all(
-        visibleUpcoming.map((event) => db.events.getArtists(event.id)),
+      const upcomingMatches = await Promise.all(
+        visibleUpcoming.map(async (event) => ({
+          artists: await db.events.getArtists(event.id),
+          attributed: await db.events.isArtistAttributedToEvent(event.id, hero.oshiArtist!.id),
+        })),
       );
       upcomingItems = visibleUpcoming.map((event, index) => {
         const matchSource = getOshiMatchSource(
-          upcomingArtists[index],
+          upcomingMatches[index].artists,
           hero.oshiArtist!.id,
           hero.oshiArtist,
+          upcomingMatches[index].attributed,
         );
 
         return {

@@ -26,7 +26,7 @@ describe('ArtistRepository artist media metadata support', () => {
     }
 
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'artist-1',
@@ -41,13 +41,13 @@ describe('ArtistRepository artist media metadata support', () => {
       '2026-01-01T00:00:00.000Z',
     );
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'artist-member-old',
       'Artist Member Old',
       null,
-      'artist-1',
+      null,
       null,
       null,
       null,
@@ -56,13 +56,13 @@ describe('ArtistRepository artist media metadata support', () => {
       '2026-01-01T00:00:00.000Z',
     );
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'artist-member-keep',
       'Artist Member Keep',
       null,
-      'artist-1',
+      null,
       null,
       null,
       null,
@@ -71,7 +71,7 @@ describe('ArtistRepository artist media metadata support', () => {
       '2026-01-01T00:00:00.000Z',
     );
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'artist-member-new',
@@ -84,6 +84,13 @@ describe('ArtistRepository artist media metadata support', () => {
       null,
       0,
       '2026-01-01T00:00:00.000Z',
+    );
+    rawDb.prepare(`INSERT INTO artist_basic_affiliations
+      (member_artist_id, parent_artist_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?), (?, ?, ?, ?)`
+    ).run(
+      'artist-member-old', 'artist-1', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+      'artist-member-keep', 'artist-1', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
     );
 
     artistRepository = new ArtistRepository(createAsyncSQLiteAdapter(rawDb));
@@ -155,14 +162,13 @@ describe('ArtistRepository artist media metadata support', () => {
     );
   });
 
-  test('delete cleans up avatar and background files', async () => {
+  test('delete preserves avatar and background files', async () => {
     await artistRepository.delete('artist-1');
 
     expect(
       rawDb.prepare('SELECT COUNT(*) FROM artists WHERE id = ?').pluck().get('artist-1')
     ).toBe(0);
-    expect(mockedDeleteLocalFileIfUnreferenced).toHaveBeenCalledWith(expect.anything(), 'file:///artist-avatar-old.jpg');
-    expect(mockedDeleteLocalFileIfUnreferenced).toHaveBeenCalledWith(expect.anything(), 'file:///artist-bg-old.jpg');
+    expect(mockedDeleteLocalFileIfUnreferenced).not.toHaveBeenCalled();
   });
 
   test('restore-shaped writes keep background_color round-trippable', async () => {
@@ -179,16 +185,68 @@ describe('ArtistRepository artist media metadata support', () => {
     await artistRepository.setMembers('artist-1', ['artist-member-keep', 'artist-member-new', 'artist-1', 'artist-member-new']);
 
     expect(
-      rawDb.prepare('SELECT parent_id FROM artists WHERE id = ?').pluck().get('artist-member-old')
-    ).toBeNull();
+      rawDb.prepare('SELECT parent_artist_id FROM artist_basic_affiliations WHERE member_artist_id = ?').pluck().get('artist-member-old')
+    ).toBeUndefined();
     expect(
-      rawDb.prepare('SELECT parent_id FROM artists WHERE id = ?').pluck().get('artist-member-keep')
+      rawDb.prepare('SELECT parent_artist_id FROM artist_basic_affiliations WHERE member_artist_id = ?').pluck().get('artist-member-keep')
     ).toBe('artist-1');
     expect(
-      rawDb.prepare('SELECT parent_id FROM artists WHERE id = ?').pluck().get('artist-member-new')
+      rawDb.prepare('SELECT parent_artist_id FROM artist_basic_affiliations WHERE member_artist_id = ?').pluck().get('artist-member-new')
     ).toBe('artist-1');
     expect(
-      rawDb.prepare('SELECT parent_id FROM artists WHERE id = ?').pluck().get('artist-1')
-    ).toBeNull();
+      rawDb.prepare('SELECT parent_artist_id FROM artist_basic_affiliations WHERE member_artist_id = ?').pluck().get('artist-1')
+    ).toBeUndefined();
+  });
+
+  test('infers members as people and their direct parent as a group', async () => {
+    const inferred = await artistRepository.inferTypeConversion();
+
+    expect(inferred).toEqual({
+      decisions: {
+        'artist-member-old': 'person',
+        'artist-member-keep': 'person',
+        'artist-1': 'group',
+      },
+      personCount: 2,
+      groupCount: 1,
+      membershipCount: 2,
+      skippedArtistCount: 0,
+    });
+    expect(inferred.decisions['artist-member-new']).toBeUndefined();
+  });
+
+  test('returns direct activity counts for conversion priority', async () => {
+    rawDb.prepare(
+      `INSERT INTO events (id, title, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+    ).run(
+      'event-a', 'Event A', 'completed', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+      'event-b', 'Event B', 'planned', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z',
+    );
+    rawDb.prepare(
+      `INSERT INTO event_artists (event_id, artist_id, sort_order)
+       VALUES (?, ?, ?), (?, ?, ?)`,
+    ).run('event-a', 'artist-member-old', 0, 'event-b', 'artist-member-old', 0);
+
+    await expect(artistRepository.findDirectActivityCounts()).resolves.toEqual({
+      'artist-member-old': 2,
+    });
+  });
+
+  test('skips an entire multi-level affiliation component', async () => {
+    rawDb.prepare(
+      `INSERT INTO artist_basic_affiliations
+        (member_artist_id, parent_artist_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run(
+      'artist-member-new', 'artist-member-old',
+      '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+    );
+
+    const inferred = await artistRepository.inferTypeConversion();
+
+    expect(inferred.decisions).toEqual({});
+    expect(inferred.membershipCount).toBe(0);
+    expect(inferred.skippedArtistCount).toBe(4);
   });
 });

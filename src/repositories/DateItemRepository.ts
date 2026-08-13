@@ -329,9 +329,11 @@ export class DateItemRepository {
 
   private async findArtists(itemId: string): Promise<Artist[]> {
     return this.db.getAllAsync<Artist>(
-      `SELECT a.*
+      `SELECT a.*, affiliation.parent_artist_id AS parent_id
        FROM artists a
        JOIN important_date_artists ida ON ida.artist_id = a.id
+       LEFT JOIN artist_basic_affiliations affiliation
+         ON affiliation.member_artist_id = a.id
        WHERE ida.important_date_id = ?
        ORDER BY a.name ASC`,
       [itemId]

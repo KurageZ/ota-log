@@ -19,14 +19,21 @@ WITH RECURSIVE referenced(id) AS (
 keep(id) AS (
   SELECT id FROM referenced
   UNION
-  SELECT a.parent_id
-  FROM artists a
-  JOIN keep k ON k.id = a.id
-  WHERE a.parent_id IS NOT NULL
+  SELECT relation.parent_artist_id
+  FROM artist_basic_affiliations relation
+  JOIN keep k ON k.id = relation.member_artist_id
   UNION
-  SELECT a.id
-  FROM artists a
-  JOIN keep k ON k.id = a.parent_id
+  SELECT relation.member_artist_id
+  FROM artist_basic_affiliations relation
+  JOIN keep k ON k.id = relation.parent_artist_id
+  UNION
+  SELECT membership.group_artist_id
+  FROM artist_group_memberships membership
+  JOIN keep k ON k.id = membership.person_artist_id
+  UNION
+  SELECT membership.person_artist_id
+  FROM artist_group_memberships membership
+  JOIN keep k ON k.id = membership.group_artist_id
 )
 SELECT a.id
 FROM artists a

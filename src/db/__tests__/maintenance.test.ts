@@ -34,10 +34,16 @@ function insertArtist(
 ): void {
   db.prepare(
     `INSERT INTO artists
-       (id, name, short_name, parent_id, avatar_uri, background_uri,
+       (id, name, short_name, artist_type, avatar_uri, background_uri,
         background_color, url, is_favorite, created_at)
      VALUES (?, ?, NULL, ?, NULL, NULL, NULL, NULL, 0, ?)`,
-  ).run(id, name, parentId, NOW);
+  ).run(id, name, null, NOW);
+  if (parentId) {
+    db.prepare(`INSERT INTO artist_basic_affiliations
+      (member_artist_id, parent_artist_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?)`
+    ).run(id, parentId, NOW, NOW);
+  }
 }
 
 function insertEvent(db: Database.Database, id: string): void {
@@ -283,6 +289,6 @@ describe('orphan artist maintenance', () => {
       'used-group',
       'used-member',
     ]);
-    expect(mockedDeleteLocalFileIfUnreferenced).toHaveBeenCalledTimes(4);
+    expect(mockedDeleteLocalFileIfUnreferenced).not.toHaveBeenCalled();
   });
 });

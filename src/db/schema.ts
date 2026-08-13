@@ -4,20 +4,16 @@ import {
   createEventArtistsV2TableSql,
   createEventsV2TableSql,
 } from './activityV2Schema';
+import {
+  ARTIST_ACTIVITY_ATTRIBUTION_VIEW_STATEMENTS,
+  ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS,
+  createArtistsTableSql,
+} from './artistRelationshipSchema';
 
 export const SCHEMA_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS artists (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    short_name  TEXT,
-    parent_id   TEXT REFERENCES artists(id) ON DELETE SET NULL,
-    avatar_uri  TEXT,
-    background_uri TEXT,
-    background_color TEXT,
-    url         TEXT,
-    is_favorite INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL
-  )`,
+  createArtistsTableSql(),
+
+  ...ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS,
 
   `CREATE TABLE IF NOT EXISTS trips (
     id          TEXT PRIMARY KEY,
@@ -36,6 +32,8 @@ export const SCHEMA_STATEMENTS = [
   createEventArtistsV2TableSql(),
 
   ...ACTIVITY_V2_SCHEMA_STATEMENTS,
+
+  ...ARTIST_ACTIVITY_ATTRIBUTION_VIEW_STATEMENTS,
 
   `CREATE TABLE IF NOT EXISTS photos (
     id         TEXT PRIMARY KEY,

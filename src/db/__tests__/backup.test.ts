@@ -5,6 +5,7 @@ import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
 import {
   buildBackupData,
+  buildRestoredBackupData,
   exportFullBackup,
   importBackup,
   normalizeLegacyBackupActivitySessions,
@@ -119,7 +120,7 @@ describe('backup artist background metadata support', () => {
 
   test('buildBackupData includes artist background metadata', async () => {
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'artist-export',
@@ -143,6 +144,76 @@ describe('backup artist background metadata support', () => {
         background_color: '#605074',
       }),
     ]);
+  });
+
+  test('backs up and restores artist types, basic affiliations, and timed memberships', async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    const insertArtist = rawDb.prepare(
+      `INSERT INTO artists (id, name, artist_type, created_at) VALUES (?, ?, ?, ?)`,
+    );
+    insertArtist.run('unset-parent', 'Unset Parent', null, now);
+    insertArtist.run('unset-member', 'Unset Member', null, now);
+    insertArtist.run('group', 'Group', 'group', now);
+    insertArtist.run('person', 'Person', 'person', now);
+    rawDb.prepare(
+      `INSERT INTO artist_basic_affiliations
+        (member_artist_id, parent_artist_id, created_at, updated_at)
+       VALUES ('unset-member', 'unset-parent', ?, ?)`,
+    ).run(now, now);
+    rawDb.prepare(
+      `INSERT INTO artist_group_memberships
+        (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+       VALUES ('membership', 'person', 'group', '2025-01-01', '2025-12-31', ?, ?)`,
+    ).run(now, now);
+
+    const data = await buildBackupData(repositories);
+    const restoredData = buildRestoredBackupData(
+      data as unknown as Parameters<typeof buildRestoredBackupData>[0],
+      new Map(),
+    );
+    await restoreBackupData(
+      repositories,
+      restoredData,
+    );
+
+    expect(rawDb.prepare('SELECT id, artist_type FROM artists ORDER BY id').all()).toEqual([
+      { id: 'group', artist_type: 'group' },
+      { id: 'person', artist_type: 'person' },
+      { id: 'unset-member', artist_type: null },
+      { id: 'unset-parent', artist_type: null },
+    ]);
+    expect(rawDb.prepare(
+      'SELECT member_artist_id, parent_artist_id FROM artist_basic_affiliations',
+    ).all()).toEqual([{ member_artist_id: 'unset-member', parent_artist_id: 'unset-parent' }]);
+    expect(rawDb.prepare(
+      `SELECT person_artist_id, group_artist_id, start_date, end_date
+       FROM artist_group_memberships`,
+    ).all()).toEqual([{
+      person_artist_id: 'person',
+      group_artist_id: 'group',
+      start_date: '2025-01-01',
+      end_date: '2025-12-31',
+    }]);
+  });
+
+  test('full backup restore preparation keeps the legacy parent_id fallback', async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    const restoredData = buildRestoredBackupData({
+      artists: [
+        { id: 'legacy-parent', name: 'Legacy Parent', parent_id: null, created_at: now },
+        { id: 'legacy-member', name: 'Legacy Member', parent_id: 'legacy-parent', created_at: now },
+      ],
+    }, new Map());
+
+    expect(restoredData.artist_basic_affiliations).toBeUndefined();
+    await restoreBackupData(repositories, restoredData);
+
+    expect(rawDb.prepare(
+      'SELECT member_artist_id, parent_artist_id FROM artist_basic_affiliations',
+    ).all()).toEqual([{
+      member_artist_id: 'legacy-member',
+      parent_artist_id: 'legacy-parent',
+    }]);
   });
 
   test('backs up and restores the artist confirmation preference', async () => {
@@ -327,7 +398,7 @@ describe('backup artist background metadata support', () => {
 
   test('export refuses to create an incomplete backup when a preset avatar is unavailable', async () => {
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       'artist-preset-missing',
@@ -388,7 +459,7 @@ describe('backup artist background metadata support', () => {
 
   test('buildBackupData includes important date records and reminder state', async () => {
     rawDb.prepare(
-      `INSERT INTO artists (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('artist-date-item', 'Date Artist', null, null, null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(

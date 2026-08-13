@@ -4,6 +4,7 @@ import { getArtistDisplayText, getArtistPrimaryName } from '../artistDisplay';
 function artist(input: Partial<Artist> & Pick<Artist, 'id' | 'name'>): Artist {
   return {
     short_name: null,
+    artist_type: null,
     parent_id: null,
     avatar_uri: null,
     background_uri: null,

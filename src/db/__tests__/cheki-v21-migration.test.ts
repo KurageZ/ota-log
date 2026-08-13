@@ -50,7 +50,7 @@ describe('Cheki v21 spec migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(21);
+    expect(db.pragma('user_version', { simple: true })).toBe(22);
     expect(db.prepare(`PRAGMA table_info('cheki_items')`).all().map((row) => (row as { name: string }).name))
       .toEqual(['id', 'record_id', 'sort_order', 'unit_price', 'spec', 'is_favorite', 'notes', 'created_at', 'updated_at']);
     expect(db.prepare(`SELECT unit_price, spec, is_favorite, notes FROM cheki_items WHERE id = 'item'`).get())

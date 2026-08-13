@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator,
   Alert,
@@ -19,11 +19,15 @@ import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { toISODate } from '../../src/utils/date';
 
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
 type ArtistGroupFilter = 'has_parent' | 'no_parent' | null;
+type ArtistTypeFilter = 'person' | 'group' | 'unset' | null;
 const IS_IOS = process.env.EXPO_OS === 'ios';
+const ARTIST_TYPE_NOTICE_DISMISSED_KEY = 'artist_type_notice_dismissed_v1';
 
 export default function ArtistsScreen() {
   const db = useDB();
@@ -34,8 +38,11 @@ export default function ArtistsScreen() {
   const [hasChekiOnly, setHasChekiOnly] = useState(false);
   const [chekiArtistIds, setChekiArtistIds] = useState<Set<string>>(new Set());
   const [eventArtistIds, setEventArtistIds] = useState<Set<string>>(new Set());
+  const [currentGroupLabels, setCurrentGroupLabels] = useState<Record<string, string>>({});
   const [eventFilter, setEventFilter] = useState<ArtistEventFilter>(null);
   const [groupFilter, setGroupFilter] = useState<ArtistGroupFilter>(null);
+  const [typeFilter, setTypeFilter] = useState<ArtistTypeFilter>(null);
+  const [showTypeNotice, setShowTypeNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
@@ -57,11 +64,21 @@ export default function ArtistsScreen() {
       if (filter === 'favorites' && artist.is_favorite !== 1) return false;
       if (hasChekiOnly && !chekiArtistIds.has(artist.id)) return false;
       if (eventFilter === 'attended' && !eventArtistIds.has(artist.id)) return false;
-      if (groupFilter === 'has_parent' && !artist.parent_id) return false;
-      if (groupFilter === 'no_parent' && artist.parent_id) return false;
+      const hasGroup = Boolean(artist.parent_id || currentGroupLabels[artist.id]);
+      if (groupFilter === 'has_parent' && !hasGroup) return false;
+      if (groupFilter === 'no_parent' && hasGroup) return false;
+      if (typeFilter === 'person' && artist.artist_type !== 'person') return false;
+      if (typeFilter === 'group' && artist.artist_type !== 'group') return false;
+      if (typeFilter === 'unset' && artist.artist_type != null) return false;
       return true;
     });
-  }, [artists, searchQuery, oshiArtistId, filter, hasChekiOnly, chekiArtistIds, eventFilter, eventArtistIds, groupFilter]);
+  }, [artists, searchQuery, oshiArtistId, filter, hasChekiOnly, chekiArtistIds, eventFilter, eventArtistIds, groupFilter, typeFilter, currentGroupLabels]);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(ARTIST_TYPE_NOTICE_DISMISSED_KEY).then((dismissed) => {
+      setShowTypeNotice(dismissed !== 'true');
+    });
+  }, []);
 
   const loadArtists = useCallback(async () => {
     setIsLoading(true);
@@ -73,7 +90,20 @@ export default function ArtistsScreen() {
         db.events.findDistinctArtistIds(),
         db.userConfig.getConfig(),
       ]);
+      const groupSummaries = await db.artists.findCurrentGroupSummaries(toISODate(new Date()));
+      const groupNames = new Map<string, string[]>();
+      groupSummaries.forEach((summary) => {
+        const names = groupNames.get(summary.person_artist_id) ?? [];
+        names.push(summary.group_name);
+        groupNames.set(summary.person_artist_id, names);
+      });
       setArtists(data);
+      setCurrentGroupLabels(Object.fromEntries(
+        [...groupNames].map(([artistId, names]) => [
+          artistId,
+          names.length === 1 ? names[0] : `${names[0]} 等 ${names.length} 个`,
+        ]),
+      ));
       setChekiArtistIds(new Set(distinctChekiArtistIds));
       setEventArtistIds(new Set(distinctEventArtistIds));
       setOshiArtistId(config.oshi_artist_id);
@@ -95,6 +125,19 @@ export default function ArtistsScreen() {
   }, []);
 
   const filterSections = useMemo<FilterSection[]>(() => [
+    {
+      key: 'type',
+      title: '艺人类型',
+      value: typeFilter,
+      onChange: (value) => setTypeFilter(
+        value === 'person' || value === 'group' || value === 'unset' ? value : null,
+      ),
+      options: [
+        { value: 'person', label: '个人' },
+        { value: 'group', label: '团体' },
+        { value: 'unset', label: '未设置' },
+      ],
+    },
     {
       key: 'cheki',
       title: '拍立得记录',
@@ -121,7 +164,7 @@ export default function ArtistsScreen() {
         { value: 'no_parent', label: '无所属团体' },
       ],
     },
-  ], [hasChekiOnly, eventFilter, groupFilter]);
+  ], [hasChekiOnly, eventFilter, groupFilter, typeFilter]);
 
   const clearFilter = useCallback(() => {
     setSearchQuery('');
@@ -129,6 +172,7 @@ export default function ArtistsScreen() {
     setHasChekiOnly(false);
     setEventFilter(null);
     setGroupFilter(null);
+    setTypeFilter(null);
   }, []);
 
   const activeSearchFilters = useMemo(() => {
@@ -146,8 +190,15 @@ export default function ArtistsScreen() {
         onPress: () => setGroupFilter(null),
       });
     }
+    if (typeFilter) {
+      filters.push({
+        id: `type:${typeFilter}`,
+        label: typeFilter === 'person' ? '个人' : typeFilter === 'group' ? '团体' : '未设置',
+        onPress: () => setTypeFilter(null),
+      });
+    }
     return filters;
-  }, [hasChekiOnly, eventFilter, groupFilter]);
+  }, [hasChekiOnly, eventFilter, groupFilter, typeFilter]);
 
   const handleToggleFavorite = async (artist: Artist) => {
     if (pendingFavoriteArtistId) return;
@@ -201,6 +252,34 @@ export default function ArtistsScreen() {
       />
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          {showTypeNotice && artists.some((artist) => artist.artist_type == null) ? (
+            <View style={{
+              marginBottom: 12, padding: 14, borderRadius: 14,
+              backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.accentBorder,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>艺人类型是可选的高级功能</Text>
+                  <Text style={{ marginTop: 5, color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                    设置个人或团体后，可记录多团体履历，并按在团时间关联活动统计。不需要时可以保持未设置。
+                  </Text>
+                  <TouchableOpacity onPress={() => router.push('/settings/artist-type-conversion')} style={{ marginTop: 8 }}>
+                    <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '700' }}>批量设置类型</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  accessibilityLabel="关闭艺人类型说明"
+                  onPress={() => {
+                    setShowTypeNotice(false);
+                    void AsyncStorage.setItem(ARTIST_TYPE_NOTICE_DISMISSED_KEY, 'true');
+                  }}
+                  hitSlop={8}
+                >
+                  <AppIcon name="close" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
           <SearchFilterBar
             keyword={searchQuery}
             onKeywordChange={setSearchQuery}
@@ -338,7 +417,8 @@ export default function ArtistsScreen() {
             const isOshi = artist.id === oshiArtistId;
             const display = getArtistDisplayText({
               artist,
-              parentName: artist.parent_id ? parentNameMap[artist.parent_id] : null,
+              parentName: currentGroupLabels[artist.id]
+                ?? (artist.parent_id ? parentNameMap[artist.parent_id] : null),
               mode: 'management',
             });
 

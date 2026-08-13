@@ -165,7 +165,7 @@ describe('Activity v18 migration', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(21);
+    expect(db.pragma('user_version', { simple: true })).toBe(22);
     expect(columns(db, 'events')).toEqual([
       'id', 'title', 'event_type', 'status', 'review_score', 'notes', 'details',
       'url', 'setlist_text', 'actual_expense', 'trip_id', 'created_at', 'updated_at',

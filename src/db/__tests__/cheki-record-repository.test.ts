@@ -151,7 +151,7 @@ describe('ChekiRecordRepository', () => {
   test('derives the latest artist unit price directly from items, including zero', async () => {
     raw.prepare(
       `INSERT INTO artists
-         (id, name, short_name, parent_id, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+         (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
        VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)`,
     ).run('artist-price', 'Price Artist', '2026-01-01T00:00:00.000Z');
     await repository.createRecord({

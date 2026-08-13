@@ -77,6 +77,7 @@ function RootNavigator() {
       <Stack.Screen name="artists/index" options={{ title: '艺人管理' }} />
       <Stack.Screen name="artists/new" options={{ presentation: 'modal', title: '新建艺人' }} />
       <Stack.Screen name="artists/[id]/index" options={{ title: '艺人详情' }} />
+      <Stack.Screen name="artists/[id]/memberships" options={{ title: '所属履历' }} />
       <Stack.Screen name="artists/[id]/edit" options={{ presentation: 'modal', title: '编辑艺人' }} />
       <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得记录' }} />
       <Stack.Screen name="cheki/records/[id]/index" options={{ title: '拍立得记录' }} />
@@ -94,6 +95,7 @@ function RootNavigator() {
       <Stack.Screen name="settings/profile" options={{ title: '个人资料' }} />
       <Stack.Screen name="settings/oshi" options={{ title: '单推设置' }} />
       <Stack.Screen name="settings/widget" options={{ title: '小组件设置' }} />
+      <Stack.Screen name="settings/artist-type-conversion" options={{ title: '艺人类型转换' }} />
       <Stack.Screen name="weibo" options={{ title: '微博抓取' }} />
       <Stack.Screen name="tools/index" options={{ title: '工具箱' }} />
       <Stack.Screen name="tools/chekiroku-import" options={{ title: '导入 Chekiroku' }} />
