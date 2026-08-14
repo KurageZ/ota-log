@@ -1007,27 +1007,6 @@ export default function StatsScreen() {
           <SectionHeader title="单推" colors={colors} />
           {oshiArtistId ? (
             <>
-              {recentOshiEvent ? (
-                <EventCard
-                  event={recentOshiEvent}
-                  oshiBadge={getEventCardOshiBadge(recentOshiEvent.status, null)}
-                  eyebrow={
-                    <>
-                      最近一次活动
-                      <Text style={{ fontWeight: '900' }}>
-                        {' '}· {formatRecentEventAge(recentOshiEvent.event_date)}
-                      </Text>
-                    </>
-                  }
-                  showStatus={false}
-                />
-              ) : (
-                <SurfaceCard colors={colors}>
-                  <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
-                    {periodNoun}范围内没有相关活动
-                  </Text>
-                </SurfaceCard>
-              )}
               <SurfaceCard colors={colors}>
                 {oshiArtist ? <OshiCardTitle artist={oshiArtist} /> : null}
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
@@ -1071,6 +1050,27 @@ export default function StatsScreen() {
                   </View>
                 ) : null}
               </SurfaceCard>
+              {recentOshiEvent ? (
+                <EventCard
+                  event={recentOshiEvent}
+                  oshiBadge={getEventCardOshiBadge(recentOshiEvent.status, null)}
+                  eyebrow={
+                    <>
+                      最近一次活动
+                      <Text style={{ fontWeight: '900' }}>
+                        {' '}· {formatRecentEventAge(recentOshiEvent.event_date)}
+                      </Text>
+                    </>
+                  }
+                  showStatus={false}
+                />
+              ) : (
+                <SurfaceCard colors={colors}>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
+                    {periodNoun}范围内没有相关活动
+                  </Text>
+                </SurfaceCard>
+              )}
             </>
           ) : (
             <EmptyCard
