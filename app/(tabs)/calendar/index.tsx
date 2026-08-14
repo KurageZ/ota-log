@@ -7,6 +7,7 @@ import {
   SectionList,
   ScrollView,
   Text,
+  type TextStyle,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -17,9 +18,9 @@ import {
   useAndroidCollapsibleTabHeader,
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
+import { CalendarMonthPicker } from '../../../src/components/CalendarMonthPicker';
 import { EventCard } from '../../../src/components/EventCard';
 import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
-import { formatEventTimes } from '../../../src/components/EventPrimitives';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ExpandableList } from '../../../src/components/ExpandableList';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
@@ -133,16 +134,30 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-function CalendarDetailCard({ title, children }: { title: string; children: ReactNode }) {
+function CalendarDetailCard({
+  title,
+  children,
+  paddingBottom = 14,
+  paddingTop = 12,
+  paddingHorizontal = 14,
+  titleStyle,
+}: {
+  title: string;
+  children: ReactNode;
+  paddingBottom?: number;
+  paddingTop?: number;
+  paddingHorizontal?: number;
+  titleStyle?: TextStyle;
+}) {
   const { colors, isDark } = useAppTheme();
 
   return (
     <View
       style={{
         borderRadius: 18,
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 14,
+        paddingHorizontal,
+        paddingTop,
+        paddingBottom,
         marginBottom: 12,
         backgroundColor: colors.card,
         shadowColor: colors.shadow,
@@ -152,7 +167,11 @@ function CalendarDetailCard({ title, children }: { title: string; children: Reac
         elevation: 3,
       }}
     >
-      <FormFieldLabel>{title}</FormFieldLabel>
+      {titleStyle ? (
+        <Text style={titleStyle}>{title}</Text>
+      ) : (
+        <FormFieldLabel>{title}</FormFieldLabel>
+      )}
       {children}
     </View>
   );
@@ -165,6 +184,11 @@ function addMonths(date: string, delta: number): string {
   const nextMonth = next.getMonth() + 1;
   const nextDay = Math.min(day, daysInMonth(nextYear, nextMonth));
   return formatISODate(nextYear, nextMonth, nextDay);
+}
+
+function dateInMonth(date: string, year: number, month: number): string {
+  const { day } = parseISODate(date);
+  return formatISODate(year, month, Math.min(day, daysInMonth(year, month)));
 }
 
 function buildChekiMonthCells(
@@ -209,9 +233,7 @@ function buildMonthCellSignalCards(
     ...sortDayEvents(events).map((event) => ({
       key: `event-${event.id}`,
       kind: 'event' as const,
-      text: formatEventTimes(event.open_time, event.start_time)
-        ? `${formatEventTimes(event.open_time, event.start_time)} ${event.title}`
-        : event.title,
+      text: event.title,
     })),
     ...occurrences.map((occurrence) => ({
       key: `date-item-${occurrence.id}`,
@@ -248,6 +270,7 @@ export default function CalendarScreen() {
 
   const today = toISODate(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>(calendarDefaultView);
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const [dayEvents, setDayEvents] = useState<Event[]>([]);
@@ -300,6 +323,11 @@ export default function CalendarScreen() {
 
   const handleChangeChekiMonth = useCallback((delta: number) => {
     handleSelectDate(addMonths(selectedDate, delta));
+  }, [handleSelectDate, selectedDate]);
+
+  const handleSelectMonth = useCallback((year: number, month: number) => {
+    setMonthPickerVisible(false);
+    handleSelectDate(dateInMonth(selectedDate, year, month));
   }, [handleSelectDate, selectedDate]);
 
   const handleSelectViewMode = useCallback((mode: ViewMode) => {
@@ -459,8 +487,6 @@ export default function CalendarScreen() {
             height: 39,
             borderRadius: 5,
             backgroundColor: colors.card,
-            borderWidth: 1,
-            borderColor: colors.inputBorder,
             transform: [{ rotate: '-12deg' }],
           }} />
         ) : null}
@@ -473,8 +499,6 @@ export default function CalendarScreen() {
             height: 39,
             borderRadius: 5,
             backgroundColor: colors.card,
-            borderWidth: 1,
-            borderColor: colors.inputBorder,
             transform: [{ rotate: backplateCount >= 2 ? '9deg' : '8deg' }],
           }} />
         ) : null}
@@ -484,13 +508,7 @@ export default function CalendarScreen() {
           top: 0,
           width: 31,
           height: 43,
-          paddingTop: 2,
-          paddingHorizontal: 2,
-          paddingBottom: 5,
-          borderRadius: 6,
-          backgroundColor: colors.card,
-          borderWidth: 1,
-          borderColor: colors.inputBorder,
+          borderRadius: 5,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 5 },
           shadowOpacity: 0.18,
@@ -504,14 +522,14 @@ export default function CalendarScreen() {
               style={{
                 width: '100%',
                 height: '100%',
-                borderRadius: 3,
+                borderRadius: 5,
                 backgroundColor: colors.accentSofter,
               }}
             />
           ) : (
             <View style={{
               flex: 1,
-              borderRadius: 3,
+              borderRadius: 5,
               backgroundColor: colors.accentSofter,
               alignItems: 'center',
               justifyContent: 'center',
@@ -529,8 +547,6 @@ export default function CalendarScreen() {
           paddingHorizontal: 5,
           borderRadius: 999,
           backgroundColor: isDark ? colors.heading : colors.text,
-          borderWidth: 1.5,
-          borderColor: colors.card,
           alignItems: 'center',
           justifyContent: 'center',
         }}>
@@ -563,24 +579,12 @@ export default function CalendarScreen() {
         />
       ) : null}
 
-      <View style={{
-        backgroundColor: colors.card,
-        borderRadius: 22,
-        paddingHorizontal: 12,
-        paddingTop: 14,
-        paddingBottom: 12,
-        marginBottom: 14,
-        shadowColor: colors.calendarShadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
-      }}>
+      <View style={{ marginBottom: 14 }}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 13,
+          marginBottom: 24,
         }}>
           <TouchableOpacity
             onPress={() => handleChangeChekiMonth(-1)}
@@ -596,9 +600,25 @@ export default function CalendarScreen() {
           >
             <AppIcon name="disclosure" variant="back" size={22} color={colors.accent} />
           </TouchableOpacity>
-          <Text style={{ color: colors.heading, fontSize: 16, fontWeight: '900' }}>
-            {monthTitle}
-          </Text>
+          <TouchableOpacity
+            onPress={() => setMonthPickerVisible(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`选择月份，当前${monthTitle}`}
+            hitSlop={{ left: 12, right: 26, top: 10, bottom: 10 }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}
+          >
+            <Text style={{ color: colors.heading, fontSize: 20, lineHeight: 26, fontWeight: '900' }}>
+              {monthTitle}
+            </Text>
+            <AppIcon
+              name="disclosure"
+              variant="down"
+              size={16}
+              color={colors.heading}
+              style={{ position: 'absolute', left: '100%', marginLeft: 5 }}
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => handleChangeChekiMonth(1)}
             activeOpacity={0.7}
@@ -716,7 +736,7 @@ export default function CalendarScreen() {
                           backgroundColor: colors.accent,
                           opacity: cell.inMonth ? 1 : 0.35,
                           borderWidth: 1,
-                          borderColor: colors.card,
+                          borderColor: colors.screen,
                         }} />
                       ) : null}
                       {hasDateItem ? (
@@ -727,7 +747,7 @@ export default function CalendarScreen() {
                           backgroundColor: colors.warning,
                           opacity: cell.inMonth ? 1 : 0.35,
                           borderWidth: 1,
-                          borderColor: colors.card,
+                          borderColor: colors.screen,
                         }} />
                       ) : null}
                     </View>
@@ -768,22 +788,12 @@ export default function CalendarScreen() {
                               backgroundColor: cardBackgroundColor,
                               flexDirection: 'row',
                               alignItems: 'center',
-                              gap: 3,
                               opacity: cell.inMonth ? 1 : 0.55,
                             }}
                           >
-                            {card.kind !== 'overflow' ? (
-                              <View
-                                style={{
-                                  width: 3,
-                                  height: 3,
-                                  borderRadius: 999,
-                                  backgroundColor: cardTextColor,
-                                }}
-                              />
-                            ) : null}
                             <Text
                               numberOfLines={1}
+                              ellipsizeMode="clip"
                               style={{
                                 flex: 1,
                                 minWidth: 0,
@@ -853,7 +863,7 @@ export default function CalendarScreen() {
       />
 
       {hasPhotoChekiCard ? (
-        <CalendarDetailCard title="拍立得">
+        <CalendarDetailCard title="拍立得" paddingBottom={0}>
           <ChekiStackPreviewCard
             chekis={dayChekis}
             manualCount={0}
@@ -882,7 +892,13 @@ export default function CalendarScreen() {
       ) : null}
 
       {hasRankingCard ? (
-        <CalendarDetailCard title="排行">
+        <CalendarDetailCard
+          title="排行"
+          paddingBottom={0}
+          paddingTop={16}
+          paddingHorizontal={16}
+          titleStyle={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}
+        >
           <ExpandableList
             items={dayArtistSummaries.map(({ artist, count }) => ({
               id: artist.id,
@@ -1070,6 +1086,13 @@ export default function CalendarScreen() {
           }
         />
       )}
+
+      <CalendarMonthPicker
+        visible={monthPickerVisible}
+        selectedMonth={monthKey(selectedDate)}
+        onClose={() => setMonthPickerVisible(false)}
+        onSelect={handleSelectMonth}
+      />
     </View>
   );
 }

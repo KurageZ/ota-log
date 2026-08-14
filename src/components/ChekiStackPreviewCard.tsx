@@ -126,7 +126,7 @@ export function ChekiStackPreviewCard({
 
       {chekis.length > 0 ? (
         shouldStack ? (
-          <View style={{ width: areaWidth, alignSelf: 'center', height: resolvedCardHeight + 12, position: 'relative', overflow: 'hidden' }}>
+          <View style={{ width: areaWidth, alignSelf: 'center', height: resolvedCardHeight + 20, position: 'relative', overflow: 'hidden' }}>
             {chekis.slice(0, previewCount).map((cheki, index) => {
               const isLastVisible = index === previewCount - 1;
               return (
@@ -138,23 +138,23 @@ export function ChekiStackPreviewCard({
                     top: 4,
                     width: cardWidth,
                     height: resolvedCardHeight,
-                    borderRadius: 11,
-                    paddingTop: 5,
-                    paddingHorizontal: 5,
-                    paddingBottom: 7,
-                    backgroundColor: colors.card,
-                    shadowColor: colors.shadow,
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.14,
-                    shadowRadius: 18,
-                    elevation: 3,
+                    borderRadius: 10,
                     zIndex: index + 1,
+                    ...(isLastVisible
+                      ? {
+                          shadowColor: colors.shadow,
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.16,
+                          shadowRadius: 10,
+                          elevation: 2,
+                        }
+                      : null),
                   }}
                 >
                   <Image
                     source={{ uri: cheki.photo_uri }}
                     resizeMethod="resize"
-                    style={{ width: '100%', height: '100%', borderRadius: 7, backgroundColor: colors.cardAlt }}
+                    style={{ width: '100%', height: '100%', borderRadius: 10, backgroundColor: colors.cardAlt }}
                   />
                   {isLastVisible && hiddenCount > 0 ? (
                     <View style={{
@@ -193,10 +193,6 @@ export function ChekiStackPreviewCard({
                   width: cardWidth,
                   height: resolvedCardHeight,
                   borderRadius: 10,
-                  paddingTop: 5,
-                  paddingHorizontal: 5,
-                  paddingBottom: 7,
-                  backgroundColor: colors.card,
                   shadowColor: colors.shadow,
                   shadowOffset: { width: 0, height: 8 },
                   shadowOpacity: 0.13,
@@ -207,7 +203,7 @@ export function ChekiStackPreviewCard({
                 <Image
                   source={{ uri: cheki.photo_uri }}
                   resizeMethod="resize"
-                  style={{ width: '100%', height: '100%', borderRadius: 7, backgroundColor: colors.cardAlt }}
+                  style={{ width: '100%', height: '100%', borderRadius: 10, backgroundColor: colors.cardAlt }}
                 />
               </View>
             ))}
