@@ -14,7 +14,7 @@ import {
 import { generateId } from '../utils/uuid';
 import { eventDateLikeParam, isValidISODate, toISODateTime } from '../utils/date';
 import { selectCurrentPlannedEvent } from '../utils/currentEvent';
-import { buildEventSearchIndex, matchesEventSearchIndex } from '../utils/eventSearch';
+import { buildSearchIndex, matchesSearchIndex, tokenizeSearchQuery } from '../utils/searchText';
 
 export interface EventFilter {
   keyword?: string;
@@ -967,8 +967,9 @@ export class EventRepository {
       for (const row of rows) searchParts.get(row.event_id)?.push(row.search_text ?? '');
     }
 
+    const queryTokens = tokenizeSearchQuery(keyword);
     return candidates.filter((event) => (
-      matchesEventSearchIndex(buildEventSearchIndex(searchParts.get(event.id) ?? []), keyword)
+      matchesSearchIndex(buildSearchIndex(searchParts.get(event.id) ?? []), queryTokens)
     ));
   }
 
