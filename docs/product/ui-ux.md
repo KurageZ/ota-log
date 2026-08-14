@@ -68,6 +68,8 @@ ota_log 是本地优先的演出记录 app，主要服务日系和国内偶像�
 
 Profile 上不直接放备份、清理、微博登录、主题、日历默认视图等操作。
 
+我的页右上角提供齿轮设置 icon，点击进入 `/settings`，与「更多 → 设置」菜单入口一致。
+
 ### 设置页 IA
 
 `/settings` 是单页设置中心。当前分组：
@@ -612,7 +614,7 @@ Chekiroku 导入：
 - 自定义范围使用 `react-native-calendars` 的单月日历，左右翻月或滑动切换月份，并提供 `YYYY-MM-DD` 开始和结束日期手动输入；无效日期或倒序范围显示行内错误且不可应用。日历范围标记只计算当前可见月份，避免超长范围拖慢选择器。点击「应用」后更新日期范围，选择「全部时间」立即应用，关闭卡片不改变当前范围。
 - 趋势图按范围跨度自适应为日、月或年分桶；密集日粒度保留每天的数据柱，缩窄柱体和间距，零值仅保留弱基线。周、月视图显示非零柱顶数值，只有当柱顶数字间距过近且数值相同时才省略重复数字；横轴标签优先显示有数据的日期，标签保持单行。年视图横轴固定展示 1–12 月，不省略月份。图表保持纯展示，不增加触摸选中交互。活动按首场日期归属，拍立得继续使用填写日期并以创建时间兜底。
 - 统计卡片下钻到活动或切册列表时继承相同时间范围。
-- iOS 与 Android 的统计页标题操作区提供「编辑」，进入 `/settings/stats`；全局设置的「外观」分区也进入同一页面。
+- iOS 与 Android 的统计页右上角使用设置 icon（与电子切册「显示选项」一致），进入 `/settings/stats`；全局设置的「外观」分区也进入同一页面。
 - 统计文案保持短、具体且以结果为中心：所选时间使用「所选时间」表达，设置分区使用「显示 / 隐藏」，还原布局不使用 danger 语义。时间范围使用完整的「自定义」表达。
 - 六个顶层 section 支持全局显隐和排序；隐藏项不执行专属统计查询，共享查询按所有可见 section 的依赖并集执行。
 - SectionHeader 使用 3x16 accent 竖线、17/700 标题、`lineHeight: 35`、可选 count badge 和右侧 action。
@@ -786,7 +788,7 @@ Shell：
 - 页面和组件只使用 `AppIcon` 的业务名，不直接 import `@react-native-vector-icons/lucide`、`@expo/vector-icons` 或具体 icon 字体。
 - 图标命名遵循「业务名 -> 映射层 -> Lucide 实际名」。例如页面使用 `favorite`、`calendar`、`disclosure`，映射层再决定实际 glyph 是 `heart`、`calendar-days` 还是 `chevron-right`。
 - iOS 原生 Toolbar 优先使用 SF Symbols，但仍通过 `AppIcon` 的业务名映射获取，页面不直接硬编码 symbol 名；其他页面图标继续使用 Lucide glyph。
-- 首页、所有活动、艺人管理和重要日期的 iOS 右上角「新建」统一复用 `NativeAddToolbar`，由原生 `Stack.Toolbar` 渲染 `plus`；Android 保留现有 Lucide Header 操作。底部 Tab Bar 不随本轮 Toolbar 调整变更。
+- 首页、所有活动、艺人管理和重要日期的 iOS 右上角「新建」统一复用 `NativeAddToolbar`，由原生 `Stack.Toolbar` 渲染 `plus`；Android 保留现有 Lucide Header 操作。首页右上角另有设置 icon（与电子切册「显示选项」一致），点击进入 `/settings/home` 自定义设置界面。底部 Tab Bar 不随本轮 Toolbar 调整变更。
 - iOS 导航栏中的「取消 / 编辑 / 保存 / 重置」等文字操作统一使用原生 `Stack.Toolbar.Button`，避免两字自定义按钮在 Liquid Glass 下收成圆形；Android 保留现有 Header 操作。
 - 只有会丢失持久数据或用户配置的操作使用 danger 红色，例如删除记录、覆盖备份和恢复默认配置；取消、清除筛选等非破坏性操作继续使用普通强调色。破坏性操作需要二次确认，确认按钮使用 destructive 语义。
 - 新增图标先扩展 `AppIconName` 和 `ICONS`，不要在页面内写 Lucide 实际名。

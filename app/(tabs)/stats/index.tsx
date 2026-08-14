@@ -18,7 +18,7 @@ import {
 } from '../../../src/components/EventRow';
 import { ChekiArtistShareChart } from '../../../src/components/ChekiArtistShareChart';
 import { ActivityHeatmap } from '../../../src/components/ActivityHeatmap';
-import { AppIcon } from '../../../src/components/AppIcon';
+import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import {
   StatsRangePicker,
   type StatsRangePickerMode,
@@ -677,15 +677,10 @@ export default function StatsScreen() {
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel="编辑统计内容"
-      style={{
-        minWidth: 52,
-        minHeight: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 10,
-      }}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}
     >
-      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.accent }}>编辑</Text>
+      <AppIcon name="settings" size={22} color={colors.accent} />
     </TouchableOpacity>
   ), [colors.accent, router]);
 
@@ -1394,11 +1389,9 @@ export default function StatsScreen() {
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             accessibilityLabel="编辑统计内容"
-            tintColor={colors.accent}
+            icon={getAppIconSFSymbol('viewSettings')}
             onPress={() => router.push('/settings/stats')}
-          >
-            编辑
-          </Stack.Toolbar.Button>
+          />
         </Stack.Toolbar>
         {periodPicker}
       </>

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import Constants from 'expo-constants';
 import {
   AndroidCompactTabHeader,
@@ -9,7 +9,7 @@ import {
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { useDB } from '../../../src/context/DBContext';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
-import { AppIcon } from '../../../src/components/AppIcon';
+import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { MenuCard, MenuItem, SectionLabel } from '../../../src/components/SettingsMenu';
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
@@ -133,12 +133,24 @@ export default function ProfileScreen() {
   const profileName = userConfig?.name ?? 'Otaku';
   const avatarSize = 92;
   const menuTints = colors.profileMenu;
+  const renderSettingsIcon = useCallback(() => (
+    <TouchableOpacity
+      activeOpacity={0.65}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      onPress={() => router.push('/settings')}
+      accessibilityLabel="设置"
+      accessibilityRole="button"
+    >
+      <AppIcon name="settings" size={22} color={colors.accent} />
+    </TouchableOpacity>
+  ), [colors.accent, router]);
   const content = (
     <>
       <View style={{ marginHorizontal: 16, marginBottom: 32 }}>
         {isAndroid ? (
           <AndroidLargeTabTitle
             title="我的"
+            right={renderSettingsIcon()}
             largeTitleStyle={androidHeader.largeTitleStyle}
           />
         ) : null}
@@ -333,6 +345,13 @@ export default function ProfileScreen() {
   if (!isAndroid) {
     return (
       <>
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityLabel="设置"
+            icon={getAppIconSFSymbol('settings')}
+            onPress={() => router.push('/settings')}
+          />
+        </Stack.Toolbar>
         <ScrollView
           style={{ flex: 1, backgroundColor: colors.screen }}
           showsVerticalScrollIndicator={false}
@@ -353,6 +372,7 @@ export default function ProfileScreen() {
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <AndroidCompactTabHeader
         title="我的"
+        right={renderSettingsIcon()}
         compactHeaderStyle={androidHeader.compactHeaderStyle}
         overlayHeight={androidHeader.overlayHeight}
         overlayPaddingTop={androidHeader.overlayPaddingTop}

@@ -89,7 +89,7 @@ export type AppIconName =
   | 'weiboImport'
   | 'widget';
 
-export type AppSFSymbolName = 'plus' | 'slider.horizontal.3' | 'square.and.arrow.up';
+export type AppSFSymbolName = 'plus' | 'slider.horizontal.3' | 'square.and.arrow.up' | 'gearshape';
 
 type IconDefinition = {
   icon: LucideIconName;
@@ -179,7 +179,7 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   reorder: { icon: 'list' },
   save: { icon: 'save' },
   search: { icon: 'search' },
-  settings: { icon: 'settings' },
+  settings: { icon: 'settings', sfSymbol: 'gearshape' },
   share: { icon: 'share-2', sfSymbol: 'square.and.arrow.up' },
   sparkles: { icon: 'sparkles' },
   stats: { icon: 'chart-column' },

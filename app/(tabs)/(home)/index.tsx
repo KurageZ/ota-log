@@ -25,7 +25,7 @@ import {
   HomeMonthOverviewData,
 } from '../../../src/components/HomeDashboardCards';
 import type { HydratedDateItem } from '../../../src/repositories/DateItemRepository';
-import { AppIcon } from '../../../src/components/AppIcon';
+import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../../src/components/native-add-toolbar';
 import { EventCardOshiBadge, getEventCardOshiBadge, getOshiMatchSource } from '../../../src/utils/oshiMatch';
 import { buildHomeTimelineGroups } from '../../../src/utils/homeTimeline';
@@ -492,6 +492,28 @@ export default function HomeScreen() {
     </TouchableOpacity>
   ), [colors.accent, colors.onAccent, router]);
 
+  const renderHeaderRight = useCallback(() => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <TouchableOpacity
+        accessibilityLabel="编辑首页内容"
+        accessibilityRole="button"
+        onPress={() => router.push('/settings/home')}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <AppIcon name="settings" size={22} color={colors.accent} />
+      </TouchableOpacity>
+      {renderCreateEventIcon()}
+    </View>
+  ), [colors.accent, renderCreateEventIcon, router]);
+
+  const renderSettingsButton = useCallback(() => (
+    <Stack.Toolbar.Button
+      accessibilityLabel="编辑首页内容"
+      icon={getAppIconSFSymbol('viewSettings')}
+      onPress={() => router.push('/settings/home')}
+    />
+  ), [router]);
+
   const renderHomeCard = useCallback((card: HomeCardConfig) => {
     if (card.type === 'futureActivity') {
       if (!card.visible) return null;
@@ -673,7 +695,7 @@ export default function HomeScreen() {
       {isAndroid ? (
         <AndroidLargeTabTitle
           title="首页"
-          right={renderCreateEventIcon()}
+          right={renderHeaderRight()}
           largeTitleStyle={androidHeader.largeTitleStyle}
         />
       ) : null}
@@ -694,6 +716,7 @@ export default function HomeScreen() {
         <NativeAddToolbar
           accessibilityLabel="新建活动"
           onPress={() => router.push('/events/compose')}
+          leading={renderSettingsButton()}
         />
       </>
     );
@@ -703,7 +726,7 @@ export default function HomeScreen() {
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <AndroidCompactTabHeader
         title="首页"
-        right={renderCreateEventIcon()}
+        right={renderHeaderRight()}
         compactHeaderStyle={androidHeader.compactHeaderStyle}
         overlayHeight={androidHeader.overlayHeight}
         overlayPaddingTop={androidHeader.overlayPaddingTop}
