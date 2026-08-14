@@ -10,6 +10,12 @@ import {
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ExpandableList } from '../../../src/components/ExpandableList';
+import { EventCard } from '../../../src/components/EventCard';
+import {
+  EventRow,
+  EventRowLocationMeta,
+  EventRowMetaText,
+} from '../../../src/components/EventRow';
 import { ChekiArtistShareChart } from '../../../src/components/ChekiArtistShareChart';
 import { ActivityHeatmap } from '../../../src/components/ActivityHeatmap';
 import { AppIcon } from '../../../src/components/AppIcon';
@@ -28,6 +34,7 @@ import type {
   EventRatingSummary,
 } from '../../../src/repositories/EventRepository';
 import { useAppTheme } from '../../../src/theme/appTheme';
+import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { getLocalDayDifference } from '../../../src/utils/dateItems';
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
@@ -392,107 +399,6 @@ function formatRecentEventAge(date: string): string {
   if (difference > 0) return `还有 ${difference} 天`;
   if (difference === 0) return '今天';
   return `${Math.abs(difference)} 天前`;
-}
-
-function SpendRankingList({
-  items,
-  colors,
-  onPressItem,
-}: {
-  items: readonly SpendEntry[];
-  colors: ReturnType<typeof useAppTheme>['colors'];
-  onPressItem: (entry: SpendEntry) => void;
-}) {
-  return (
-    <View>
-      {items.map((entry, index) => {
-        const isLast = index === items.length - 1;
-        return (
-          <TouchableOpacity
-            key={entry.event.id}
-            activeOpacity={0.7}
-            onPress={() => onPressItem(entry)}
-            accessibilityRole="button"
-            accessibilityLabel={`查看活动详情：${entry.event.title}，花费 ${formatCurrency(entry.totalSpend)}`}
-            style={{
-              minHeight: 60,
-              paddingVertical: 9,
-              borderBottomWidth: isLast ? 0 : 1,
-              borderBottomColor: colors.divider,
-              justifyContent: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
-                  {entry.event.title}
-                </Text>
-                <Text numberOfLines={1} style={{ marginTop: 3, fontSize: 12, color: colors.textSecondary }}>
-                  {entry.event.event_date} · 门票 {formatCurrency(entry.ticketTotal)} + 特典 {formatCurrency(entry.chekiTotal)}
-                </Text>
-              </View>
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: 13, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}
-              >
-                {formatCurrency(entry.totalSpend)}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-function PerfectEventList({
-  items,
-  colors,
-  onPressItem,
-}: {
-  items: readonly Event[];
-  colors: ReturnType<typeof useAppTheme>['colors'];
-  onPressItem: (event: Event) => void;
-}) {
-  return (
-    <View>
-      {items.map((event, index) => {
-        const location = [event.city, event.venue].filter(Boolean).join(' / ');
-        const isLast = index === items.length - 1;
-        return (
-          <TouchableOpacity
-            key={event.id}
-            activeOpacity={0.7}
-            onPress={() => onPressItem(event)}
-            accessibilityRole="button"
-            accessibilityLabel={`查看活动详情：${event.title}，评分 5 分`}
-            style={{
-              minHeight: 60,
-              paddingVertical: 9,
-              borderBottomWidth: isLast ? 0 : 1,
-              borderBottomColor: colors.divider,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
-          >
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
-                {event.title}
-              </Text>
-              <Text numberOfLines={1} style={{ marginTop: 5, fontSize: 12, color: colors.textSecondary }}>
-                {event.event_date}{location ? ` · ${location}` : ''}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 13, fontWeight: '900', color: colors.accent, fontVariant: ['tabular-nums'] }}>
-              5 分
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
 }
 
 function GroupRatingList({
@@ -1122,43 +1028,36 @@ export default function StatsScreen() {
                   onPress={() => goToCheki({ artist_id: oshiArtistId })}
                 />
               </View>
-              <TouchableOpacity
-                activeOpacity={recentOshiEvent ? 0.7 : 1}
-                disabled={!recentOshiEvent}
-                onPress={recentOshiEvent ? () => router.push(`/events/${recentOshiEvent.id}`) : undefined}
-                accessibilityRole={recentOshiEvent ? 'button' : undefined}
-                accessibilityLabel={recentOshiEvent ? `查看活动详情：${recentOshiEvent.title}` : undefined}
-                style={{
-                  borderRadius: 14,
-                  padding: 14,
-                  marginBottom: trendBuckets.length > 0 ? 14 : 0,
-                  backgroundColor: colors.accentSoft,
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accentText, marginBottom: 6 }}>
-                  最近一次活动
-                  {recentOshiEvent ? (
-                    <Text style={{ fontWeight: '900' }}> · {formatRecentEventAge(recentOshiEvent.event_date)}</Text>
-                  ) : null}
-                </Text>
-                {recentOshiEvent ? (
-                  <>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }} numberOfLines={1}>
-                      {recentOshiEvent.title}
-                    </Text>
-                    <Text style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4 }}>
-                      {recentOshiEvent.event_date}
-                      {recentOshiEvent.city || recentOshiEvent.venue
-                        ? ` · ${[recentOshiEvent.city, recentOshiEvent.venue].filter(Boolean).join(' / ')}`
-                        : ''}
-                    </Text>
-                  </>
-                ) : (
+              {recentOshiEvent ? (
+                <EventCard
+                  event={recentOshiEvent}
+                  oshiBadge={getEventCardOshiBadge(recentOshiEvent.status, null)}
+                  eyebrow={
+                    <>
+                      最近一次活动
+                      <Text style={{ fontWeight: '900' }}>
+                        {' '}· {formatRecentEventAge(recentOshiEvent.event_date)}
+                      </Text>
+                    </>
+                  }
+                  showStatus={false}
+                  style={{
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: trendBuckets.length > 0 ? 14 : 0,
+                    backgroundColor: colors.accentSoft,
+                    shadowOpacity: 0,
+                    shadowRadius: 0,
+                    elevation: 0,
+                  }}
+                />
+              ) : (
+                <View style={{ borderRadius: 14, padding: 14, backgroundColor: colors.accentSoft }}>
                   <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
                     {periodNoun}范围内没有相关活动
                   </Text>
-                )}
-              </TouchableOpacity>
+                </View>
+              )}
               {trendBuckets.length > 0 ? (
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -1212,11 +1111,24 @@ export default function StatsScreen() {
               支出最高的活动
             </Text>
             {topSpendEvents.length > 0 ? (
-              <SpendRankingList
-                items={topSpendEvents}
-                colors={colors}
-                onPressItem={(entry) => router.push(`/events/${entry.event.id}`)}
-              />
+              <View>
+                {topSpendEvents.map((entry, index) => (
+                  <EventRow
+                    key={entry.event.id}
+                    title={entry.event.title}
+                    subtitle={
+                      <EventRowMetaText>
+                        {entry.event.event_date} · 门票 {formatCurrency(entry.ticketTotal)}
+                        {' + '}特典 {formatCurrency(entry.chekiTotal)}
+                      </EventRowMetaText>
+                    }
+                    trailing={formatCurrency(entry.totalSpend)}
+                    onPress={() => router.push(`/events/${entry.event.id}`)}
+                    isLast={index === topSpendEvents.length - 1}
+                    accessibilityLabel={`查看活动详情：${entry.event.title}，花费 ${formatCurrency(entry.totalSpend)}`}
+                  />
+                ))}
+              </View>
             ) : (
               <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
                 {periodNoun}内没有可统计的支出。
@@ -1292,11 +1204,25 @@ export default function StatsScreen() {
                     expandLabel={(hiddenCount) => `展开其余 ${hiddenCount} 场`}
                     collapseLabel={() => '收起活动'}
                     renderItems={(items) => (
-                      <PerfectEventList
-                        items={items}
-                        colors={colors}
-                        onPressItem={(event) => router.push(`/events/${event.id}`)}
-                      />
+                      <View>
+                        {items.map((event, index) => (
+                          <EventRow
+                            key={event.id}
+                            title={event.title}
+                            subtitle={
+                              <EventRowLocationMeta
+                                date={event.event_date}
+                                city={event.city}
+                                venue={event.venue}
+                              />
+                            }
+                            trailing={`${event.review_score} 分`}
+                            onPress={() => router.push(`/events/${event.id}`)}
+                            isLast={index === items.length - 1}
+                            accessibilityLabel={`查看活动详情：${event.title}，评分 5 分`}
+                          />
+                        ))}
+                      </View>
                     )}
                   />
                 ) : (

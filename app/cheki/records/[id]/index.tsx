@@ -20,9 +20,11 @@ import { formatDate } from '../../../../src/utils/date';
 import { getArtistPrimaryName } from '../../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../../src/utils/avatarSource';
 import { AppIcon } from '../../../../src/components/AppIcon';
+import { EventCard } from '../../../../src/components/EventCard';
 import { ChekiViewerModal } from '../../../../src/components/ChekiViewerModal';
 import { FormSectionLabel } from '../../../../src/components/FormPrimitives';
 import { OshiAvatar } from '../../../../src/components/Oshi';
+import { getEventCardOshiBadge } from '../../../../src/utils/oshiMatch';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 import {
   DEFAULT_CHEKI_SPEC,
@@ -253,18 +255,28 @@ export default function ChekiRecordDetailScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity
-              disabled={!event}
-              onPress={event ? () => router.push(`/events/${event.id}`) : undefined}
-              activeOpacity={0.7}
-              style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <AppIcon name="music" size={15} color={colors.textMuted} />
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
-                {event?.title ?? '未关联活动'}
-              </Text>
-              {event ? <AppIcon name="disclosure" variant="forward" size={14} color={colors.chevron} /> : null}
-            </TouchableOpacity>
+            {event ? (
+              <EventCard
+                event={event}
+                oshiBadge={getEventCardOshiBadge(event.status, null)}
+                variant="compact"
+                style={{
+                  marginTop: 12,
+                  marginBottom: 0,
+                  backgroundColor: colors.cardAlt,
+                  borderWidth: 1,
+                  borderColor: colors.divider,
+                  borderRadius: 15,
+                }}
+              />
+            ) : (
+              <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AppIcon name="music" size={15} color={colors.textMuted} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
+                  未关联活动
+                </Text>
+              </View>
+            )}
             <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <AppIcon name="image" size={15} color={colors.textMuted} />
               <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>

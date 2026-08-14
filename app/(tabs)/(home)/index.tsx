@@ -11,7 +11,10 @@ import {
   useAndroidCollapsibleTabHeader,
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { HomeTimelineEventCard } from '../../../src/components/HomeTimelineEventCard';
-import { HomeCompletedEventCard } from '../../../src/components/HomeCompletedEventCard';
+import {
+  EventRow,
+  EventRowLocationMeta,
+} from '../../../src/components/EventRow';
 import {
   HomeChekiOverviewCard,
   HomeChekiPreview,
@@ -250,7 +253,7 @@ function HomeCardsEmptyState({ onCustomizePress }: { onCustomizePress: () => voi
 
 export default function HomeScreen() {
   const db = useDB();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const isAndroid = Platform.OS === 'android';
   const androidHeader = useAndroidCollapsibleTabHeader();
@@ -526,12 +529,35 @@ export default function HomeScreen() {
             actionLabel="查看全部"
             onActionPress={() => router.push({ pathname: '/events', params: { status: 'completed' } })}
           />
-          {recent.map((event) => (
-            <HomeCompletedEventCard
-              key={event.id}
-              event={event}
-            />
-          ))}
+          <View
+            style={{
+              backgroundColor: colors.card,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.divider,
+              paddingHorizontal: 16,
+              overflow: 'hidden',
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: isDark ? 0.1 : 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
+            {recent.map((event, index) => (
+              <EventRow
+                key={event.id}
+                title={event.title}
+                subtitle={
+                  <EventRowLocationMeta city={event.city} venue={event.venue} />
+                }
+                trailing={event.review_score != null ? `${event.review_score} 分` : undefined}
+                onPress={() => router.push(`/events/${event.id}`)}
+                isLast={index === recent.length - 1}
+                accessibilityLabel={`查看活动详情：${event.title}`}
+              />
+            ))}
+          </View>
         </View>
       );
     }
@@ -625,6 +651,8 @@ export default function HomeScreen() {
     recent,
     router,
     timelineGroups,
+    colors,
+    isDark,
   ]);
   const renderedHomeCards = homeCards.map(renderHomeCard);
   const hasRenderedHomeCards = renderedHomeCards.some(Boolean);

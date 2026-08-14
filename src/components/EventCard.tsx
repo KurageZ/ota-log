@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { TouchableOpacity, View, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Event } from '../types/models';
@@ -14,6 +15,8 @@ interface Props {
   variant?: 'default' | 'compact';
   style?: StyleProp<ViewStyle>;
   tone?: 'default' | 'showcase' | 'showcase-light';
+  eyebrow?: ReactNode;
+  showStatus?: boolean;
 }
 
 export function EventCard({
@@ -22,6 +25,8 @@ export function EventCard({
   variant = 'default',
   style,
   tone = 'default',
+  eyebrow,
+  showStatus = true,
 }: Props) {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
@@ -86,6 +91,20 @@ export function EventCard({
       activeOpacity={0.72}
     >
       <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', gap: isCompact ? 5 : 6 }}>
+        {eyebrow ? (
+          <Text
+            style={{
+              color: colors.accentText,
+              fontSize: 11,
+              lineHeight: 15,
+              fontWeight: '700',
+            }}
+            numberOfLines={1}
+          >
+            {eyebrow}
+          </Text>
+        ) : null}
+
         <Text
           style={{
             color: titleColor,
@@ -139,7 +158,9 @@ export function EventCard({
           </View>
 
           <View style={{ flexShrink: 0, alignItems: 'flex-end', justifyContent: 'center', gap: isCompact ? 5 : 6 }}>
-            <EventStatusChip status={event.status} size={isCompact ? 'sm' : 'md'} tone={tone} />
+            {showStatus ? (
+              <EventStatusChip status={event.status} size={isCompact ? 'sm' : 'md'} tone={tone} />
+            ) : null}
             {event.review_score != null && (
               <EventRatingStars score={event.review_score} size="sm" tone={tone} />
             )}
