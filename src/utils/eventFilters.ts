@@ -84,7 +84,19 @@ export function buildEventDeepLinkState(
   params: EventFilterRouteParams,
   context: { favoriteArtistIds: string[]; oshiArtistId: string | null; selectableArtistIds: string[] },
 ): { hasDeepLink: boolean; keyword: string; filters: EventListFilters } {
-  const rawValues = Object.values(params).flatMap((value) => Array.isArray(value) ? value : [value]);
+  const rawValues = [
+    params.keyword,
+    params.city,
+    params.venue,
+    params.status,
+    params.artist_id,
+    params.year,
+    params.month,
+    params.startDate,
+    params.endDate,
+    params.min_score,
+    params.scope,
+  ].flatMap((value) => Array.isArray(value) ? value : [value]);
   const hasDeepLink = rawValues.some((value) => typeof value === 'string' && value.trim().length > 0);
   const filters = cloneEventListFilters(EMPTY_EVENT_LIST_FILTERS);
 

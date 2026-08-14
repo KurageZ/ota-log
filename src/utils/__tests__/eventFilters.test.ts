@@ -50,6 +50,18 @@ describe('eventFilters', () => {
     expect(result.filters.minScore).toBe(4);
   });
 
+  test('ignores a stats preset left behind after consuming status and date filters', () => {
+    const result = buildEventDeepLinkState({
+      preset: 'month',
+    } as Parameters<typeof buildEventDeepLinkState>[0], {
+      favoriteArtistIds: [],
+      oshiArtistId: null,
+      selectableArtistIds: [],
+    });
+
+    expect(result.hasDeepLink).toBe(false);
+  });
+
   test('preserves an explicit deep-link artist outside the selectable candidates', () => {
     const result = buildEventDeepLinkState({ artist_id: 'artist-without-events' }, {
       favoriteArtistIds: [],
