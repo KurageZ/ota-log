@@ -198,6 +198,55 @@ describe('ArtistRepository artist media metadata support', () => {
     ).toBeUndefined();
   });
 
+  test('findAll falls back to current memberships for parent_id', async () => {
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('member-only', 'Member Only', null, 'person', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('group-only', 'Group Only', null, 'group', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artist_group_memberships
+        (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, NULL, ?, ?)`,
+    ).run(
+      'membership-1', 'member-only', 'group-only',
+      '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+    );
+
+    const artists = await artistRepository.findAll('2026-06-01');
+    const byId = new Map(artists.map((artist) => [artist.id, artist]));
+
+    // 无 basic affiliation 时，parent_id 取当前 membership 的团体
+    expect(byId.get('member-only')?.parent_id).toBe('group-only');
+    // 有 basic affiliation 时仍以 basic affiliation 为准
+    expect(byId.get('artist-member-old')?.parent_id).toBe('artist-1');
+  });
+
+  test('findAll ignores expired memberships when resolving parent_id', async () => {
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('member-only', 'Member Only', null, 'person', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('group-only', 'Group Only', null, 'group', null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    rawDb.prepare(
+      `INSERT INTO artist_group_memberships
+        (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'membership-expired', 'member-only', 'group-only',
+      '2026-01-01', '2026-02-01', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+    );
+
+    const artists = await artistRepository.findAll('2026-06-01');
+    expect(artists.find((artist) => artist.id === 'member-only')?.parent_id).toBeNull();
+  });
+
   test('infers members as people and their direct parent as a group', async () => {
     const inferred = await artistRepository.inferTypeConversion();
 

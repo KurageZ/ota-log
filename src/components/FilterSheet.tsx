@@ -10,27 +10,19 @@ import {
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
-import { withAlpha } from '../utils/color';
 import { Artist } from '../types/models';
-import { ArtistOptionRow } from './ArtistOptionRow';
+import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { BottomSheetActionFooter } from './BottomSheetDialog';
 
 export interface FilterOption {
   value: string;
   label: string;
-  /** 搜索用补充文本；展示仍使用 label */
-  searchText?: string;
-  subtitle?: string;
-  artist?: Artist;
-  parentName?: string;
-  isOshi?: boolean;
 }
 
 /** 分区标题下的一组独立 chip 行；不设置 title 时该组 chips 直接展示 */
@@ -52,7 +44,7 @@ export interface FilterChipGroup {
 export interface FilterSection {
   key: string;
   title: string;
-  options: FilterOption[];
+  options?: FilterOption[];
   value: string | null;
   onChange: (value: string | null) => void;
   values?: string[];
@@ -62,12 +54,26 @@ export interface FilterSection {
   allLabel?: string;
   /** 设置后，该分区顶部显示一个自由文本输入框，options 作为快捷建议 */
   input?: { placeholder?: string };
-  /** 设置后，该分区顶部显示一个搜索框，用于在 options 中本地过滤（单选，value 为选项 value） */
-  search?: { placeholder?: string };
+  /** 设置后，该分区改用共享的 ArtistSearchPicker 渲染艺人选择 */
+  artistSearch?: ArtistSearchSectionConfig;
   /** 标题下方、选择器/已选中区域上方的附加内容（例如批量快捷 chip） */
   beforeContent?: ReactNode;
   /** 设置后，该分区改为渲染多组独立 chip 行，不再渲染 options 的默认 chips */
   chipGroups?: FilterChipGroup[];
+}
+
+export interface ArtistSearchSectionConfig {
+  /** 候选艺人列表（含所属团体），顺序仅作为同档内的稳定序 */
+  artists: Artist[];
+  /** 完整艺人库（含所属团体），用于搜索匹配与所属链解析；候选列表是子集时传入 */
+  lookup?: Artist[];
+  oshiArtistId?: string | null;
+  parentNameMap?: Record<string, string>;
+  placeholder?: string;
+  /** 类型优先：'group' 团体优先，'person' 个人优先，不传/null 不区分类型 */
+  typePreference?: 'group' | 'person' | null;
+  /** 已选但 artists 中不存在对应记录的兜底行（例如已删除的艺人） */
+  extraSelectedRows?: Array<{ id: string; label: string; subtitle?: string }>;
 }
 
 interface FilterSheetProps {
@@ -119,97 +125,6 @@ function Chip({
       >
         {label}
       </Text>
-    </TouchableOpacity>
-  );
-}
-
-function SearchOptionRow({
-  option,
-  label,
-  subtitle,
-  active,
-  isLast,
-  isDark,
-  trailing = 'check',
-  onPress,
-  onTrailingPress,
-}: {
-  option?: FilterOption;
-  label: string;
-  subtitle?: string;
-  active: boolean;
-  isLast: boolean;
-  isDark: boolean;
-  trailing?: 'check' | 'remove';
-  onPress?: () => void;
-  onTrailingPress?: () => void;
-}) {
-  const { colors } = useAppTheme();
-  const selectedColor = colors.accent;
-
-  if (option?.artist) {
-    return (
-      <ArtistOptionRow
-        artist={option.artist}
-        selected={active}
-        isDark={isDark}
-        isLast={isLast}
-        isOshi={Boolean(option.isOshi)}
-        parentName={option.parentName}
-        colors={colors}
-        trailing={active ? trailing : 'none'}
-        onPress={onPress ? () => onPress() : undefined}
-        onTrailingPress={onTrailingPress ? () => onTrailingPress() : undefined}
-      />
-    );
-  }
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      style={{
-        minHeight: 46,
-        paddingHorizontal: 12,
-        paddingVertical: subtitle ? 8 : 11,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: active ? withAlpha(colors.accent, isDark ? 0.18 : 0.1) : colors.card,
-        borderBottomWidth: isLast ? 0 : 1,
-        borderBottomColor: isDark ? colors.inputBorder : colors.cardAlt,
-      }}
-    >
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontSize: 14,
-            fontWeight: active ? '700' : '500',
-            color: active ? selectedColor : colors.text,
-          }}
-        >
-          {label}
-        </Text>
-        {subtitle ? (
-          <Text numberOfLines={1} style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      {active ? (
-        <TouchableOpacity
-          onPress={onTrailingPress}
-          activeOpacity={onTrailingPress ? 0.7 : 1}
-          disabled={!onTrailingPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <AppIcon
-            name={trailing === 'remove' ? 'closeCircle' : 'statusCompleted'}
-            size={16}
-            color={selectedColor}
-          />
-        </TouchableOpacity>
-      ) : null}
     </TouchableOpacity>
   );
 }
@@ -396,29 +311,12 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
             fontSize: 14,
             color: colors.text,
           } as const;
+          const options = section.options ?? [];
 
-          // 搜索型分区：本地过滤 options；已选项单独显示在搜索框上方，候选列表只负责继续选择
           const selectedValues = section.values ?? (section.value != null ? [section.value] : []);
           const selectedSet = new Set(selectedValues);
-          let displayedOptions = section.options;
-          let selectedOptions: FilterOption[] = [];
-          if (section.search) {
-            const query = (drafts[section.key] ?? '').trim().toLowerCase();
-            let matched = query
-              ? section.options.filter((option) =>
-                `${option.label} ${option.searchText ?? ''}`.toLowerCase().includes(query)
-              )
-              : section.options;
-            if (selectedValues.length > 0) {
-              selectedOptions = selectedValues
-                .flatMap((value) => section.options.find((option) => option.value === value) ?? []);
-              matched = matched.filter((option) => !selectedSet.has(option.value));
-            }
-            displayedOptions = matched.slice(0, 40);
-          }
-
           const showAllChip = !section.input;
-          const showSearchList = Boolean(section.search);
+          const showArtistSearch = Boolean(section.artistSearch);
 
           return (
             <View key={section.key} style={{ marginBottom: 18 }}>
@@ -430,9 +328,49 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                 <View style={{ marginBottom: 10 }}>{section.beforeContent}</View>
               ) : null}
 
+              {section.artistSearch ? (
+                <ArtistSearchPicker
+                  artists={section.artistSearch.artists}
+                  lookup={section.artistSearch.lookup}
+                  selectedIds={selectedValues}
+                  oshiArtistId={section.artistSearch.oshiArtistId}
+                  isDark={isDark}
+                  searchValue={drafts[section.key] ?? ''}
+                  onSearchChange={(text) => setDrafts((prev) => ({ ...prev, [section.key]: text }))}
+                  parentNameMap={section.artistSearch.parentNameMap}
+                  placeholder={section.artistSearch.placeholder}
+                  typePreference={section.artistSearch.typePreference}
+                  inputVariant="bottomSheet"
+                  selectedLabel="已选中"
+                  maxHeight={236}
+                  extraSelectedRows={section.artistSearch.extraSelectedRows}
+                  onSelectArtist={(artist) => {
+                    if (section.multiple) {
+                      section.onValuesChange?.([...selectedValues, artist.id]);
+                    } else {
+                      setSectionValue(section, artist.id);
+                    }
+                  }}
+                  onRemoveArtist={(artist) => {
+                    if (section.multiple) {
+                      section.onValuesChange?.(selectedValues.filter((value) => value !== artist.id));
+                    } else {
+                      setSectionValue(section, null);
+                    }
+                  }}
+                  onRemoveExtraSelectedRow={(id) => {
+                    if (section.multiple) {
+                      section.onValuesChange?.(selectedValues.filter((value) => value !== id));
+                    } else {
+                      setSectionValue(section, null);
+                    }
+                  }}
+                />
+              ) : null}
+
               {section.input ? (
                 <BottomSheetTextInput
-                  style={{ ...inputStyle, marginBottom: section.options.length > 0 ? 10 : 0 }}
+                  style={{ ...inputStyle, marginBottom: options.length > 0 ? 10 : 0 }}
                   placeholder={section.input.placeholder}
                   placeholderTextColor={colors.placeholder}
                   value={drafts[section.key] ?? ''}
@@ -454,57 +392,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                 />
               ) : null}
 
-              {section.search && selectedOptions.length > 0 ? (
-                <View style={{ marginBottom: 10 }}>
-                  <Text style={{ marginBottom: 6, fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
-                    已选中
-                  </Text>
-                  <View
-                    style={{
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: colors.inputBorder,
-                      overflow: 'hidden',
-                      backgroundColor: colors.card,
-                    }}
-                  >
-                    {selectedOptions.map((option, index) => (
-                      <SearchOptionRow
-                        key={option.value}
-                        option={option}
-                        label={option.label}
-                        subtitle={option.subtitle}
-                        active
-                        isDark={isDark}
-                        isLast={index === selectedOptions.length - 1}
-                        trailing="remove"
-                        onTrailingPress={() => {
-                          if (section.multiple) {
-                            section.onValuesChange?.(selectedValues.filter((value) => value !== option.value));
-                          } else {
-                            setSectionValue(section, null);
-                          }
-                        }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              {section.search ? (
-                <BottomSheetTextInput
-                  style={{ ...inputStyle, marginBottom: 10 }}
-                  placeholder={section.search.placeholder}
-                  placeholderTextColor={colors.placeholder}
-                  value={drafts[section.key] ?? ''}
-                  onChangeText={(text) => setDrafts((prev) => ({ ...prev, [section.key]: text }))}
-                  clearButtonMode="while-editing"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                />
-              ) : null}
-
-              {section.chipGroups ? (
+              {!showArtistSearch && section.chipGroups ? (
                 <View style={{ gap: 12 }}>
                   {section.chipGroups.map((group) => {
                     const groupSelected = group.values ?? (group.value != null ? [group.value] : []);
@@ -558,63 +446,8 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                     );
                   })}
                 </View>
-              ) : showSearchList ? (
-                <View
-                  style={{
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: colors.inputBorder,
-                    overflow: 'hidden',
-                    maxHeight: 236,
-                    backgroundColor: colors.card,
-                  }}
-                >
-                  <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    <SearchOptionRow
-                      label={section.allLabel ?? '全部'}
-                      active={selectedValues.length === 0}
-                      isDark={isDark}
-                      isLast={displayedOptions.length === 0}
-                      onPress={() => {
-                        if (section.multiple) {
-                          section.onValuesChange?.([]);
-                        } else {
-                          setSectionValue(section, null);
-                        }
-                      }}
-                    />
-                    {displayedOptions.map((option, index) => (
-                      <SearchOptionRow
-                        key={option.value}
-                        option={option}
-                        label={option.label}
-                        subtitle={option.subtitle}
-                        active={selectedSet.has(option.value)}
-                        isDark={isDark}
-                        isLast={index === displayedOptions.length - 1}
-                        onPress={() => {
-                          if (section.multiple) {
-                            const next = selectedSet.has(option.value)
-                              ? selectedValues.filter((value) => value !== option.value)
-                              : [...selectedValues, option.value];
-                            section.onValuesChange?.(next);
-                          } else {
-                            setSectionValue(section, option.value);
-                          }
-                        }}
-                      />
-                    ))}
-                    {displayedOptions.length === 0 ? (
-                      <View style={{ padding: 14, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 13, color: colors.textMuted }}>
-                          没有找到匹配项
-                        </Text>
-                      </View>
-                    ) : null}
-                  </ScrollView>
-                </View>
-              ) : displayedOptions.length > 0 || showAllChip ? (
-                // 限制最多三行（chip 34 + gap 8），超出部分裁掉，靠搜索/输入找其余项
+              ) : !showArtistSearch && (options.length > 0 || showAllChip) ? (
+                // 限制最多三行（chip 34 + gap 8），超出部分裁掉，靠输入找其余项
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                   {showAllChip ? (
                     <Chip
@@ -627,7 +460,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                       }}
                     />
                   ) : null}
-                  {displayedOptions.map((option) => {
+                  {options.map((option) => {
                     const active = section.multiple ? selectedSet.has(option.value) : section.value === option.value;
                     return (
                       <Chip

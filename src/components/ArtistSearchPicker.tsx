@@ -2,7 +2,8 @@ import { ReactNode, useMemo, useState } from 'react';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Artist } from '../types/models';
-import { filterArtistsByQuery } from '../utils/filter';
+import { filterArtistsByQuery, sortArtistsByPreference } from '../utils/filter';
+import type { ArtistTypePreference } from '../utils/filter';
 import { ArtistDisplayMode } from '../utils/artistDisplay';
 import { useAppTheme } from '../theme/appTheme';
 import { AppIcon } from './AppIcon';
@@ -35,8 +36,14 @@ export function ArtistSearchPicker({
   hideSelectedFromCandidates = true,
   displayMode = 'compact',
   inputVariant = 'plain',
+  extraSelectedRows,
+  onRemoveExtraSelectedRow,
+  typePreference,
+  lookup,
 }: {
   artists: Artist[];
+  /** 完整的艺人库（含所属团体），用于搜索匹配与所属链解析；候选列表是子集时传入 */
+  lookup?: Artist[];
   selectedIds?: Set<string> | string[];
   selectedArtists?: Artist[];
   oshiArtistId?: string | null;
@@ -59,6 +66,11 @@ export function ArtistSearchPicker({
   hideSelectedFromCandidates?: boolean;
   displayMode?: ArtistDisplayMode;
   inputVariant?: 'plain' | 'bottomSheet';
+  /** 已选但无法在 artists 中解析为 Artist 的兜底行（例如已删除的艺人） */
+  extraSelectedRows?: Array<{ id: string; label: string; subtitle?: string }>;
+  onRemoveExtraSelectedRow?: (id: string) => void;
+  /** 类型优先：'group' 团体优先，'person' 个人优先，不传/null 不区分类型 */
+  typePreference?: ArtistTypePreference;
 }) {
   const { colors } = useAppTheme();
   const [showAllSelected, setShowAllSelected] = useState(false);
@@ -72,8 +84,13 @@ export function ArtistSearchPicker({
     return artists.filter((artist) => selectedSet.has(artist.id));
   }, [artists, selectedArtists, selectedSet]);
   const filteredArtists = useMemo(
-    () => filterArtistsByQuery(artists, searchValue, oshiArtistId),
-    [artists, oshiArtistId, searchValue],
+    () => sortArtistsByPreference(
+      filterArtistsByQuery(artists, searchValue, oshiArtistId, lookup),
+      oshiArtistId,
+      typePreference,
+      lookup,
+    ),
+    [artists, lookup, oshiArtistId, searchValue, typePreference],
   );
   const candidateArtists = useMemo(
     () => hideSelectedFromCandidates
@@ -85,12 +102,13 @@ export function ArtistSearchPicker({
     ? resolvedSelectedArtists
     : resolvedSelectedArtists.slice(0, maxVisibleSelected);
   const hiddenSelectedCount = resolvedSelectedArtists.length - visibleSelectedArtists.length;
+  const hasExtraSelectedRows = Boolean(extraSelectedRows && extraSelectedRows.length > 0);
   const trimmedSearch = searchValue.trim();
   const candidateRenderLimit = renderLimit ?? (trimmedSearch ? 80 : 32);
 
   return (
     <View>
-      {resolvedSelectedArtists.length > 0 ? (
+      {resolvedSelectedArtists.length > 0 || hasExtraSelectedRows ? (
         <View style={{ marginBottom: 10 }}>
           {selectedLabel ? (
             <Text style={{ marginBottom: 6, fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
@@ -109,7 +127,7 @@ export function ArtistSearchPicker({
                 artist={artist}
                 selected
                 isDark={isDark}
-                isLast={index === visibleSelectedArtists.length - 1 && hiddenSelectedCount === 0}
+                isLast={index === visibleSelectedArtists.length - 1 && hiddenSelectedCount === 0 && !hasExtraSelectedRows}
                 isOshi={artist.id === oshiArtistId}
                 parentName={artist.parent_id ? parentNameMap?.[artist.parent_id] : undefined}
                 colors={colors}
@@ -117,6 +135,46 @@ export function ArtistSearchPicker({
                 trailing="remove"
                 onTrailingPress={onRemoveArtist}
               />
+            ))}
+            {extraSelectedRows?.map((row, index) => (
+              <View
+                key={row.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  minHeight: 48,
+                  paddingHorizontal: 12,
+                  paddingVertical: 9,
+                  backgroundColor: colors.card,
+                  borderBottomWidth: index === extraSelectedRows.length - 1 && hiddenSelectedCount === 0 ? 0 : 1,
+                  borderBottomColor: isDark ? colors.inputBorder : colors.cardAlt,
+                }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: 14, fontWeight: '500', color: colors.text }}
+                  >
+                    {row.label}
+                  </Text>
+                  {row.subtitle ? (
+                    <Text
+                      numberOfLines={1}
+                      style={{ marginTop: 1, fontSize: 12, color: colors.textSecondary }}
+                    >
+                      {row.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  onPress={onRemoveExtraSelectedRow ? () => onRemoveExtraSelectedRow(row.id) : undefined}
+                  activeOpacity={onRemoveExtraSelectedRow ? 0.7 : 1}
+                  disabled={!onRemoveExtraSelectedRow}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <AppIcon name="closeCircle" size={16} color={colors.accent} />
+                </TouchableOpacity>
+              </View>
             ))}
             {hiddenSelectedCount > 0 ? (
               <TouchableOpacity

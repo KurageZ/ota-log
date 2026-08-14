@@ -756,6 +756,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           selectedIds={artistIdSet}
           oshiArtistId={oshiArtistId}
           isDark={isDark}
+          typePreference="group"
           searchValue={artistSearch}
           onSearchChange={setArtistSearch}
           parentNameMap={artistNameMap}

@@ -647,6 +647,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
               selectedIds={selectedArtistSet}
               oshiArtistId={oshiArtistId}
               isDark={isDark}
+              typePreference={quickPreset === 'firstCheki' ? 'person' : quickPreset === 'firstLive' ? 'group' : undefined}
               searchValue={artistSearch}
               onSearchChange={setArtistSearch}
               placeholder="搜索艺人..."

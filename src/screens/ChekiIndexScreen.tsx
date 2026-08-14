@@ -37,7 +37,7 @@ import { FilterSheet, FilterSection, type FilterChipGroup, type FilterOption } f
 import { ChekiDatePicker, type ChekiDatePickerMode } from '../components/ChekiDatePicker';
 import { FilteredEmptyState } from '../components/FilteredEmptyState';
 import { AppIcon, getAppIconSFSymbol } from '../components/AppIcon';
-import { getArtistSearchText, sortArtistsWithOshi } from '../utils/filter';
+import { getArtistSearchText } from '../utils/filter';
 import { withAlpha } from '../utils/color';
 import { measureImageTransitionOrigin } from '../utils/imageTransition';
 import {
@@ -935,32 +935,21 @@ export default function ChekiLibraryScreen() {
       chipGroups: otherGroups,
     });
 
-    // 艺人：单推 / 收藏艺人快捷 chip 放在选择器上方
+    // 艺人：单推 / 收藏艺人快捷 chip 放在选择器上方；选择器复用共享 ArtistSearchPicker
     const oshiSelected = Boolean(oshiArtistId && draftArtistIds.includes(oshiArtistId));
     const favoritesSelected = favoriteArtistIds.length > 0 && favoriteArtistIds.every((id) => draftArtistIds.includes(id));
-    const selectableArtistsById = new Map(distinctArtists.map((artist) => [artist.id, artist]));
+    const artistSearchArtists = [...distinctArtists];
+    const artistSearchArtistIds = new Set(artistSearchArtists.map((artist) => artist.id));
     for (const artistId of draftArtistIds) {
       const selectedArtist = artistMap.get(artistId);
-      if (selectedArtist) selectableArtistsById.set(artistId, selectedArtist);
-    }
-    const artistOptions: FilterOption[] = sortArtistsWithOshi([...selectableArtistsById.values()], oshiArtistId)
-      .map((artist) => {
-        const label = getArtistPrimaryName(artist);
-        return {
-          value: artist.id,
-          label,
-          searchText: getArtistSearchText(artist, artistMap),
-          subtitle: label !== artist.name ? artist.name : undefined,
-          artist,
-          parentName: artist.parent_id ? artistMap.get(artist.parent_id)?.short_name || artistMap.get(artist.parent_id)?.name : undefined,
-          isOshi: artist.id === oshiArtistId,
-        };
-      });
-    for (const artistId of draftArtistIds) {
-      if (!artistMap.has(artistId)) {
-        artistOptions.push({ value: artistId, label: '未知艺人', searchText: '未知艺人' });
+      if (selectedArtist && !artistSearchArtistIds.has(selectedArtist.id)) {
+        artistSearchArtistIds.add(selectedArtist.id);
+        artistSearchArtists.push(selectedArtist);
       }
     }
+    const missingSelectedArtistRows = draftArtistIds
+      .filter((artistId) => !artistMap.has(artistId))
+      .map((artistId) => ({ id: artistId, label: '未知艺人' }));
     result.push({
       key: 'artist',
       title: '艺人',
@@ -969,8 +958,6 @@ export default function ChekiLibraryScreen() {
       multiple: true,
       onChange: (value) => setDraftArtistIds(value ? [value] : []),
       onValuesChange: setDraftArtistIds,
-      allLabel: '全部艺人',
-      search: { placeholder: '搜索艺人…' },
       beforeContent: (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity
@@ -1013,7 +1000,15 @@ export default function ChekiLibraryScreen() {
           </TouchableOpacity>
         </View>
       ),
-      options: artistOptions,
+      artistSearch: {
+        artists: artistSearchArtists,
+        lookup: [...artistMap.values()],
+        oshiArtistId,
+        parentNameMap: artistNameMap,
+        placeholder: '搜索艺人…',
+        typePreference: 'person',
+        extraSelectedRows: missingSelectedArtistRows,
+      },
     });
     // 活动筛选仅经深链带入，这里给出可清除的 chip
     if (isRecordMode && recordFilterDraft.eventId) {

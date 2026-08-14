@@ -1,6 +1,7 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ComponentType, ForwardedRef, ReactNode } from 'react';
 import { View } from 'react-native';
+import type { Artist } from '../../types/models';
 import { FilterSheet, type FilterSection } from '../FilterSheet';
 
 const mockPresent = jest.fn();
@@ -95,6 +96,30 @@ jest.mock('../AppIcon', () => ({
 jest.mock('../ArtistOptionRow', () => ({
   ArtistOptionRow: () => null,
 }));
+
+const mockArtistSearchPicker = jest.fn();
+jest.mock('../ArtistSearchPicker', () => ({
+  ArtistSearchPicker: (props: unknown) => {
+    mockArtistSearchPicker(props);
+    return null;
+  },
+}));
+
+function artist(id: string, name: string): Artist {
+  return {
+    id,
+    name,
+    short_name: null,
+    artist_type: null,
+    parent_id: null,
+    avatar_uri: null,
+    background_uri: null,
+    background_color: null,
+    url: null,
+    is_favorite: 0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+}
 
 describe('FilterSheet', () => {
   const sections: FilterSection[] = [
@@ -554,5 +579,96 @@ describe('FilterSheet', () => {
     });
 
     expect(renderer.root.findByProps({ accessibilityLabel: '快捷内容' })).toBeTruthy();
+  });
+
+  test('renders artist section through ArtistSearchPicker and wires selection callbacks', () => {
+    mockArtistSearchPicker.mockClear();
+    const onValuesChange = jest.fn();
+    act(() => {
+      renderer = create(
+        <FilterSheet
+          visible
+          sections={[{
+            key: 'artist',
+            title: '艺人',
+            value: null,
+            values: ['a1'],
+            multiple: true,
+            onChange: jest.fn(),
+            onValuesChange,
+            artistSearch: {
+              artists: [artist('a1', '艺人A'), artist('a2', '艺人B')],
+              oshiArtistId: 'a1',
+              parentNameMap: {},
+              placeholder: '搜索艺人…',
+              typePreference: 'person',
+              extraSelectedRows: [{ id: 'deleted', label: '未知艺人' }],
+            },
+          }]}
+          isDark={false}
+          onReset={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+    });
+
+    const props = mockArtistSearchPicker.mock.calls[0][0] as {
+      artists: Artist[];
+      selectedIds: string[];
+      oshiArtistId: string | null;
+      typePreference: 'group' | 'person' | null;
+      extraSelectedRows: Array<{ id: string; label: string }>;
+      onSelectArtist: (item: Artist) => void;
+      onRemoveArtist: (item: Artist) => void;
+      onRemoveExtraSelectedRow: (id: string) => void;
+    };
+    expect(props.artists.map((item) => item.id)).toEqual(['a1', 'a2']);
+    expect(props.selectedIds).toEqual(['a1']);
+    expect(props.oshiArtistId).toBe('a1');
+    expect(props.typePreference).toBe('person');
+    expect(props.extraSelectedRows).toEqual([{ id: 'deleted', label: '未知艺人' }]);
+
+    act(() => props.onSelectArtist(artist('a2', '艺人B')));
+    expect(onValuesChange).toHaveBeenCalledWith(['a1', 'a2']);
+  });
+
+  test('artist section removal updates values through FilterSheet', () => {
+    mockArtistSearchPicker.mockClear();
+    const onValuesChange = jest.fn();
+    const section: FilterSection = {
+      key: 'artist',
+      title: '艺人',
+      value: null,
+      values: ['a1', 'deleted'],
+      multiple: true,
+      onChange: jest.fn(),
+      onValuesChange,
+      artistSearch: {
+        artists: [artist('a1', '艺人A')],
+        oshiArtistId: null,
+        extraSelectedRows: [{ id: 'deleted', label: '未知艺人' }],
+      },
+    };
+    act(() => {
+      renderer = create(
+        <FilterSheet
+          visible
+          sections={[section]}
+          isDark={false}
+          onReset={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+    });
+
+    const props = mockArtistSearchPicker.mock.calls[0][0] as {
+      onRemoveArtist: (item: Artist) => void;
+      onRemoveExtraSelectedRow: (id: string) => void;
+    };
+    act(() => props.onRemoveArtist(artist('a1', '艺人A')));
+    expect(onValuesChange).toHaveBeenCalledWith(['deleted']);
+
+    act(() => props.onRemoveExtraSelectedRow('deleted'));
+    expect(onValuesChange).toHaveBeenCalledWith(['a1']);
   });
 });

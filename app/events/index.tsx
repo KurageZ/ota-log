@@ -26,7 +26,6 @@ import { AppIcon } from '../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import type { EventFilter } from '../../src/repositories/EventRepository';
 import { buildEventMonthSections } from '../../src/utils/eventSections';
-import { getArtistSearchText, sortArtistsWithOshi } from '../../src/utils/filter';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
 const EVENT_FILTER_HISTORY_STORAGE_KEY = 'ota-log.events-filter-history.v1';
@@ -289,6 +288,10 @@ export default function EventsIndexScreen() {
   const scopeParam = params.scope === 'favorite' || params.scope === 'oshi' ? params.scope : undefined;
   const selectedArtistIds = useMemo(() => parseArtistIdsParam(params.artist_id), [params.artist_id]);
   const artistMap = useMemo(() => new Map(artists.map((artist) => [artist.id, artist])), [artists]);
+  const artistParentNameMap = useMemo(
+    () => Object.fromEntries([...artistMap.values()].map((artist) => [artist.id, getArtistPrimaryName(artist)])),
+    [artistMap],
+  );
   const hasRepositoryFilter = Boolean(
     params.city || params.venue || params.status || selectedArtistIds.length > 0 ||
     yearNum || (startDate && endDate) || minScoreNum || scopeParam || debouncedKeyword.trim()
@@ -505,20 +508,13 @@ export default function EventsIndexScreen() {
       multiple: true,
       onChange: (value) => router.setParams({ artist_id: value ?? '' }),
       onValuesChange: (values) => router.setParams({ artist_id: serializeArtistIdsParam(values) }),
-      allLabel: '全部艺人',
-      search: { placeholder: '搜索艺人…' },
-      options: sortArtistsWithOshi(artists, oshiArtistId).map((artist) => {
-        const label = getArtistPrimaryName(artist);
-        return {
-          value: artist.id,
-          label,
-          searchText: getArtistSearchText(artist, artistMap),
-          subtitle: label !== artist.name ? artist.name : undefined,
-          artist,
-          parentName: artist.parent_id ? artistMap.get(artist.parent_id)?.short_name || artistMap.get(artist.parent_id)?.name : undefined,
-          isOshi: artist.id === oshiArtistId,
-        };
-      }),
+      artistSearch: {
+        artists,
+        oshiArtistId,
+        parentNameMap: artistParentNameMap,
+        placeholder: '搜索艺人…',
+        typePreference: 'group',
+      },
     });
 
     result.push({
@@ -550,7 +546,7 @@ export default function EventsIndexScreen() {
     monthNum,
     params.city,
     params.venue,
-    artistMap,
+    artistParentNameMap,
     router,
     scopeParam,
     selectedArtistIds,

@@ -135,6 +135,7 @@ export default function OshiSettingsScreen() {
             selectedIds={selectedArtistId ? [selectedArtistId] : []}
             oshiArtistId={selectedArtistId}
             isDark={isDark}
+            typePreference="person"
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
             placeholder="搜索艺人设置单推"

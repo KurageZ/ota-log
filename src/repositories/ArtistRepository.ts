@@ -8,7 +8,7 @@ import {
   CreateArtistInput,
 } from '../types/models';
 import { generateId } from '../utils/uuid';
-import { isValidISODate, toISODateTime } from '../utils/date';
+import { isValidISODate, toISODate, toISODateTime } from '../utils/date';
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 import { analyzeArtistTypeConversionGraph } from '../utils/artistTypeConversion';
 
@@ -67,13 +67,24 @@ export class ArtistRepository {
     }
   }
 
-  async findAll(): Promise<Artist[]> {
+  async findAll(date = toISODate(new Date())): Promise<Artist[]> {
     return this.db.getAllAsync<Artist>(
-      `SELECT a.*, affiliation.parent_artist_id AS parent_id
+      `SELECT a.*,
+              COALESCE(
+                affiliation.parent_artist_id,
+                (SELECT membership.group_artist_id
+                 FROM artist_group_memberships membership
+                 WHERE membership.person_artist_id = a.id
+                   AND (membership.start_date IS NULL OR membership.start_date <= ?)
+                   AND (membership.end_date IS NULL OR membership.end_date >= ?)
+                 ORDER BY membership.start_date DESC, membership.created_at ASC, membership.group_artist_id
+                 LIMIT 1)
+              ) AS parent_id
        FROM artists a
        LEFT JOIN artist_basic_affiliations affiliation
          ON affiliation.member_artist_id = a.id
-       ORDER BY a.name ASC`
+       ORDER BY a.name ASC`,
+      [date, date],
     );
   }
 

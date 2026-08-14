@@ -795,6 +795,7 @@ export function ChekiRecordForm({
                 selectedArtists={selectedArtist ? [selectedArtist] : []}
                 oshiArtistId={oshiArtistId}
                 isDark={isDark}
+                typePreference="person"
                 searchValue={artistSearch}
                 onSearchChange={setArtistSearch}
                 onSelectArtist={(artist) => {

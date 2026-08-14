@@ -1,5 +1,10 @@
 import { Artist } from '../../types/models';
-import { filterArtistsByQuery, getArtistSearchText, sortArtistsWithOshi } from '../filter';
+import {
+  filterArtistsByQuery,
+  getArtistSearchText,
+  sortArtistsByPreference,
+  sortArtistsWithOshi,
+} from '../filter';
 
 function artist(input: Partial<Artist> & Pick<Artist, 'id' | 'name'>): Artist {
   return {
@@ -26,6 +31,180 @@ describe('artist filtering', () => {
 
     expect(sortArtistsWithOshi(artists, 'oshi').map((item) => item.id)).toEqual(['oshi', 'first', 'last']);
     expect(artists.map((item) => item.id)).toEqual(['first', 'oshi', 'last']);
+  });
+
+  test('sortArtistsByPreference promotes oshi and its parent group above favorites and their groups', () => {
+    const artists = [
+      artist({ id: 'oshi', name: 'Oshi', parent_id: 'oshiGroup' }),
+      artist({ id: 'oshiGroup', name: 'Oshi Group' }),
+      artist({ id: 'fav', name: 'Fav', is_favorite: 1, parent_id: 'favGroup' }),
+      artist({ id: 'favGroup', name: 'Fav Group' }),
+      artist({ id: 'other1', name: 'Other 1' }),
+      artist({ id: 'other2', name: 'Other 2' }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi').map((item) => item.id)).toEqual([
+      'oshi',
+      'oshiGroup',
+      'fav',
+      'favGroup',
+      'other1',
+      'other2',
+    ]);
+  });
+
+  test('sortArtistsByPreference follows the full parent chain of oshi and favorites', () => {
+    const artists = [
+      artist({ id: 'other', name: 'Other' }),
+      artist({ id: 'oshi', name: 'Oshi', parent_id: 'group' }),
+      artist({ id: 'group', name: 'Group', parent_id: 'agency' }),
+      artist({ id: 'agency', name: 'Agency' }),
+      artist({ id: 'fav', name: 'Fav', is_favorite: 1, parent_id: 'favGroup' }),
+      artist({ id: 'favGroup', name: 'Fav Group', parent_id: 'favAgency' }),
+      artist({ id: 'favAgency', name: 'Fav Agency' }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi').map((item) => item.id)).toEqual([
+      'oshi',
+      'group',
+      'agency',
+      'fav',
+      'favGroup',
+      'favAgency',
+      'other',
+    ]);
+  });
+
+  test('sortArtistsByPreference does not promote members of a favorite group', () => {
+    const artists = [
+      artist({ id: 'other', name: 'Other' }),
+      artist({ id: 'member', name: 'Member', parent_id: 'favGroup' }),
+      artist({ id: 'favGroup', name: 'Fav Group', is_favorite: 1 }),
+    ];
+
+    expect(sortArtistsByPreference(artists).map((item) => item.id)).toEqual([
+      'favGroup',
+      'other',
+      'member',
+    ]);
+  });
+
+  test('sortArtistsByPreference preserves the original order without oshi or favorites', () => {
+    const artists = [
+      artist({ id: 'first', name: 'First' }),
+      artist({ id: 'second', name: 'Second' }),
+    ];
+
+    expect(sortArtistsByPreference(artists).map((item) => item.id)).toEqual(['first', 'second']);
+  });
+
+  test('sortArtistsByPreference with group priority puts oshi, oshi group, favorite groups, other groups, then persons', () => {
+    const artists = [
+      artist({ id: 'otherGroup', name: 'Other Group', artist_type: 'group' }),
+      artist({ id: 'otherPerson', name: 'Other Person', artist_type: 'person' }),
+      artist({ id: 'oshi', name: 'Oshi', artist_type: 'person', parent_id: 'oshiGroup', is_favorite: 1 }),
+      artist({ id: 'oshiGroup', name: 'Oshi Group', artist_type: 'group' }),
+      artist({ id: 'favGroup', name: 'Fav Group', artist_type: 'group', parent_id: 'favAgency', is_favorite: 1 }),
+      artist({ id: 'favAgency', name: 'Fav Agency', artist_type: 'group' }),
+      artist({ id: 'favPerson', name: 'Fav Person', artist_type: 'person', parent_id: 'favGroup', is_favorite: 1 }),
+      artist({ id: 'unset', name: 'Unset', artist_type: null }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi', 'group').map((item) => item.id)).toEqual([
+      'oshi',
+      'oshiGroup',
+      'favGroup',
+      'favAgency',
+      'otherGroup',
+      'favPerson',
+      'otherPerson',
+      'unset',
+    ]);
+  });
+
+  test('sortArtistsByPreference infers untyped artists from parent relations in group mode', () => {
+    const artists = [
+      artist({ id: 'oshi', name: 'Oshi', artist_type: 'person' }),
+      artist({ id: 'untypedGroup', name: 'Untyped Group', artist_type: null }),
+      artist({ id: 'untypedMember', name: 'Untyped Member', artist_type: null, parent_id: 'untypedGroup' }),
+      artist({ id: 'typedPerson', name: 'Typed Person', artist_type: 'person' }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi', 'group').map((item) => item.id)).toEqual([
+      'oshi',
+      'untypedGroup',
+      'untypedMember',
+      'typedPerson',
+    ]);
+  });
+
+  test('sortArtistsByPreference infers untyped artists from parent relations in person mode', () => {
+    const artists = [
+      artist({ id: 'oshi', name: 'Oshi', artist_type: 'person' }),
+      artist({ id: 'untypedMember', name: 'Untyped Member', artist_type: null, parent_id: 'untypedGroup' }),
+      artist({ id: 'typedPerson', name: 'Typed Person', artist_type: 'person' }),
+      artist({ id: 'untypedGroup', name: 'Untyped Group', artist_type: null }),
+      artist({ id: 'member', name: 'Member', artist_type: 'person', parent_id: 'untypedGroup' }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi', 'person').map((item) => item.id)).toEqual([
+      'oshi',
+      'untypedMember',
+      'typedPerson',
+      'member',
+      'untypedGroup',
+    ]);
+  });
+
+  test('filterArtistsByQuery matches parent-group names through a separate lookup', () => {
+    const candidates = [
+      artist({ id: 'member', name: '小美', parent_id: 'group' }),
+    ];
+    const lookup = [
+      artist({ id: 'member', name: '小美', parent_id: 'group' }),
+      artist({ id: 'group', name: '超级团体' }),
+    ];
+
+    expect(filterArtistsByQuery(candidates, '超级团体', null, lookup).map((item) => item.id)).toEqual(['member']);
+    expect(filterArtistsByQuery(candidates, '超级团体').map((item) => item.id)).toEqual([]);
+  });
+
+  test('sortArtistsByPreference resolves favorite chains through a separate lookup', () => {
+    const candidates = [
+      artist({ id: 'group', name: 'Fav Person Group', artist_type: 'group' }),
+      artist({ id: 'otherGroup', name: 'Other Group', artist_type: 'group' }),
+    ];
+    const lookup = [
+      ...candidates,
+      artist({ id: 'favPerson', name: 'Fav Person', artist_type: 'person', parent_id: 'group', is_favorite: 1 }),
+    ];
+
+    expect(sortArtistsByPreference(candidates, null, 'group', lookup).map((item) => item.id)).toEqual([
+      'group',
+      'otherGroup',
+    ]);
+  });
+
+  test('sortArtistsByPreference with person priority puts oshi, favorite persons, other persons, then groups', () => {
+    const artists = [
+      artist({ id: 'oshi', name: 'Oshi', artist_type: 'person', parent_id: 'oshiGroup', is_favorite: 1 }),
+      artist({ id: 'oshiGroup', name: 'Oshi Group', artist_type: 'group' }),
+      artist({ id: 'favPerson', name: 'Fav Person', artist_type: 'person', is_favorite: 1 }),
+      artist({ id: 'favGroup', name: 'Fav Group', artist_type: 'group', is_favorite: 1 }),
+      artist({ id: 'otherPerson', name: 'Other Person', artist_type: 'person' }),
+      artist({ id: 'otherGroup', name: 'Other Group', artist_type: 'group' }),
+      artist({ id: 'unset', name: 'Unset', artist_type: null }),
+    ];
+
+    expect(sortArtistsByPreference(artists, 'oshi', 'person').map((item) => item.id)).toEqual([
+      'oshi',
+      'favPerson',
+      'otherPerson',
+      'oshiGroup',
+      'favGroup',
+      'otherGroup',
+      'unset',
+    ]);
   });
 
   test('search text includes recursive parent groups', () => {

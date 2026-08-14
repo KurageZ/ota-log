@@ -168,6 +168,7 @@ export default function WidgetSettingsScreen() {
             selectedIds={selectedArtistIds}
             oshiArtistId={oshiArtistId}
             isDark={isDark}
+            typePreference="person"
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
             placeholder="搜索要展示的艺人"
