@@ -193,6 +193,13 @@ export default function SettingsScreen() {
               onPress={() => router.push('/settings/features')}
             />
             <MenuItem
+              icon="calendar"
+              label="日历"
+              subtitle="周起始日与月视图展示"
+              tint={preferenceTint}
+              onPress={() => router.push('/settings/calendar')}
+            />
+            <MenuItem
               icon="filter"
               label="首页自定义"
               subtitle="调整首页卡片顺序和显示内容"

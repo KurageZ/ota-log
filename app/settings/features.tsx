@@ -5,7 +5,6 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { SectionLabel, SettingsChoiceCard } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
-import { AppCalendarDefaultView, APP_CALENDAR_DEFAULT_VIEW_LABELS } from '../../src/theme/config';
 import { UserConfig, ArtistConfirmationMode } from '../../src/types/models';
 import {
   CHEKI_BROWSE_MODE_LABELS,
@@ -30,19 +29,17 @@ import {
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
-const CALENDAR_VIEW_OPTIONS: AppCalendarDefaultView[] = ['month', 'timeline'];
 const CHEKI_DEFAULT_VIEW_OPTIONS: ChekiBrowseMode[] = ['album', 'record'];
 const STATS_DEFAULT_PERIOD_OPTIONS: StatsDefaultPeriodPreset[] = ['week', 'month', 'year'];
 const ARTIST_CONFIRMATION_OPTIONS: ArtistConfirmationMode[] = ['always', 'matches_only', 'never'];
 
 export default function FeatureSettingsScreen() {
-  const { colors, calendarDefaultView, setCalendarDefaultView } = useAppTheme();
+  const { colors } = useAppTheme();
   const db = useDB();
 
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [chekiViewPreferences, setChekiViewPreferences] = useState<ChekiViewPreferences | null>(null);
   const [statsPreferences, setStatsPreferences] = useState<StatsPreferences | null>(null);
-  const [pendingCalendarDefaultView, setPendingCalendarDefaultView] = useState<AppCalendarDefaultView | null>(null);
   const [pendingChekiDefaultView, setPendingChekiDefaultView] = useState<ChekiBrowseMode | null>(null);
   const [pendingStatsDefaultPeriod, setPendingStatsDefaultPeriod] = useState<StatsDefaultPeriodPreset | null>(null);
   const [pendingArtistConfirmationMode, setPendingArtistConfirmationMode] = useState<ArtistConfirmationMode | null>(null);
@@ -63,23 +60,6 @@ export default function FeatureSettingsScreen() {
       reloadContext();
     }, [reloadContext]),
   );
-
-  const handleSelectCalendarDefaultView = async (nextView: AppCalendarDefaultView) => {
-    if (nextView === calendarDefaultView || pendingCalendarDefaultView) return;
-
-    setPendingCalendarDefaultView(nextView);
-    try {
-      await setCalendarDefaultView(nextView);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存日历默认视图。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingCalendarDefaultView(null);
-    }
-  };
 
   const handleSelectChekiDefaultView = async (nextView: ChekiBrowseMode) => {
     if (!chekiViewPreferences || nextView === chekiViewPreferences.defaultBrowseMode || pendingChekiDefaultView) return;
@@ -164,17 +144,6 @@ export default function FeatureSettingsScreen() {
           pending={pendingStatsDefaultPeriod}
           labelOf={(option) => STATS_DEFAULT_PERIOD_LABELS[option]}
           onSelect={handleSelectStatsDefaultPeriod}
-        />
-
-        <View style={{ height: 16 }} />
-
-        <SectionLabel label="日历默认视图" />
-        <SettingsChoiceCard
-          options={CALENDAR_VIEW_OPTIONS}
-          value={pendingCalendarDefaultView ?? calendarDefaultView}
-          pending={pendingCalendarDefaultView}
-          labelOf={(option) => APP_CALENDAR_DEFAULT_VIEW_LABELS[option]}
-          onSelect={handleSelectCalendarDefaultView}
         />
 
         <View style={{ height: 16 }} />

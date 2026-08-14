@@ -2,10 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppAppearance,
-  AppCalendarDefaultView,
+  AppCalendarWeekStart,
   AppThemeId,
+  CalendarDisplayOptions,
   DEFAULT_APPEARANCE,
-  DEFAULT_CALENDAR_DEFAULT_VIEW,
+  DEFAULT_CALENDAR_DISPLAY,
+  DEFAULT_CALENDAR_WEEK_START,
   DEFAULT_THEME_ID,
 } from './config';
 
@@ -14,20 +16,23 @@ const STORAGE_KEY = 'ota-log.theme-preferences.v1';
 export interface ThemePreferences {
   themeId: AppThemeId;
   appearance: AppAppearance;
-  calendarDefaultView: AppCalendarDefaultView;
+  calendarWeekStart: AppCalendarWeekStart;
+  calendarDisplay: CalendarDisplayOptions;
 }
 
 interface ThemePreferencesContextValue extends ThemePreferences {
   isHydrated: boolean;
   setAppearance: (appearance: AppAppearance) => Promise<void>;
-  setCalendarDefaultView: (view: AppCalendarDefaultView) => Promise<void>;
+  setCalendarWeekStart: (weekStart: AppCalendarWeekStart) => Promise<void>;
+  setCalendarDisplay: (display: CalendarDisplayOptions) => Promise<void>;
   setThemeId: (themeId: AppThemeId) => Promise<void>;
 }
 
 const defaultPreferences: ThemePreferences = {
   themeId: DEFAULT_THEME_ID,
   appearance: DEFAULT_APPEARANCE,
-  calendarDefaultView: DEFAULT_CALENDAR_DEFAULT_VIEW,
+  calendarWeekStart: DEFAULT_CALENDAR_WEEK_START,
+  calendarDisplay: DEFAULT_CALENDAR_DISPLAY,
 };
 
 const ThemePreferencesContext = createContext<ThemePreferencesContextValue | null>(null);
@@ -40,8 +45,8 @@ function isAppearance(value: unknown): value is AppAppearance {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
-function isCalendarDefaultView(value: unknown): value is AppCalendarDefaultView {
-  return value === 'month' || value === 'timeline';
+function isCalendarWeekStart(value: unknown): value is AppCalendarWeekStart {
+  return value === 'sunday' || value === 'monday';
 }
 
 function parseStoredPreferences(rawValue: string | null): ThemePreferences {
@@ -60,14 +65,32 @@ function parseStoredPreferences(rawValue: string | null): ThemePreferences {
     const appearance = 'appearance' in parsed && isAppearance(parsed.appearance)
       ? parsed.appearance
       : DEFAULT_APPEARANCE;
-    const rawCalendarDefaultView = 'calendarDefaultView' in parsed ? parsed.calendarDefaultView : undefined;
-    const calendarDefaultView = rawCalendarDefaultView === 'chekiMonth'
-      ? 'month'
-      : isCalendarDefaultView(rawCalendarDefaultView)
-        ? rawCalendarDefaultView
-        : DEFAULT_CALENDAR_DEFAULT_VIEW;
+    const rawCalendarWeekStart = 'calendarWeekStart' in parsed ? parsed.calendarWeekStart : undefined;
+    const calendarWeekStart = isCalendarWeekStart(rawCalendarWeekStart)
+      ? rawCalendarWeekStart
+      : DEFAULT_CALENDAR_WEEK_START;
+    const rawCalendarDisplay = 'calendarDisplay' in parsed && parsed.calendarDisplay !== null
+      && typeof parsed.calendarDisplay === 'object'
+      ? parsed.calendarDisplay as Partial<Record<keyof CalendarDisplayOptions, unknown>>
+      : {};
+    const calendarDisplay: CalendarDisplayOptions = {
+      showChekiPhotos: typeof rawCalendarDisplay.showChekiPhotos === 'boolean'
+        ? rawCalendarDisplay.showChekiPhotos
+        : DEFAULT_CALENDAR_DISPLAY.showChekiPhotos,
+      showEvents: typeof rawCalendarDisplay.showEvents === 'boolean'
+        ? rawCalendarDisplay.showEvents
+        : DEFAULT_CALENDAR_DISPLAY.showEvents,
+      showDateItems: typeof rawCalendarDisplay.showDateItems === 'boolean'
+        ? rawCalendarDisplay.showDateItems
+        : DEFAULT_CALENDAR_DISPLAY.showDateItems,
+    };
 
-    return { themeId, appearance, calendarDefaultView };
+    return {
+      themeId,
+      appearance,
+      calendarWeekStart,
+      calendarDisplay,
+    };
   } catch {
     return defaultPreferences;
   }
@@ -122,9 +145,16 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     [persistPreferences],
   );
 
-  const setCalendarDefaultView = useCallback(
-    async (calendarDefaultView: AppCalendarDefaultView) => (
-      persistPreferences({ ...latestPreferencesRef.current, calendarDefaultView })
+  const setCalendarWeekStart = useCallback(
+    async (calendarWeekStart: AppCalendarWeekStart) => (
+      persistPreferences({ ...latestPreferencesRef.current, calendarWeekStart })
+    ),
+    [persistPreferences],
+  );
+
+  const setCalendarDisplay = useCallback(
+    async (calendarDisplay: CalendarDisplayOptions) => (
+      persistPreferences({ ...latestPreferencesRef.current, calendarDisplay })
     ),
     [persistPreferences],
   );
@@ -138,9 +168,17 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     ...preferences,
     isHydrated,
     setAppearance,
-    setCalendarDefaultView,
+    setCalendarWeekStart,
+    setCalendarDisplay,
     setThemeId,
-  }), [isHydrated, preferences, setAppearance, setCalendarDefaultView, setThemeId]);
+  }), [
+    isHydrated,
+    preferences,
+    setAppearance,
+    setCalendarWeekStart,
+    setCalendarDisplay,
+    setThemeId,
+  ]);
 
   return (
     <ThemePreferencesContext.Provider value={value}>

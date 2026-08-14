@@ -1,10 +1,9 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   Image,
   ImageSourcePropType,
   Platform,
-  SectionList,
   ScrollView,
   Text,
   type TextStyle,
@@ -31,25 +30,19 @@ import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
 import { DateItemCalendarOccurrence } from '../../../src/repositories/DateItemRepository';
 import { useAppTheme } from '../../../src/theme/appTheme';
-import { AppCalendarDefaultView, APP_CALENDAR_DEFAULT_VIEW_LABELS } from '../../../src/theme/config';
 import { Artist, Cheki, ChekiCalendarDaySummary, ChekiManualEntry, Event } from '../../../src/types/models';
 import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
+import {
+  monthGridLeadingBlankCount,
+  reorderWeekdayLabels,
+  type CalendarGridWeekStart,
+} from '../../../src/utils/calendarWeeks';
 import { calculateChekiGridLayout, getChekiManualCount } from '../../../src/utils/cheki';
 import { withAlpha } from '../../../src/utils/color';
 import { toISODate } from '../../../src/utils/date';
 import { getLocalDayDifference } from '../../../src/utils/dateItems';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
-
-type TimelineItem = { type: 'event'; data: Event };
-
-type Section = {
-  title: string;
-  key: string;
-  data: TimelineItem[];
-};
-
-type ViewMode = AppCalendarDefaultView;
 
 type ChekiMonthCell = {
   date: string;
@@ -69,42 +62,16 @@ type MonthCellSignalCard = {
   text: string;
 };
 
-const VIEW_MODES: ViewMode[] = ['month', 'timeline'];
 const CALENDAR_CHEKI_GRID_GAP = 8;
 const CALENDAR_CHEKI_ASPECT_RATIO = 86 / 54;
 const CALENDAR_MONTH_CELL_SIGNAL_CARD_LIMIT = 3;
 const CALENDAR_RANKING_PREVIEW_LIMIT = 10;
+const CALENDAR_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const;
+const CALENDAR_MONTH_CELL_HEIGHT = 92;
+const CALENDAR_MONTH_CELL_COMPACT_HEIGHT = 89;
+const CALENDAR_MONTH_TOP_SPACING = 12;
 function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
-}
-
-function monthLabel(key: string): string {
-  return key;
-}
-
-function buildTimeline(events: Event[]): Section[] {
-  const buckets: Record<string, TimelineItem[]> = {};
-
-  for (const event of events) {
-    if (!event.event_date) continue;
-    const key = monthKey(event.event_date);
-    if (!buckets[key]) buckets[key] = [];
-    buckets[key].push({ type: 'event', data: event });
-  }
-
-  return Object.keys(buckets)
-    .sort((a, b) => b.localeCompare(a))
-    .map((key) => ({
-      key,
-      title: monthLabel(key),
-      data: buckets[key].sort((a, b) => {
-        const dateA = a.data.event_date;
-        const dateB = b.data.event_date;
-        const dateCompare = dateB.localeCompare(dateA);
-        if (dateCompare !== 0) return dateCompare;
-        return (b.data.event_time ?? '').localeCompare(a.data.event_time ?? '');
-      }),
-    }));
 }
 
 function sortDayEvents(events: Event[]): Event[] {
@@ -194,16 +161,17 @@ function dateInMonth(date: string, year: number, month: number): string {
 function buildChekiMonthCells(
   date: string,
   summaries: Map<string, ChekiCalendarDaySummary>,
+  weekStart: CalendarGridWeekStart,
 ): ChekiMonthCell[] {
   const { year, month } = parseISODate(date);
-  const firstDay = new Date(year, month - 1, 1).getDay();
+  const leadingBlankCount = monthGridLeadingBlankCount(year, month, weekStart);
   const currentDays = daysInMonth(year, month);
   const previousMonthDate = addMonths(formatISODate(year, month, 1), -1);
   const previous = parseISODate(previousMonthDate);
   const previousDays = daysInMonth(previous.year, previous.month);
   const cells: ChekiMonthCell[] = [];
 
-  for (let index = firstDay - 1; index >= 0; index -= 1) {
+  for (let index = leadingBlankCount - 1; index >= 0; index -= 1) {
     const day = previousDays - index;
     const cellDate = formatISODate(previous.year, previous.month, day);
     cells.push({ date: cellDate, day, inMonth: false, summary: summaries.get(cellDate) ?? null });
@@ -228,14 +196,16 @@ function buildChekiMonthCells(
 function buildMonthCellSignalCards(
   events: Event[],
   occurrences: DateItemCalendarOccurrence[],
+  showEvents: boolean,
+  showDateItems: boolean,
 ): MonthCellSignalCard[] {
   const cards: MonthCellSignalCard[] = [
-    ...sortDayEvents(events).map((event) => ({
+    ...(showEvents ? sortDayEvents(events) : []).map((event) => ({
       key: `event-${event.id}`,
       kind: 'event' as const,
       text: event.title,
     })),
-    ...occurrences.map((occurrence) => ({
+    ...(showDateItems ? occurrences : []).map((occurrence) => ({
       key: `date-item-${occurrence.id}`,
       kind: 'dateItem' as const,
       text: occurrence.anniversaryLabel ?? occurrence.relativeText,
@@ -258,18 +228,21 @@ function buildMonthCellSignalCards(
 
 export default function CalendarScreen() {
   const db = useDB();
-  const { isDark, colors, calendarDefaultView } = useAppTheme();
+  const {
+    isDark,
+    colors,
+    calendarWeekStart,
+    calendarDisplay,
+  } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const { width: screenWidth } = useWindowDimensions();
   const isIOS = Platform.OS === 'ios';
   const androidHeader = useAndroidCollapsibleTabHeader();
   const monthViewTabBarScroll = useFloatingTabBarScroll();
-  const timelineViewTabBarScroll = useFloatingTabBarScroll();
   const monthViewScrollProps = isIOS ? monthViewTabBarScroll : androidHeader.scrollProps;
-  const timelineViewScrollProps = isIOS ? timelineViewTabBarScroll : androidHeader.scrollProps;
 
   const today = toISODate(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>(calendarDefaultView);
+  const calendarGridWeekStart: CalendarGridWeekStart = calendarWeekStart === 'monday' ? 1 : 0;
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(today);
@@ -281,10 +254,6 @@ export default function CalendarScreen() {
   const [dayDateItemOccurrences, setDayDateItemOccurrences] = useState<DateItemCalendarOccurrence[]>([]);
   const [artistMap, setArtistMap] = useState<Map<string, Artist>>(new Map());
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setViewMode(calendarDefaultView);
-  }, [calendarDefaultView]);
 
   const selectedMonth = useMemo(() => parseISODate(selectedDate), [selectedDate]);
 
@@ -330,11 +299,6 @@ export default function CalendarScreen() {
     handleSelectDate(dateInMonth(selectedDate, year, month));
   }, [handleSelectDate, selectedDate]);
 
-  const handleSelectViewMode = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-  }, []);
-
-  const timelineSections = useMemo(() => buildTimeline(allEvents), [allEvents]);
   const eventsByDate = useMemo(() => {
     const byDate = new Map<string, Event[]>();
     for (const event of allEvents) {
@@ -376,8 +340,8 @@ export default function CalendarScreen() {
     [chekiSummaries],
   );
   const chekiMonthCells = useMemo(
-    () => buildChekiMonthCells(selectedDate, summaryMap),
-    [selectedDate, summaryMap],
+    () => buildChekiMonthCells(selectedDate, summaryMap, calendarGridWeekStart),
+    [calendarGridWeekStart, selectedDate, summaryMap],
   );
   const selectedChekiSummary = summaryMap.get(selectedDate) ?? null;
   const noPhotoCount = useMemo(() => getChekiManualCount(dayNoPhotoEntries), [dayNoPhotoEntries]);
@@ -432,37 +396,25 @@ export default function CalendarScreen() {
     });
   }, [selectedDate]);
 
-  const renderSegmentedControl = useCallback(() => (
-    <View style={{
-      flexDirection: 'row',
-      backgroundColor: isDark ? colors.input : colors.inputBorder,
-      borderRadius: 10,
-      padding: 3,
-    }}>
-      {VIEW_MODES.map((mode) => (
-        <TouchableOpacity
-          key={mode}
-          onPress={() => { handleSelectViewMode(mode); }}
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 8,
-            backgroundColor: viewMode === mode ? (isDark ? colors.inputBorder : colors.card) : 'transparent',
-          }}
-        >
-          <Text style={{
-            fontSize: 12,
-            fontWeight: '700',
-            color: viewMode === mode
-              ? colors.text
-              : colors.textMuted,
-          }}>
-            {APP_CALENDAR_DEFAULT_VIEW_LABELS[mode]}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  ), [colors.card, colors.input, colors.inputBorder, colors.text, colors.textMuted, handleSelectViewMode, isDark, viewMode]);
+  const renderCalendarSettingsButton = useCallback(() => (
+    <TouchableOpacity
+      onPress={() => router.push('/settings/calendar')}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel="日历设置"
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: isDark ? colors.input : colors.inputBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <AppIcon name="settings" size={18} color={colors.accent} />
+    </TouchableOpacity>
+  ), [colors.accent, colors.input, colors.inputBorder, isDark]);
 
   const renderChekiStack = useCallback((summary: ChekiCalendarDaySummary) => {
     const imageSource: ImageSourcePropType | null = summary.latestPhotoUri
@@ -484,7 +436,7 @@ export default function CalendarScreen() {
       <View style={{
         width: 38,
         height: 50,
-        marginTop: 5,
+        marginTop: calendarDisplay.showEvents || calendarDisplay.showDateItems ? 8 : 5,
       }}>
         {backplateCount >= 2 ? (
           hasThirdPhoto ? (
@@ -608,7 +560,7 @@ export default function CalendarScreen() {
         </View>
       </View>
     );
-  }, [colors, isDark]);
+  }, [calendarDisplay, colors, isDark]);
 
   const renderChekiMonthView = () => (
     <ScrollView
@@ -616,7 +568,7 @@ export default function CalendarScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingHorizontal: 16,
-        paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,
+        paddingTop: (isIOS ? 0 : androidHeader.contentTopPadding) + CALENDAR_MONTH_TOP_SPACING,
         paddingBottom: contentBottomPadding,
       }}
       contentInsetAdjustmentBehavior="automatic"
@@ -626,7 +578,7 @@ export default function CalendarScreen() {
       {!isIOS ? (
         <AndroidLargeTabTitle
           title="日历"
-          right={renderSegmentedControl()}
+          right={renderCalendarSettingsButton()}
           largeTitleStyle={androidHeader.largeTitleStyle}
         />
       ) : null}
@@ -694,7 +646,7 @@ export default function CalendarScreen() {
           paddingBottom: 7,
           marginHorizontal: 2,
         }}>
-          {['日', '一', '二', '三', '四', '五', '六'].map((weekday) => (
+          {reorderWeekdayLabels(CALENDAR_WEEKDAY_LABELS, calendarGridWeekStart).map((weekday) => (
             <Text key={weekday} style={{ flex: 1, textAlign: 'center', color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>
               {weekday}
             </Text>
@@ -706,14 +658,18 @@ export default function CalendarScreen() {
             const selected = cell.date === selectedDate;
             const hasEvent = eventDateSet.has(cell.date);
             const hasDateItem = dateItemDateSet.has(cell.date);
-            const signalCards = cell.summary
-              ? []
-              : buildMonthCellSignalCards(
+            const showChekiStack = cell.summary !== null && calendarDisplay.showChekiPhotos;
+            const signalCards = !showChekiStack
+              ? buildMonthCellSignalCards(
                 eventsByDate.get(cell.date) ?? [],
                 dateItemOccurrencesByDate.get(cell.date) ?? [],
-              );
-            const showCornerSignals = cell.summary !== null && (hasEvent || hasDateItem);
-            const isLastWeek = index >= chekiMonthCells.length - 7;
+                calendarDisplay.showEvents,
+                calendarDisplay.showDateItems,
+              )
+              : [];
+            const showCornerSignals = cell.summary !== null && (
+              (hasEvent && calendarDisplay.showEvents) || (hasDateItem && calendarDisplay.showDateItems)
+            );
             return (
               <TouchableOpacity
                 key={cell.date}
@@ -721,10 +677,12 @@ export default function CalendarScreen() {
                 onPress={() => handleSelectDate(cell.date)}
                 style={{
                   width: `${100 / 7}%`,
-                  minHeight: 82,
+                  height: calendarDisplay.showEvents || calendarDisplay.showDateItems
+                    ? CALENDAR_MONTH_CELL_HEIGHT
+                    : CALENDAR_MONTH_CELL_COMPACT_HEIGHT,
                   paddingTop: 7,
                   paddingHorizontal: 2,
-                  borderBottomWidth: isLastWeek ? 0 : 1,
+                  borderBottomWidth: 1,
                   borderBottomColor: colors.divider,
                 }}
               >
@@ -780,7 +738,7 @@ export default function CalendarScreen() {
                       justifyContent: 'center',
                       zIndex: 2,
                     }}>
-                      {hasEvent ? (
+                      {hasEvent && calendarDisplay.showEvents ? (
                         <View style={{
                           width: 5,
                           height: 5,
@@ -791,7 +749,7 @@ export default function CalendarScreen() {
                           borderColor: colors.screen,
                         }} />
                       ) : null}
-                      {hasDateItem ? (
+                      {hasDateItem && calendarDisplay.showDateItems ? (
                         <View style={{
                           width: 5,
                           height: 5,
@@ -804,10 +762,10 @@ export default function CalendarScreen() {
                       ) : null}
                     </View>
                   ) : null}
-                  {cell.summary ? renderChekiStack(cell.summary) : signalCards.length > 0 ? (
+                  {showChekiStack && cell.summary ? renderChekiStack(cell.summary) : signalCards.length > 0 ? (
                     <View style={{
                       alignSelf: 'stretch',
-                      marginTop: 4,
+                      marginTop: 7,
                       gap: 3,
                     }}>
                       {signalCards.map((card) => {
@@ -1070,74 +1028,24 @@ export default function CalendarScreen() {
         <>
           <Stack.Screen options={{ headerRight: undefined }} />
           <Stack.Toolbar placement="right">
-            <Stack.Toolbar.Menu
-              icon={getAppIconSFSymbol('viewSettings')}
-              accessibilityLabel={`切换日历视图，当前${APP_CALENDAR_DEFAULT_VIEW_LABELS[viewMode]}`}
-            >
-              <Stack.Toolbar.Menu inline>
-                {VIEW_MODES.map((mode) => (
-                  <Stack.Toolbar.MenuAction
-                    key={mode}
-                    isOn={viewMode === mode}
-                    onPress={() => { handleSelectViewMode(mode); }}
-                  >
-                    {APP_CALENDAR_DEFAULT_VIEW_LABELS[mode]}
-                  </Stack.Toolbar.MenuAction>
-                ))}
-              </Stack.Toolbar.Menu>
-            </Stack.Toolbar.Menu>
+            <Stack.Toolbar.Button
+              accessibilityLabel="日历设置"
+              icon={getAppIconSFSymbol('settings')}
+              onPress={() => router.push('/settings/calendar')}
+            />
           </Stack.Toolbar>
         </>
       ) : (
         <AndroidCompactTabHeader
           title="日历"
-          right={renderSegmentedControl()}
+          right={renderCalendarSettingsButton()}
           compactHeaderStyle={androidHeader.compactHeaderStyle}
           overlayHeight={androidHeader.overlayHeight}
           overlayPaddingTop={androidHeader.overlayPaddingTop}
         />
       )}
 
-      {viewMode === 'month' ? (
-        renderChekiMonthView()
-      ) : (
-        <SectionList
-          sections={timelineSections}
-          keyExtractor={(item) => `${item.data.id}-${item.data.event_date}`}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,
-            paddingBottom: contentBottomPadding,
-          }}
-          contentInsetAdjustmentBehavior="automatic"
-          scrollIndicatorInsets={isIOS ? undefined : { bottom: contentBottomPadding }}
-          showsVerticalScrollIndicator={false}
-          {...timelineViewScrollProps}
-          ListHeaderComponent={!isIOS ? (
-            <AndroidLargeTabTitle
-              title="日历"
-              right={renderSegmentedControl()}
-              largeTitleStyle={androidHeader.largeTitleStyle}
-            />
-          ) : undefined}
-          renderSectionHeader={({ section }) => (
-            <EventSectionHeader title={section.title} count={section.data.length} colors={colors} />
-          )}
-          renderItem={({ item }) => (
-            <View>
-              <EventCard event={item.data} oshiBadge={getEventCardOshiBadge(item.data.status, null)} />
-            </View>
-          )}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-              <AppIcon name="calendar" size={24} color={colors.textMuted} />
-              <Text style={{ marginTop: 10, fontSize: 14, color: colors.textMuted }}>
-                还没有活动记录
-              </Text>
-            </View>
-          }
-        />
-      )}
+      {renderChekiMonthView()}
 
       <CalendarMonthPicker
         visible={monthPickerVisible}

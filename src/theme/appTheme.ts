@@ -703,10 +703,12 @@ export function useAppTheme() {
   const {
     themeId = DEFAULT_THEME_ID,
     appearance,
-    calendarDefaultView,
+    calendarWeekStart,
+    calendarDisplay,
     isHydrated,
     setAppearance,
-    setCalendarDefaultView,
+    setCalendarWeekStart,
+    setCalendarDisplay,
     setThemeId,
   } = useThemePreferences();
   const mode = resolveMode(appearance, systemColorScheme);
@@ -716,13 +718,15 @@ export function useAppTheme() {
     themeId,
     themeLabel: appThemes[themeId].label,
     appearance,
-    calendarDefaultView,
+    calendarWeekStart,
+    calendarDisplay,
     mode,
     isDark: mode === 'dark',
     colors,
     isHydrated,
     setAppearance,
-    setCalendarDefaultView,
+    setCalendarWeekStart,
+    setCalendarDisplay,
     setThemeId,
   };
 }
