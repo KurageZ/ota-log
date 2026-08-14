@@ -1205,7 +1205,7 @@ describe('Cheki repositories', () => {
     await expect(ids({ status: 'completed', year: 2026, month: 5 })).resolves.toEqual([]);
   });
 
-  test('findFiltered combines multiple artist filters with AND semantics', async () => {
+  test('findFiltered combines multiple artist filters with OR semantics', async () => {
     const ids = async (filter: Parameters<EventRepository['findFiltered']>[0]) =>
       (await eventRepository.findFiltered(filter)).map((event) => event.id);
 
@@ -1232,8 +1232,76 @@ describe('Cheki repositories', () => {
     rawDb.prepare(`INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)`).run('event-artist-2', 'artist-2');
 
     await expect(ids({ artistIds: ['artist-2'] })).resolves.toEqual(['event-artist-2', 'event-both']);
-    await expect(ids({ artistIds: ['artist-1', 'artist-2'] })).resolves.toEqual(['event-both']);
+    await expect(ids({ artistIds: ['artist-1', 'artist-2'] })).resolves.toEqual([
+      'event-artist-2',
+      'event-both',
+      'event-1',
+    ]);
     await expect(ids({ artistIds: ['artist-1', 'artist-2'], status: 'planned' })).resolves.toEqual([]);
+  });
+
+  test('findFiltered searches the activity aggregate and limits session text to the selected date range', async () => {
+    const ids = async (filter: Parameters<EventRepository['findFiltered']>[0]) =>
+      (await eventRepository.findFiltered(filter)).map((event) => event.id);
+
+    rawDb.prepare(
+      `INSERT INTO fixture_events
+         (id, title, event_type, event_date, event_time, city, venue, ticket_price, status, review_score, notes, details, url, setlist_text, trip_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'event-multi', 'Summer Multi Day', 'festival', '2026-08-01', null, 'Tokyo', 'Day Stage', null,
+      'planned', null, null, null, null, null, null,
+      '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
+    );
+    rawDb.prepare(
+      `INSERT INTO event_sessions
+         (id, event_id, title, session_date, end_date, open_time, start_time, end_time, city, venue, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'event-multi-session-2', 'event-multi', 'Night Stage', '2026-08-10', null,
+      '17:00', '18:00', '21:00', 'ＯＳＡＫＡ', 'Night Hall', 1,
+      '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
+    );
+    rawDb.prepare(
+      `INSERT INTO event_timetable_entries
+         (id, session_id, title, artist_id, start_time, end_time, notes, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'event-multi-entry', 'event-multi-session-2', '特典会', 'artist-2', '19:00', '20:00', '蓝色队列', 0,
+      '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
+    );
+    rawDb.prepare('INSERT INTO event_artists (event_id, artist_id) VALUES (?, ?)').run('event-multi', 'artist-1');
+
+    await expect(ids({ keyword: 'summer artist one' })).resolves.toEqual(['event-multi']);
+    await expect(ids({ keyword: 'osaka 特典会' })).resolves.toEqual(['event-multi']);
+    await expect(ids({ keyword: 'Artist Two' })).resolves.toContain('event-multi');
+    await expect(ids({ keyword: 'osaka', startDate: '2026-08-01', endDate: '2026-08-01' })).resolves.toEqual([]);
+    await expect(ids({ keyword: 'osaka 蓝色', startDate: '2026-08-10', endDate: '2026-08-10' })).resolves.toEqual(['event-multi']);
+  });
+
+  test('findFiltered uses intersecting session ranges and OR-within / AND-between filter categories', async () => {
+    const ids = async (filter: Parameters<EventRepository['findFiltered']>[0]) =>
+      (await eventRepository.findFiltered(filter)).map((event) => event.id);
+
+    rawDb.prepare('UPDATE event_sessions SET end_date = ? WHERE event_id = ?').run('2026-03-16', 'event-1');
+    rawDb.prepare('UPDATE events SET notes = ?, setlist_text = ?, review_score = ? WHERE id = ?')
+      .run('  回顾  ', 'Song A', 5, 'event-1');
+    rawDb.prepare(
+      `INSERT INTO event_timetable_entries
+         (id, session_id, title, artist_id, start_time, end_time, notes, sort_order, created_at, updated_at)
+       VALUES ('event-1-entry', 'fixture-session-event-1', 'Main Live', NULL, NULL, NULL, NULL, 0, ?, ?)`,
+    ).run('2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z');
+    rawDb.prepare('INSERT INTO photos (id, event_id, local_uri, created_at) VALUES (?, ?, ?, ?)')
+      .run('event-1-photo', 'event-1', 'file:///event-1.jpg', '2026-03-01T00:00:00.000Z');
+
+    await expect(ids({ startDate: '2026-03-16', endDate: '2026-03-16' })).resolves.toEqual(['event-1']);
+    await expect(ids({ statuses: ['planned', 'completed'], startDate: '2026-05-20', endDate: '2026-05-20' })).resolves.toEqual(['event-2']);
+    await expect(ids({ statuses: ['planned'], startDate: '2026-03-16', endDate: '2026-03-16' })).resolves.toEqual([]);
+    await expect(ids({ hasNotes: true })).resolves.toEqual(['event-1']);
+    await expect(ids({ hasSetlist: true })).resolves.toEqual(['event-1']);
+    await expect(ids({ hasTimetable: true })).resolves.toEqual(['event-1']);
+    await expect(ids({ hasPhotos: true })).resolves.toEqual(['event-1']);
+    await expect(ids({ hasCheki: true })).resolves.toEqual(['event-1']);
   });
 
   test('findDistinctYears returns deduplicated years in descending order', async () => {
@@ -1340,6 +1408,7 @@ describe('Cheki repositories', () => {
 
     // 指定艺人筛选同样递归：选成员 member-1 → 命中其团体 group-1 出演的 event-5
     await expect(ids({ artistId: 'member-1' })).resolves.toEqual(['event-5']);
+    await expect(ids({ keyword: 'Member One' })).resolves.toEqual(['event-5']);
     await expect(eventRepository.countCompletedByArtistYear(2026, 'member-1')).resolves.toBe(1);
 
     // 指定艺人 + scope 同时生效（两个递归 CTE 共存于同一查询）

@@ -1,11 +1,7 @@
 import type { ChekiSpec } from '../domain/chekiSpec';
+import type { DateFilter } from './dateFilters';
 
-export type ChekiDateFilter =
-  | { mode: 'day'; startDate: string; endDate: string }
-  | { mode: 'month'; startDate: string; endDate: string }
-  | { mode: 'year'; startDate: string; endDate: string }
-  | { mode: 'custom'; startDate: string; endDate: string }
-  | null;
+export type ChekiDateFilter = DateFilter;
 
 export type ChekiRecordImageStatus = 'none' | 'partial' | 'complete' | null;
 
@@ -80,12 +76,4 @@ export function countChekiItemFilterCategories(filters: ChekiItemFilters): numbe
     + Number(filters.hasNotes)
     + Number(filters.isFavorite)
     + Number(filters.hasBackImage);
-}
-
-export function formatChekiDateFilter(filter: ChekiDateFilter): string | null {
-  if (!filter) return null;
-  if (filter.mode === 'day') return filter.startDate;
-  if (filter.mode === 'month') return filter.startDate.slice(0, 7).replace('-', '.');
-  if (filter.mode === 'year') return filter.startDate.slice(0, 4);
-  return `${filter.startDate} – ${filter.endDate}`;
 }

@@ -7,18 +7,23 @@ import {
   Event,
   EventSessionScheduleInput,
   EventStatus,
+  EventType,
   CreateEventTimetableEntryInput,
   UpdateEventWithScheduleInput,
 } from '../types/models';
 import { generateId } from '../utils/uuid';
 import { eventDateLikeParam, isValidISODate, toISODateTime } from '../utils/date';
 import { selectCurrentPlannedEvent } from '../utils/currentEvent';
+import { buildEventSearchIndex, matchesEventSearchIndex } from '../utils/eventSearch';
 
 export interface EventFilter {
   keyword?: string;
+  /** @deprecated 城市现在作为关键词搜索；仅为旧调用兼容保留。 */
   city?: string;
+  /** @deprecated 场地现在作为关键词搜索；仅为旧调用兼容保留。 */
   venue?: string;
   status?: EventStatus;
+  statuses?: EventStatus[];
   artistId?: string;
   artistIds?: string[];
   year?: number;
@@ -29,6 +34,11 @@ export interface EventFilter {
   minScore?: number;
   /** 出演者范围：favorite=任一出演者为收藏；oshi=出演者含单推 */
   artistScope?: 'favorite' | 'oshi';
+  hasNotes?: boolean;
+  hasSetlist?: boolean;
+  hasTimetable?: boolean;
+  hasPhotos?: boolean;
+  hasCheki?: boolean;
 }
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 
@@ -785,51 +795,13 @@ export class EventRepository {
   async findFiltered(filter: EventFilter): Promise<Event[]> {
     const conditions: string[] = [];
     const params: Array<string | number> = [];
-    const withClauses: string[] = [];
-
-    if (filter.keyword?.trim()) {
-      const tokens = filter.keyword.trim().split(/\s+/);
-      for (const token of tokens) {
-        // 仅检索用户可见字段：标题 / 日期 / 时间 / 城市 / 场地 / 备注 / 详情 / 链接 / setlist，
-        // 以及出演艺人名称；不含内部 id、状态枚举、时间戳等
-        conditions.push(`((
-          COALESCE(e.title, '') || ' ' ||
-          COALESCE(e.notes, '') || ' ' ||
-          COALESCE(e.details, '') || ' ' ||
-          COALESCE(e.url, '') || ' ' ||
-          COALESCE(e.setlist_text, '')
-        ) LIKE '%' || ? || '%'
-        OR EXISTS (
-          SELECT 1
-          FROM event_sessions keyword_session
-          WHERE keyword_session.event_id = e.id
-            AND (
-              COALESCE(keyword_session.session_date, '') || ' ' ||
-              COALESCE(keyword_session.start_time, '') || ' ' ||
-              COALESCE(keyword_session.city, '') || ' ' ||
-              COALESCE(keyword_session.venue, '')
-            ) LIKE '%' || ? || '%'
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM event_artists keyword_ea
-          JOIN artists keyword_artist ON keyword_artist.id = keyword_ea.artist_id
-          WHERE keyword_ea.event_id = e.id
-            AND (
-              keyword_artist.name LIKE '%' || ? || '%'
-              OR keyword_artist.short_name LIKE '%' || ? || '%'
-            )
-        ))`);
-        params.push(token, token, token, token);
-      }
-    }
     const artistIds = filter.artistIds?.length ? [...new Set(filter.artistIds)] : filter.artistId ? [filter.artistId] : [];
-    for (const artistId of artistIds) {
+    if (artistIds.length > 0) {
       conditions.push(`e.id IN (
         SELECT attribution.event_id FROM event_artist_attributions attribution
-        WHERE attribution.artist_id = ?
+        WHERE attribution.artist_id IN (${artistIds.map(() => '?').join(', ')})
       )`);
-      params.push(artistId);
+      params.push(...artistIds);
     }
     if (filter.city != null) {
       // 支持用户自由输入，按包含匹配（精确值仍命中）
@@ -848,9 +820,10 @@ export class EventRepository {
       )`);
       params.push(filter.venue);
     }
-    if (filter.status) {
-      conditions.push('e.status = ?');
-      params.push(filter.status);
+    const statuses = filter.statuses?.length ? [...new Set(filter.statuses)] : filter.status ? [filter.status] : [];
+    if (statuses.length > 0) {
+      conditions.push(`e.status IN (${statuses.map(() => '?').join(', ')})`);
+      params.push(...statuses);
     }
     if (filter.minScore != null) {
       conditions.push('e.review_score >= ?');
@@ -871,31 +844,132 @@ export class EventRepository {
           ON config.id = 'default' AND config.oshi_artist_id = attribution.artist_id
       )`);
     }
-    if (filter.year != null) {
+    let rangeStart = filter.startDate;
+    let rangeEnd = filter.endDate;
+    if (!rangeStart && !rangeEnd && filter.year != null) {
+      const month = filter.month;
+      rangeStart = month == null
+        ? `${filter.year}-01-01`
+        : `${filter.year}-${String(month).padStart(2, '0')}-01`;
+      rangeEnd = month == null
+        ? `${filter.year}-12-31`
+        : `${filter.year}-${String(month).padStart(2, '0')}-${String(new Date(filter.year, month, 0).getDate()).padStart(2, '0')}`;
+    }
+    if (rangeStart && rangeEnd) {
       conditions.push(`EXISTS (
-        SELECT 1 FROM event_first_summaries period_event
-        WHERE period_event.id = e.id
-          AND period_event.event_date LIKE ? || '-%'
+        SELECT 1 FROM event_sessions period_session
+        WHERE period_session.event_id = e.id
+          AND period_session.session_date <= ?
+          AND COALESCE(period_session.end_date, period_session.session_date) >= ?
       )`);
-      params.push(eventDateLikeParam(filter.year, filter.month));
-    } else if (filter.startDate && filter.endDate) {
+      params.push(rangeEnd, rangeStart);
+    }
+
+    if (filter.hasNotes) conditions.push("TRIM(COALESCE(e.notes, '')) != ''");
+    if (filter.hasSetlist) conditions.push("TRIM(COALESCE(e.setlist_text, '')) != ''");
+    if (filter.hasTimetable) {
       conditions.push(`EXISTS (
-        SELECT 1 FROM event_first_summaries period_event
-        WHERE period_event.id = e.id
-          AND period_event.event_date >= ?
-          AND period_event.event_date <= ?
+        SELECT 1 FROM event_sessions timetable_session
+        JOIN event_timetable_entries timetable_entry ON timetable_entry.session_id = timetable_session.id
+        WHERE timetable_session.event_id = e.id
       )`);
-      params.push(filter.startDate, filter.endDate);
+    }
+    if (filter.hasPhotos) {
+      conditions.push('EXISTS (SELECT 1 FROM photos event_photo WHERE event_photo.event_id = e.id)');
+    }
+    if (filter.hasCheki) {
+      conditions.push('EXISTS (SELECT 1 FROM cheki_records event_cheki WHERE event_cheki.event_id = e.id)');
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const withPrefix = withClauses.length > 0 ? `WITH RECURSIVE ${withClauses.join(', ')} ` : '';
-    return this.db.getAllAsync<Event>(
-      `${withPrefix}SELECT e.* FROM event_summaries e
+    const candidates = await this.db.getAllAsync<Event>(
+      `SELECT e.* FROM event_summaries e
        ${where}
        ORDER BY e.event_date DESC, e.event_time DESC`,
       params
     );
+
+    const keyword = [filter.keyword, filter.city, filter.venue]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+      .join(' ');
+    if (!keyword || candidates.length === 0) return candidates;
+
+    const searchParts = new Map<string, string[]>();
+    for (const event of candidates) searchParts.set(event.id, []);
+    const candidateIds = candidates.map((event) => event.id);
+    const chunks: string[][] = [];
+    // 每个聚合查询会重复绑定同一批活动 ID 六次；150 保持在常见的
+    // SQLite 999 参数上限以内，同时避免为每条活动单独查询。
+    for (let index = 0; index < candidateIds.length; index += 150) {
+      chunks.push(candidateIds.slice(index, index + 150));
+    }
+
+    for (const chunk of chunks) {
+      const placeholders = chunk.map(() => '?').join(', ');
+      const dateClause = rangeStart && rangeEnd
+        ? `AND search_session.session_date <= ?
+           AND COALESCE(search_session.end_date, search_session.session_date) >= ?`
+        : '';
+      const dateParams = rangeStart && rangeEnd ? [rangeEnd, rangeStart] : [];
+      const rows = await this.db.getAllAsync<{ event_id: string; search_text: string | null }>(
+        `SELECT root.id AS event_id,
+                COALESCE(root.title, '') || ' ' || COALESCE(root.notes, '') || ' ' ||
+                COALESCE(root.details, '') || ' ' || COALESCE(root.url, '') || ' ' ||
+                COALESCE(root.setlist_text, '') AS search_text
+         FROM events root
+         WHERE root.id IN (${placeholders})
+         UNION ALL
+         SELECT search_session.event_id,
+                COALESCE(search_session.title, '') || ' ' || search_session.session_date || ' ' ||
+                COALESCE(search_session.end_date, '') || ' ' || COALESCE(search_session.open_time, '') || ' ' ||
+                COALESCE(search_session.start_time, '') || ' ' || COALESCE(search_session.end_time, '') || ' ' ||
+                COALESCE(search_session.city, '') || ' ' || COALESCE(search_session.venue, '')
+         FROM event_sessions search_session
+         WHERE search_session.event_id IN (${placeholders}) ${dateClause}
+         UNION ALL
+         SELECT search_session.event_id,
+                search_entry.title || ' ' || COALESCE(search_entry.start_time, '') || ' ' ||
+                COALESCE(search_entry.end_time, '') || ' ' || COALESCE(search_entry.notes, '')
+         FROM event_timetable_entries search_entry
+         JOIN event_sessions search_session ON search_session.id = search_entry.session_id
+         WHERE search_session.event_id IN (${placeholders}) ${dateClause}
+         UNION ALL
+         SELECT attribution.event_id, artist.name || ' ' || COALESCE(artist.short_name, '')
+         FROM event_artist_attributions attribution
+         JOIN artists artist ON artist.id = attribution.artist_id
+         WHERE attribution.event_id IN (${placeholders})
+         UNION ALL
+         SELECT search_session.event_id, artist.name || ' ' || COALESCE(artist.short_name, '')
+         FROM event_timetable_entries search_entry
+         JOIN event_sessions search_session ON search_session.id = search_entry.session_id
+         JOIN artists artist ON artist.id = search_entry.artist_id
+         WHERE search_session.event_id IN (${placeholders}) ${dateClause}
+         UNION ALL
+         SELECT search_session.event_id, search_group.name || ' ' || COALESCE(search_group.short_name, '')
+         FROM event_timetable_entries search_entry
+         JOIN event_sessions search_session ON search_session.id = search_entry.session_id
+         JOIN artist_group_memberships membership ON membership.person_artist_id = search_entry.artist_id
+         JOIN artists search_group ON search_group.id = membership.group_artist_id
+         WHERE search_session.event_id IN (${placeholders})
+           AND (membership.start_date IS NULL OR COALESCE(search_session.end_date, search_session.session_date) >= membership.start_date)
+           AND (membership.end_date IS NULL OR search_session.session_date <= membership.end_date)
+           ${dateClause}`,
+        [
+          ...chunk,
+          ...chunk, ...dateParams,
+          ...chunk, ...dateParams,
+          ...chunk,
+          ...chunk, ...dateParams,
+          ...chunk, ...dateParams,
+        ],
+      );
+      for (const row of rows) searchParts.get(row.event_id)?.push(row.search_text ?? '');
+    }
+
+    return candidates.filter((event) => (
+      matchesEventSearchIndex(buildEventSearchIndex(searchParts.get(event.id) ?? []), keyword)
+    ));
   }
 
   async findDistinctYears(): Promise<number[]> {
@@ -934,9 +1008,11 @@ export class EventRepository {
 
   async findDistinctArtistIds(): Promise<string[]> {
     const rows = await this.db.getAllAsync<{ artist_id: string }>(
-      `SELECT DISTINCT artist_id
-       FROM event_artist_attributions
-       ORDER BY artist_id`
+      `SELECT attribution.artist_id
+       FROM event_artist_attributions attribution
+       JOIN event_first_summaries event ON event.id = attribution.event_id
+       GROUP BY attribution.artist_id
+       ORDER BY MAX(event.event_date) DESC, attribution.artist_id`
     );
     return rows.map((row) => row.artist_id);
   }

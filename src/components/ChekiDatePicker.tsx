@@ -6,16 +6,16 @@ import { StatsDateRangePicker } from './StatsDateRangePicker';
 import { AppIcon } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
 import { toISODate } from '../utils/date';
-import type { ChekiDateFilter } from '../utils/chekiFilters';
+import type { DateFilter, DateFilterMode } from '../utils/dateFilters';
 
-export type ChekiDatePickerMode = 'day' | 'month' | 'year' | 'custom';
+export type ChekiDatePickerMode = DateFilterMode;
 
 interface Props {
   visible: boolean;
   mode: ChekiDatePickerMode;
-  value: ChekiDateFilter;
+  value: DateFilter;
   onCancel: () => void;
-  onConfirm: (value: ChekiDateFilter) => void;
+  onConfirm: (value: DateFilter) => void;
   onClear: () => void;
 }
 

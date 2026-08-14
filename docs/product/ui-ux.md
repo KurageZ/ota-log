@@ -314,6 +314,8 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - 艺人筛选分区复用共享的 `ArtistSearchPicker`：已选项显示在搜索框上方，清除动作只在已选行上触发，候选列表只负责继续选择；候选排序规则与表单内选择器一致（单推及所属团体 > 收藏及所属团体 > 其他），并支持类型优先。
 - 需要「应用 / 确认」的 Bottom Sheet 使用滚动区外的固定操作 Footer；Footer 统一承担底部安全区与键盘避让，内容区为其预留空间。即时生效的选择菜单不额外增加 Footer。
 
+日期筛选头复用 `DateFilterHeader`，日期摘要统一由 `src/utils/dateFilters.ts` 格式化；艺人筛选中的「单推 / 收藏艺人」快捷选择复用 `FilterBatchChip` 和 `toggleBatchSelection()`，不要在活动与电子切册页面各自维护一份实现。
+
 ### ArtistSearchPicker
 
 文件：`src/components/ArtistSearchPicker.tsx`
@@ -473,7 +475,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - 顶部使用明确页面标题，例如「艺人管理」「电子切册」。
 - iOS 独立 Stack 的普通滚动页保持底部 edge-to-edge，不用外层 `SafeAreaView` 隔出固定空白；滚动容器使用 `contentInsetAdjustmentBehavior="automatic"`，内容末尾间距保留在可滚动区域内。Android 继续使用底部安全区保护。
 - 搜索和筛选统一走 `SearchFilterBar` + `FilterSheet`。
-- 已生效筛选默认在搜索框内以 chip 展示，可点击移除；电子切册例外，只通过筛选按钮激活态与数量 badge 表达，避免条件挤压搜索输入。
+- 已生效筛选默认在搜索框内以 chip 展示，可点击移除；电子切册和所有活动页例外，只通过筛选按钮激活态与数量 badge 表达，避免条件挤压搜索输入。
 - 空态要说明下一步，例如新建活动、导入艺人、添加拍立得，而不是只写「暂无数据」。
 - 大列表优先使用 `FlatList` 或虚拟化结构，不要用长 `ScrollView`。
 

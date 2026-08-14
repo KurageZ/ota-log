@@ -5,7 +5,6 @@ import {
   cloneChekiRecordFilters,
   countChekiItemFilterCategories,
   countChekiRecordFilterCategories,
-  formatChekiDateFilter,
 } from '../chekiFilters';
 
 describe('chekiFilters', () => {
@@ -38,14 +37,5 @@ describe('chekiFilters', () => {
     })).toBe(3);
     expect(countChekiRecordFilterCategories({ ...EMPTY_CHEKI_RECORD_FILTERS, hasBackImage: true })).toBe(1);
     expect(countChekiItemFilterCategories({ ...EMPTY_CHEKI_ITEM_FILTERS, hasBackImage: true })).toBe(1);
-  });
-
-  it('formats the four date modes for compact summaries', () => {
-    expect(formatChekiDateFilter({ mode: 'day', startDate: '2026-08-13', endDate: '2026-08-13' }))
-      .toBe('2026-08-13');
-    expect(formatChekiDateFilter({ mode: 'month', startDate: '2026-08-01', endDate: '2026-08-31' }))
-      .toBe('2026.08');
-    expect(formatChekiDateFilter({ mode: 'year', startDate: '2026-01-01', endDate: '2026-12-31' }))
-      .toBe('2026');
   });
 });

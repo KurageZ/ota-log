@@ -35,6 +35,8 @@ import { SearchFilterBar } from '../components/SearchFilterBar';
 import { BottomSheetDialog } from '../components/BottomSheetDialog';
 import { FilterSheet, FilterSection, type FilterChipGroup, type FilterOption } from '../components/FilterSheet';
 import { ChekiDatePicker, type ChekiDatePickerMode } from '../components/ChekiDatePicker';
+import { DateFilterHeader } from '../components/DateFilterHeader';
+import { FilterBatchChip } from '../components/FilterBatchChip';
 import { FilteredEmptyState } from '../components/FilteredEmptyState';
 import { AppIcon, getAppIconSFSymbol } from '../components/AppIcon';
 import { getArtistSearchText } from '../utils/filter';
@@ -59,7 +61,6 @@ import {
   cloneChekiRecordFilters,
   countChekiItemFilterCategories,
   countChekiRecordFilterCategories,
-  formatChekiDateFilter,
   type ChekiItemFilters,
   type ChekiRecordFilters,
 } from '../utils/chekiFilters';
@@ -72,6 +73,7 @@ import {
   tokenizeChekiSearchQuery,
 } from '../utils/chekiSearch';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { toggleBatchSelection } from '../utils/filterSelection';
 
 type ChekiGalleryItem =
   | { type: 'record'; key: string; record: ChekiRecordWithItems }
@@ -818,40 +820,16 @@ export default function ChekiLibraryScreen() {
     [artistMap],
   );
   const toggleArtistBatch = useCallback((batch: string[]) => {
-    const selected = new Set(draftArtistIds);
-    const allSelected = batch.length > 0 && batch.every((id) => selected.has(id));
-    for (const id of batch) {
-      if (allSelected) selected.delete(id);
-      else selected.add(id);
-    }
-    setDraftArtistIds([...selected]);
+    setDraftArtistIds(toggleBatchSelection(draftArtistIds, batch));
   }, [draftArtistIds, setDraftArtistIds]);
   const filterHeader = (
-    <View style={{ marginBottom: 18 }}>
-      <Text style={{ marginBottom: 10, fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>日期</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {([
-          ['day', '日'],
-          ['month', '月'],
-          ['year', '年'],
-          ['custom', '自定义'],
-        ] as const).map(([mode, label]) => (
-          <TouchableOpacity
-            key={mode}
-            onPress={() => {
-              setFilterVisible(false);
-              setDatePickerMode(mode);
-            }}
-            style={{ flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: draftDate?.mode === mode ? colors.accent : colors.cardAlt }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: draftDate?.mode === mode ? colors.onAccent : colors.text }}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {draftDate ? (
-        <Text style={{ marginTop: 8, fontSize: 12, color: colors.textSecondary }}>{formatChekiDateFilter(draftDate)}</Text>
-      ) : null}
-    </View>
+    <DateFilterHeader
+      value={draftDate}
+      onSelectMode={(mode) => {
+        setFilterVisible(false);
+        setDatePickerMode(mode);
+      }}
+    />
   );
 
   const filterSections = useMemo<FilterSection[]>(() => {
@@ -960,44 +938,18 @@ export default function ChekiLibraryScreen() {
       onValuesChange: setDraftArtistIds,
       beforeContent: (
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity
+          <FilterBatchChip
+            label="单推"
             onPress={() => toggleArtistBatch(oshiArtistId ? [oshiArtistId] : [])}
             disabled={!oshiArtistId}
-            accessibilityRole="button"
-            accessibilityLabel="单推"
-            style={{
-              minHeight: 44,
-              paddingHorizontal: 14,
-              borderRadius: 99,
-              borderWidth: 1.5,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: oshiSelected ? colors.accent : isDark ? colors.input : colors.cardAlt,
-              borderColor: oshiSelected ? colors.accent : colors.inputBorder,
-              opacity: oshiArtistId ? 1 : 0.4,
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: oshiSelected ? colors.onAccent : colors.textSecondary }}>单推</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+            selected={oshiSelected}
+          />
+          <FilterBatchChip
+            label="收藏艺人"
             onPress={() => toggleArtistBatch(favoriteArtistIds)}
             disabled={favoriteArtistIds.length === 0}
-            accessibilityRole="button"
-            accessibilityLabel="收藏艺人"
-            style={{
-              minHeight: 44,
-              paddingHorizontal: 14,
-              borderRadius: 99,
-              borderWidth: 1.5,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: favoritesSelected ? colors.accent : isDark ? colors.input : colors.cardAlt,
-              borderColor: favoritesSelected ? colors.accent : colors.inputBorder,
-              opacity: favoriteArtistIds.length > 0 ? 1 : 0.4,
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: favoritesSelected ? colors.onAccent : colors.textSecondary }}>收藏艺人</Text>
-          </TouchableOpacity>
+            selected={favoritesSelected}
+          />
         </View>
       ),
       artistSearch: {
