@@ -1,11 +1,13 @@
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Artist, CreateEventTimetableEntryInput } from '../types/models';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
+import { resolveAvatarSource } from '../utils/avatarSource';
 import { withAlpha } from '../utils/color';
 import { formatTimeInput, isValidTime } from '../utils/date';
 import { generateId } from '../utils/uuid';
 import { useAppTheme } from '../theme/appTheme';
 import { AppIcon } from './AppIcon';
+import { OshiAvatar } from './Oshi';
 
 export interface EventTimetableEntryDraft {
   key: string;
@@ -60,6 +62,7 @@ function EditorInput({
   multiline = false,
   numeric = false,
   compact = false,
+  leftInset,
 }: {
   value: string;
   onChangeText: (value: string) => void;
@@ -67,6 +70,7 @@ function EditorInput({
   multiline?: boolean;
   numeric?: boolean;
   compact?: boolean;
+  leftInset?: number;
 }) {
   const { colors } = useAppTheme();
   return (
@@ -82,7 +86,8 @@ function EditorInput({
       style={{
         height: compact ? 36 : (multiline ? undefined : 46),
         minHeight: compact ? 36 : (multiline ? 72 : undefined),
-        paddingHorizontal: compact ? 10 : 14,
+        paddingLeft: leftInset ?? (compact ? 10 : 14),
+        paddingRight: compact ? 10 : 14,
         paddingVertical: compact ? 0 : (multiline ? 10 : 0),
         borderWidth: 1,
         borderColor: colors.inputBorder,
@@ -93,6 +98,14 @@ function EditorInput({
       }}
     />
   );
+}
+
+function matchArtists(artists: Artist[], query: string): Artist[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return artists
+    .filter((artist) => getArtistPrimaryName(artist).toLowerCase().includes(q))
+    .slice(0, 5);
 }
 
 function ReorderButton({
@@ -196,148 +209,163 @@ export function EventTimetableEditor({
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>时间表</Text>
           <Text style={{ marginTop: 2, fontSize: 12, color: colors.textMuted }}>时间跟随当前场次日期</Text>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="添加时间表条目"
-          activeOpacity={0.7}
-          onPress={() => onChange([...entries, createEmptyTimetableEntry()])}
-          style={{
-            minHeight: 36,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            paddingHorizontal: 10,
-            borderRadius: 10,
-            backgroundColor: withAlpha(colors.accent, isDark ? 0.15 : 0.08),
-          }}
-        >
-          <AppIcon name="add" size={14} color={colors.accent} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.accent }}>添加条目</Text>
-        </TouchableOpacity>
       </View>
 
-      {entries.map((entry, entryIndex) => (
-        <View
-          key={entry.key}
-          style={{
-            marginTop: entryIndex === 0 ? 8 : 12,
-            paddingTop: entryIndex === 0 ? 0 : 10,
-            borderTopWidth: entryIndex === 0 ? 0 : 1,
-            borderTopColor: colors.divider,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <EditorInput
-                value={entry.title}
-                onChangeText={(title) => updateEntry(entry.key, { title })}
-                placeholder={`条目 ${entryIndex + 1}`}
-                compact
-              />
-            </View>
-            <View style={{ width: 58 }}>
-              <EditorInput
-                value={entry.start_time}
-                onChangeText={(start_time) => updateEntry(entry.key, {
-                  start_time: formatTimeInput(start_time),
-                })}
-                placeholder="开始"
-                numeric
-                compact
-              />
-            </View>
-            <View style={{ width: 58 }}>
-              <EditorInput
-                value={entry.end_time}
-                onChangeText={(end_time) => updateEntry(entry.key, {
-                  end_time: formatTimeInput(end_time),
-                })}
-                placeholder="结束"
-                numeric
-                compact
-              />
-            </View>
-            <ReorderButton
-              label="上移时间表条目"
-              icon="chevron"
-              compact
-              disabled={entryIndex === 0}
-              onPress={() => onChange(moveEntry(entries, entryIndex, -1))}
-            />
-            <ReorderButton
-              label="下移时间表条目"
-              icon="chevron"
-              compact
-              disabled={entryIndex === entries.length - 1}
-              onPress={() => onChange(moveEntry(entries, entryIndex, 1))}
-            />
-            <ReorderButton
-              label="删除时间表条目"
-              icon="trash"
-              compact
-              danger
-              onPress={() => onChange(entries.filter((item) => item.key !== entry.key))}
-            />
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 }}>
-            {artists.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ flex: 1, minWidth: 0 }}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {[null, ...artists].map((artist) => {
-                  const artistId = artist?.id ?? '';
-                  const selected = entry.artist_id === artistId;
-                  const label = artist ? getArtistPrimaryName(artist) : '不关联';
-                  return (
+      {entries.map((entry, entryIndex) => {
+        const matchedArtist = entry.artist_id
+          ? artists.find((artist) => artist.id === entry.artist_id) ?? null
+          : null;
+        const suggestions = matchedArtist ? [] : matchArtists(artists, entry.title);
+        return (
+          <View
+            key={entry.key}
+            style={{
+              marginTop: entryIndex === 0 ? 8 : 12,
+              paddingTop: entryIndex === 0 ? 0 : 10,
+              borderTopWidth: entryIndex === 0 ? 0 : 1,
+              borderTopColor: colors.divider,
+            }}
+          >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                  <EditorInput
+                    value={entry.title}
+                    onChangeText={(title) => updateEntry(entry.key, { title })}
+                    placeholder={`条目 ${entryIndex + 1}`}
+                    compact
+                    leftInset={matchedArtist ? 32 : undefined}
+                  />
+                  {matchedArtist ? (
                     <TouchableOpacity
-                      key={artistId || 'none'}
                       accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      activeOpacity={0.7}
-                      onPress={() => updateEntry(entry.key, { artist_id: artistId })}
+                      accessibilityLabel="移除关联艺人"
+                      onPress={() => updateEntry(entry.key, { artist_id: '' })}
                       style={{
-                        minHeight: 32,
+                        position: 'absolute',
+                        left: 6,
+                        top: 0,
+                        bottom: 0,
                         justifyContent: 'center',
-                        paddingHorizontal: 10,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: selected ? colors.accent : colors.inputBorder,
-                        backgroundColor: selected
-                          ? withAlpha(colors.accent, isDark ? 0.2 : 0.1)
-                          : colors.input,
                       }}
                     >
-                      <Text style={{
-                        fontSize: 12,
-                        fontWeight: selected ? '700' : '500',
-                        color: selected ? colors.accent : colors.textSecondary,
-                      }}>
-                        {label}
-                      </Text>
+                      <OshiAvatar source={resolveAvatarSource(matchedArtist.avatar_uri)} size={22} isOshi={false} />
                     </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <Text style={{ flex: 1, fontSize: 11.5, color: colors.textMuted }} numberOfLines={1}>
-                可先在「详细信息」中添加出演者
-              </Text>
-            )}
-            <View style={{ width: 124, flexShrink: 0 }}>
-              <EditorInput
-                value={entry.notes}
-                onChangeText={(notes) => updateEntry(entry.key, { notes })}
-                placeholder="备注"
-                compact
-              />
-            </View>
+                  ) : null}
+                </View>
+                <ReorderButton
+                  label="上移时间表条目"
+                  icon="chevron"
+                  compact
+                  disabled={entryIndex === 0}
+                  onPress={() => onChange(moveEntry(entries, entryIndex, -1))}
+                />
+                <ReorderButton
+                  label="下移时间表条目"
+                  icon="chevron"
+                  compact
+                  disabled={entryIndex === entries.length - 1}
+                  onPress={() => onChange(moveEntry(entries, entryIndex, 1))}
+                />
+                <ReorderButton
+                  label="删除时间表条目"
+                  icon="trash"
+                  compact
+                  danger
+                  onPress={() => onChange(entries.filter((item) => item.key !== entry.key))}
+                />
+              </View>
+
+              {suggestions.length > 0 ? (
+                <View style={{
+                  marginTop: 6, borderRadius: 10, overflow: 'hidden',
+                  borderWidth: 1, borderColor: colors.inputBorder,
+                }}>
+                  {suggestions.map((artist, index) => (
+                    <TouchableOpacity
+                      key={artist.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`关联 ${getArtistPrimaryName(artist)}`}
+                      activeOpacity={0.7}
+                      onPress={() => updateEntry(entry.key, {
+                        title: getArtistPrimaryName(artist),
+                        artist_id: artist.id,
+                      })}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 8,
+                        paddingHorizontal: 10, paddingVertical: 8,
+                        backgroundColor: colors.input,
+                        borderBottomWidth: index === suggestions.length - 1 ? 0 : 1,
+                        borderBottomColor: colors.inputBorder,
+                      }}
+                    >
+                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={20} isOshi={false} />
+                      <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+                        {getArtistPrimaryName(artist)}
+                      </Text>
+                      <AppIcon name="add" size={14} color={colors.accent} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, gap: 4 }}>
+                <View style={{ width: 58 }}>
+                  <EditorInput
+                    value={entry.start_time}
+                    onChangeText={(start_time) => updateEntry(entry.key, {
+                      start_time: formatTimeInput(start_time),
+                    })}
+                    placeholder="开始"
+                    numeric
+                    compact
+                  />
+                </View>
+                <View style={{ width: 58 }}>
+                  <EditorInput
+                    value={entry.end_time}
+                    onChangeText={(end_time) => updateEntry(entry.key, {
+                      end_time: formatTimeInput(end_time),
+                    })}
+                    placeholder="结束"
+                    numeric
+                    compact
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <EditorInput
+                    value={entry.notes}
+                    onChangeText={(notes) => updateEntry(entry.key, { notes })}
+                    placeholder="备注"
+                    compact
+                  />
+                </View>
+              </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="添加时间表条目"
+        activeOpacity={0.7}
+        onPress={() => onChange([...entries, createEmptyTimetableEntry()])}
+        style={{
+          minHeight: 42,
+          marginTop: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderStyle: 'dashed',
+          borderColor: colors.accent,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          backgroundColor: withAlpha(colors.accent, isDark ? 0.1 : 0.05),
+        }}
+      >
+        <AppIcon name="add" size={16} color={colors.accent} />
+        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>添加条目</Text>
+      </TouchableOpacity>
     </View>
   );
 }

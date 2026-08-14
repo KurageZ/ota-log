@@ -421,7 +421,6 @@ export default function EventDetailScreen() {
   const [artistsExpanded, setArtistsExpanded] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [detailsOverflows, setDetailsOverflows] = useState(false);
-  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [oshiIsAttributed, setOshiIsAttributed] = useState(false);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
   const [addingSessionId, setAddingSessionId] = useState<string | null>(null);
@@ -1352,66 +1351,51 @@ export default function EventDetailScreen() {
         {event.status !== 'completed' ? myRecordsSection : null}
 
         {/* 更多 */}
-        {advancedExpanded ? (
-          <>
-            <SectionTitle label="更多" />
-            {sessions.some((session) => session.end_time || session.end_date) ? (
-              <Card cardBg={cardBg}>
-                <CardHeader label="结束信息" />
-                {sessions.map((session, index) => {
-                  if (!session.end_time && !session.end_date) return null;
-                  const endParts = [
-                    session.end_date ? formatDate(session.end_date) : null,
-                    session.end_time,
-                  ].filter(Boolean).join(' ');
-                  return (
-                    <View
-                      key={session.id}
-                      style={{
-                        paddingVertical: 8,
-                        borderBottomWidth: index === sessions.length - 1 ? 0 : 1,
-                        borderBottomColor: colors.divider,
-                      }}
-                    >
-                      {sessions.length > 1 ? (
-                        <Text style={{ fontSize: 12, color: colors.textMuted }}>
-                          {session.title || `场次 ${index + 1}`}
-                        </Text>
-                      ) : null}
-                      <Text style={{ marginTop: sessions.length > 1 ? 3 : 0, fontSize: 14, fontWeight: '600', color: colors.text }}>
-                        结束 {endParts}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </Card>
-            ) : null}
-            {event.url ? (
-              <Card cardBg={cardBg}>
-                <CardHeader label="演出链接" />
-                <TouchableOpacity onPress={handleOpenEventUrl} onLongPress={handleCopyEventUrl} activeOpacity={0.7}>
-                  <Text style={{ fontSize: 14, lineHeight: 21, color: colors.accent }}>{event.url}</Text>
-                </TouchableOpacity>
-              </Card>
-            ) : null}
-            {advancedItemCount === 0 ? (
-              <Card cardBg={cardBg}>
-                <Text style={{ fontSize: 13, color: colors.textMuted }}>还没有更多信息</Text>
-              </Card>
-            ) : null}
-          </>
+        <SectionTitle label="更多" />
+        {sessions.some((session) => session.end_time || session.end_date) ? (
+          <Card cardBg={cardBg}>
+            <CardHeader label="结束信息" />
+            {sessions.map((session, index) => {
+              if (!session.end_time && !session.end_date) return null;
+              const endParts = [
+                session.end_date ? formatDate(session.end_date) : null,
+                session.end_time,
+              ].filter(Boolean).join(' ');
+              return (
+                <View
+                  key={session.id}
+                  style={{
+                    paddingVertical: 8,
+                    borderBottomWidth: index === sessions.length - 1 ? 0 : 1,
+                    borderBottomColor: colors.divider,
+                  }}
+                >
+                  {sessions.length > 1 ? (
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                      {session.title || `场次 ${index + 1}`}
+                    </Text>
+                  ) : null}
+                  <Text style={{ marginTop: sessions.length > 1 ? 3 : 0, fontSize: 14, fontWeight: '600', color: colors.text }}>
+                    结束 {endParts}
+                  </Text>
+                </View>
+              );
+            })}
+          </Card>
         ) : null}
-
-        <ExpansionToggle
-          accessibilityLabel="更多"
-          expanded={advancedExpanded}
-          collapsedLabel="展开更多"
-          expandedLabel="收起更多"
-          onPress={() => setAdvancedExpanded((current) => !current)}
-          style={{
-            marginBottom: 12,
-          }}
-        />
+        {event.url ? (
+          <Card cardBg={cardBg}>
+            <CardHeader label="演出链接" />
+            <TouchableOpacity onPress={handleOpenEventUrl} onLongPress={handleCopyEventUrl} activeOpacity={0.7}>
+              <Text style={{ fontSize: 14, lineHeight: 21, color: colors.accent }}>{event.url}</Text>
+            </TouchableOpacity>
+          </Card>
+        ) : null}
+        {advancedItemCount === 0 ? (
+          <Card cardBg={cardBg}>
+            <Text style={{ fontSize: 13, color: colors.textMuted }}>还没有更多信息</Text>
+          </Card>
+        ) : null}
 
         {/* Delete */}
         <TouchableOpacity
