@@ -77,7 +77,7 @@ function ChekiDetails({ item, showPrice }: { item: ChekiViewerItem; showPrice: b
   const { colors } = useAppTheme();
   const detailBlockBackgroundColor = 'rgba(255,255,255,0.07)';
   const detailLabelColor = 'rgba(255,255,255,0.66)';
-  const dateText = item.date ? formatDate(item.date) : '未记录日期';
+  const dateText = item.date ? formatDate(item.date) : '日期未填写';
   const eventTitle = item.eventTitle ?? '未关联活动';
   const artistName = item.artistName ?? '未关联艺人';
   const notesText = item.notes?.trim() ? item.notes.trim() : '暂无备注';
@@ -190,7 +190,7 @@ export function ChekiViewerModal({
         return null;
       }}
       getAlternateActionLabel={(item) => item.side === 'back' ? '查看正面' : '查看背面'}
-      getDetailSummary={(item) => item.date ? formatDate(item.date) : '未记录日期'}
+      getDetailSummary={(item) => item.date ? formatDate(item.date) : '日期未填写'}
       renderDetails={(item) => <ChekiDetails item={item} showPrice={showPrice} />}
       initialTransitionOrigin={initialTransitionOrigin}
     />

@@ -14,6 +14,21 @@ const mockDb = {
   },
 };
 
+const baseRecord = {
+  id: 'record-1',
+  event_id: null,
+  artist_id: 'artist-1',
+  date: '2026-08-05',
+  quantity: 1,
+  total_price: 100,
+  notes: null,
+  created_at: '2026-08-05T00:00:00.000Z',
+  updated_at: '2026-08-05T00:00:00.000Z',
+  items: [],
+};
+
+const mockEventCardProps: { event?: { id: string } }[] = [];
+
 jest.mock('expo-router', () => {
   const ReactModule = require('react');
   return {
@@ -63,6 +78,13 @@ jest.mock('../../theme/appTheme', () => ({
 
 jest.mock('../AppIcon', () => ({ AppIcon: () => null }));
 jest.mock('../ChekiViewerModal', () => ({ ChekiViewerModal: () => null }));
+jest.mock('../EventCard', () => ({
+  EventCard: (props: { event: { id: string } }) => {
+    mockEventCardProps.push(props);
+    return null;
+  },
+}));
+jest.mock('../native-text-toolbar', () => ({ NativeTextToolbar: () => null }));
 jest.mock('../Oshi', () => {
   const ReactModule = require('react');
   const { Image } = require('react-native');
@@ -80,18 +102,7 @@ describe('ChekiRecordDetailScreen', () => {
   let renderer: ReactTestRenderer;
 
   beforeEach(() => {
-    mockDb.chekiRecords.findRecordById.mockResolvedValue({
-      id: 'record-1',
-      event_id: null,
-      artist_id: 'artist-1',
-      date: '2026-08-05',
-      quantity: 1,
-      total_price: 100,
-      notes: null,
-      created_at: '2026-08-05T00:00:00.000Z',
-      updated_at: '2026-08-05T00:00:00.000Z',
-      items: [],
-    });
+    mockDb.chekiRecords.findRecordById.mockResolvedValue({ ...baseRecord });
     mockDb.artists.findById.mockResolvedValue({
       id: 'artist-1',
       name: '测试艺人',
@@ -104,6 +115,7 @@ describe('ChekiRecordDetailScreen', () => {
       is_favorite: 0,
       created_at: '2026-08-05T00:00:00.000Z',
     });
+    mockEventCardProps.length = 0;
   });
 
   afterEach(() => {
@@ -122,7 +134,7 @@ describe('ChekiRecordDetailScreen', () => {
     expect(avatar.props.source).toEqual({ uri: 'file:///artist-avatar.jpg' });
   });
 
-  test('shows a stable unassociated event label without extra empty-state copy', async () => {
+  test('renders the date with weekday in the overview header', async () => {
     await act(async () => {
       renderer = create(<ChekiRecordDetailScreen />);
       await Promise.resolve();
@@ -134,7 +146,23 @@ describe('ChekiRecordDetailScreen', () => {
       .map((node) => node.props.children)
       .flat(Infinity);
 
-    expect(textContent).toContain('未关联活动');
+    expect(textContent).toContain('2026年8月5日 周三');
+  });
+
+  test('hides the activity section when no event is linked', async () => {
+    await act(async () => {
+      renderer = create(<ChekiRecordDetailScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const textContent = renderer.root
+      .findAllByType(require('react-native').Text)
+      .map((node) => node.props.children)
+      .flat(Infinity);
+
+    expect(textContent).not.toContain('关联活动');
+    expect(textContent).not.toContain('未关联活动');
     expect(textContent).not.toContain('尚未添加图片');
     expect(textContent).not.toContain('可以之后再添加。');
     expect(textContent).not.toContain('还可添加');
@@ -143,5 +171,48 @@ describe('ChekiRecordDetailScreen', () => {
       (node) => node.props.accessibilityLabel === '添加图片',
     );
     expect(addImageButtons).toHaveLength(1);
+  });
+
+  test('shows the activity section when an event is linked', async () => {
+    mockDb.chekiRecords.findRecordById.mockResolvedValue({ ...baseRecord, event_id: 'event-1' });
+    mockDb.events.findById.mockResolvedValue({
+      id: 'event-1',
+      title: '测试活动',
+      event_type: 'concert',
+      actual_expense: null,
+      event_date: '2026-08-05',
+      event_time: null,
+      open_time: null,
+      start_time: null,
+      end_time: null,
+      city: null,
+      venue: null,
+      ticket_price: null,
+      status: 'completed',
+      review_score: null,
+      notes: null,
+      details: null,
+      url: null,
+      setlist_text: null,
+      trip_id: null,
+      created_at: '2026-08-05T00:00:00.000Z',
+      updated_at: '2026-08-05T00:00:00.000Z',
+    });
+
+    await act(async () => {
+      renderer = create(<ChekiRecordDetailScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const textContent = renderer.root
+      .findAllByType(require('react-native').Text)
+      .map((node) => node.props.children)
+      .flat(Infinity);
+
+    expect(textContent).toContain('关联活动');
+    expect(textContent).not.toContain('未关联活动');
+    expect(mockEventCardProps).toHaveLength(1);
+    expect(mockEventCardProps[0].event?.id).toBe('event-1');
   });
 });

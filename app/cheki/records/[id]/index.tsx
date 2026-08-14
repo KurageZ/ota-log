@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -16,21 +17,24 @@ import type { Artist, Event } from '../../../../src/types/models';
 import type { ChekiRecordWithItems } from '../../../../src/repositories/ChekiRecordRepository';
 import type { ChekiViewerItem } from '../../../../src/types/chekiViewer';
 import { useAppTheme } from '../../../../src/theme/appTheme';
-import { formatDate } from '../../../../src/utils/date';
+import { formatChineseDateWithWeekday } from '../../../../src/utils/date';
 import { getArtistPrimaryName } from '../../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../../src/utils/avatarSource';
 import { AppIcon } from '../../../../src/components/AppIcon';
 import { EventCard } from '../../../../src/components/EventCard';
 import { ChekiViewerModal } from '../../../../src/components/ChekiViewerModal';
 import { FormSectionLabel } from '../../../../src/components/FormPrimitives';
+import { NativeTextToolbar } from '../../../../src/components/native-text-toolbar';
 import { OshiAvatar } from '../../../../src/components/Oshi';
 import { getEventCardOshiBadge } from '../../../../src/utils/oshiMatch';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 import {
   DEFAULT_CHEKI_SPEC,
-  formatChekiSpecDistribution,
   getChekiSpecAspectRatio,
 } from '../../../../src/domain/chekiSpec';
+
+const ARTIST_AVATAR_SIZE = 48;
+const ARTIST_TITLE_GAP = 14;
 
 function getItemPreviewUri(item: ChekiRecordWithItems['items'][number]): string | null {
   return item.images.find((image) => image.side === 'front')?.photo_uri
@@ -181,6 +185,13 @@ export default function ChekiRecordDetailScreen() {
         edges={SCROLL_SCREEN_SAFE_AREA_EDGES}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.screen }}
       >
+        <Stack.Screen
+          options={{
+            title: '拍立得记录',
+            headerStyle: { backgroundColor: colors.screen },
+            headerShadowVisible: false,
+          }}
+        />
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
     );
@@ -192,6 +203,13 @@ export default function ChekiRecordDetailScreen() {
         edges={SCROLL_SCREEN_SAFE_AREA_EDGES}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.screen }}
       >
+        <Stack.Screen
+          options={{
+            title: '拍立得记录',
+            headerStyle: { backgroundColor: colors.screen },
+            headerShadowVisible: false,
+          }}
+        />
         <AppIcon name="alert" size={34} color={colors.textMuted} />
         <Text style={{ marginTop: 12, fontSize: 17, fontWeight: '700', color: colors.heading }}>记录不存在</Text>
         <Text style={{ marginTop: 6, fontSize: 13, textAlign: 'center', color: colors.textSecondary }}>
@@ -206,23 +224,37 @@ export default function ChekiRecordDetailScreen() {
   const hasMissingImages = photoItems.length < record.quantity;
   const totalPrice = record.items.reduce((sum, item) => sum + item.unit_price, 0);
   const artistName = artist ? getArtistPrimaryName(artist) : '未关联艺人';
-  const specDistribution = formatChekiSpecDistribution(record.items.map((item) => item.spec));
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
           title: '拍立得记录',
-          headerRight: () => (
+          headerStyle: { backgroundColor: colors.screen },
+          headerShadowVisible: false,
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity
-              onPress={() => router.push(`/cheki/records/${record.id}/edit`)}
               accessibilityRole="button"
               accessibilityLabel="编辑拍立得记录"
-              hitSlop={8}
+              onPress={() => router.push(`/cheki/records/${record.id}/edit`)}
+              style={{
+                minWidth: 44,
+                height: 44,
+                paddingRight: 4,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.accent }}>编辑</Text>
+              <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>编辑</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        right={{
+          label: '编辑',
+          accessibilityLabel: '编辑拍立得记录',
+          onPress: () => router.push(`/cheki/records/${record.id}/edit`),
         }}
       />
       <ScrollView
@@ -230,62 +262,52 @@ export default function ChekiRecordDetailScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ padding: 18, borderRadius: 20, backgroundColor: colors.card }}>
+        <View style={{ paddingVertical: 28, paddingHorizontal: 18, borderRadius: 20, backgroundColor: colors.card }}>
           <TouchableOpacity
             activeOpacity={artist ? 0.7 : 1}
             onPress={artist ? () => router.push(`/artists/${artist.id}`) : undefined}
+            accessibilityRole={artist ? 'button' : undefined}
+            accessibilityLabel={artist ? `查看艺人 ${artistName}` : undefined}
             style={{ flexDirection: 'row', alignItems: 'center' }}
           >
             <OshiAvatar
               source={artist ? resolveAvatarSource(artist.avatar_uri) : null}
-              size={42}
+              size={ARTIST_AVATAR_SIZE}
               isOshi={false}
             />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.heading }}>{artistName}</Text>
-            </View>
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                marginLeft: ARTIST_TITLE_GAP,
+                fontSize: 18,
+                lineHeight: 24,
+                fontWeight: '800',
+                color: colors.heading,
+              }}
+            >
+              {artistName}
+            </Text>
             {artist ? <AppIcon name="disclosure" variant="forward" size={16} color={colors.chevron} /> : null}
           </TouchableOpacity>
 
-          <View style={{ marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.divider }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <AppIcon name="calendar" size={15} color={colors.textMuted} />
-              <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
-                {record.date ? formatDate(record.date) : '未记录日期'}
-              </Text>
-            </View>
-
-            {event ? (
-              <EventCard
-                event={event}
-                oshiBadge={getEventCardOshiBadge(event.status, null)}
-                variant="compact"
-                style={{
-                  marginTop: 12,
-                  marginBottom: 0,
-                  backgroundColor: colors.cardAlt,
-                  borderWidth: 1,
-                  borderColor: colors.divider,
-                  borderRadius: 15,
-                }}
-              />
-            ) : (
-              <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <AppIcon name="music" size={15} color={colors.textMuted} />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
-                  未关联活动
-                </Text>
-              </View>
-            )}
-            <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <AppIcon name="image" size={15} color={colors.textMuted} />
-              <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>
-                {specDistribution}
-              </Text>
-            </View>
+          <View style={{ marginTop: 12, marginLeft: ARTIST_AVATAR_SIZE + ARTIST_TITLE_GAP, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <AppIcon name="calendar" size={16} color={colors.accent} />
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                lineHeight: 24,
+                fontWeight: '700',
+                fontVariant: ['tabular-nums'],
+                color: colors.text,
+              }}
+            >
+              {record.date ? formatChineseDateWithWeekday(record.date) : '日期未填写'}
+            </Text>
           </View>
 
-          <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider, flexDirection: 'row' }}>
+          <View style={{ marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.divider, flexDirection: 'row' }}>
             <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 4 }}>
               <Text style={{ fontSize: 11, lineHeight: 15, color: colors.textSecondary }}>总数量</Text>
               <Text style={{ marginTop: 4, fontSize: 17, lineHeight: 22, fontWeight: '800', color: colors.text }}>{record.quantity} 张</Text>
@@ -304,6 +326,24 @@ export default function ChekiRecordDetailScreen() {
             </View>
           </View>
         </View>
+
+        {event ? (
+          <View style={{ marginTop: 20 }}>
+            <FormSectionLabel label="关联活动" />
+            <EventCard
+              event={event}
+              oshiBadge={getEventCardOshiBadge(event.status, null)}
+              variant="compact"
+              style={{
+                marginBottom: 0,
+                backgroundColor: colors.cardAlt,
+                borderWidth: 1,
+                borderColor: colors.divider,
+                borderRadius: 15,
+              }}
+            />
+          </View>
+        ) : null}
 
         <View style={{ marginTop: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
