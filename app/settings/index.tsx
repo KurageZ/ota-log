@@ -25,6 +25,21 @@ import {
 } from '../../src/theme/config';
 import { loadChekiPhotoWidgetPreferences } from '../../src/widgets/chekiPhotoWidgetPreferences';
 import {
+  CHEKI_BROWSE_MODE_LABELS,
+  type ChekiBrowseMode,
+  type ChekiViewPreferences,
+  loadChekiViewPreferences,
+  saveChekiViewPreferences,
+} from '../../src/utils/chekiViewPreferences';
+import {
+  DEFAULT_STATS_PERIOD_PRESET,
+  STATS_DEFAULT_PERIOD_LABELS,
+  type StatsDefaultPeriodPreset,
+  type StatsPreferences,
+  loadStatsPreferences,
+  saveStatsPreferences,
+} from '../../src/utils/statsPreferences';
+import {
   ARTIST_CONFIRMATION_MODE_DESCRIPTIONS,
   ARTIST_CONFIRMATION_MODE_LABELS,
   ARTIST_CONFIRMATION_MODE_SUMMARIES,
@@ -40,6 +55,8 @@ type BackupExportState =
 const APPEARANCE_OPTIONS: AppAppearance[] = ['system', 'light', 'dark'];
 const THEME_OPTIONS: AppThemeId[] = ['monoChrome', 'classicViolet', 'nightNeon'];
 const CALENDAR_VIEW_OPTIONS: AppCalendarDefaultView[] = ['month', 'timeline'];
+const CHEKI_DEFAULT_VIEW_OPTIONS: ChekiBrowseMode[] = ['album', 'record'];
+const STATS_DEFAULT_PERIOD_OPTIONS: StatsDefaultPeriodPreset[] = ['week', 'month', 'year'];
 const ARTIST_CONFIRMATION_OPTIONS: ArtistConfirmationMode[] = ['always', 'matches_only', 'never'];
 
 function formatBytes(bytes: number): string {
@@ -72,31 +89,41 @@ export default function SettingsScreen() {
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [widgetArtistIds, setWidgetArtistIds] = useState<string[]>([]);
+  const [chekiViewPreferences, setChekiViewPreferences] = useState<ChekiViewPreferences | null>(null);
+  const [statsPreferences, setStatsPreferences] = useState<StatsPreferences | null>(null);
   const [backupExportState, setBackupExportState] = useState<BackupExportState>({ status: 'idle' });
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCalendarDefaultViewOpen, setIsCalendarDefaultViewOpen] = useState(false);
+  const [isChekiDefaultViewOpen, setIsChekiDefaultViewOpen] = useState(false);
+  const [isStatsDefaultPeriodOpen, setIsStatsDefaultPeriodOpen] = useState(false);
   const [isArtistConfirmationOpen, setIsArtistConfirmationOpen] = useState(false);
   const [pendingAppearance, setPendingAppearance] = useState<AppAppearance | null>(null);
   const [pendingThemeId, setPendingThemeId] = useState<AppThemeId | null>(null);
   const [pendingCalendarDefaultView, setPendingCalendarDefaultView] = useState<AppCalendarDefaultView | null>(null);
+  const [pendingChekiDefaultView, setPendingChekiDefaultView] = useState<ChekiBrowseMode | null>(null);
+  const [pendingStatsDefaultPeriod, setPendingStatsDefaultPeriod] = useState<StatsDefaultPeriodPreset | null>(null);
   const [pendingArtistConfirmationMode, setPendingArtistConfirmationMode] = useState<ArtistConfirmationMode | null>(null);
   const [isClearingAllData, setIsClearingAllData] = useState(false);
   const [isRemovingOrphanArtists, setIsRemovingOrphanArtists] = useState(false);
   const showDeveloperOptions = __DEV__;
 
   const reloadSettingsContext = useCallback(async () => {
-    const [config, artists, photoArtistIds, widgetPreferences] = await Promise.all([
+    const [config, artists, photoArtistIds, widgetPreferences, chekiPreferences, statsPrefs] = await Promise.all([
       db.userConfig.getConfig(),
       db.artists.findAll(),
       db.cheki.findDistinctPhotoArtistIds(),
       loadChekiPhotoWidgetPreferences(),
+      loadChekiViewPreferences(),
+      loadStatsPreferences(),
     ]);
     const availableArtistIds = new Set(photoArtistIds);
     setUserConfig(config);
     setAllArtists(artists);
     setWidgetArtistIds(widgetPreferences.artistIds.filter((artistId) => availableArtistIds.has(artistId)));
+    setChekiViewPreferences(chekiPreferences);
+    setStatsPreferences(statsPrefs);
   }, [db]);
 
   useFocusEffect(
@@ -277,6 +304,44 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSelectChekiDefaultView = async (nextView: ChekiBrowseMode) => {
+    if (!chekiViewPreferences || nextView === chekiViewPreferences.defaultBrowseMode || pendingChekiDefaultView) return;
+
+    setPendingChekiDefaultView(nextView);
+    try {
+      const nextPreferences = { ...chekiViewPreferences, defaultBrowseMode: nextView };
+      await saveChekiViewPreferences(nextPreferences);
+      setChekiViewPreferences(nextPreferences);
+    } catch (error) {
+      showOperationFailedAlert(
+        '无法保存切册默认视图。',
+        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
+        error,
+      );
+    } finally {
+      setPendingChekiDefaultView(null);
+    }
+  };
+
+  const handleSelectStatsDefaultPeriod = async (nextPreset: StatsDefaultPeriodPreset) => {
+    if (!statsPreferences || nextPreset === statsPreferences.defaultPeriodPreset || pendingStatsDefaultPeriod) return;
+
+    setPendingStatsDefaultPeriod(nextPreset);
+    try {
+      const nextPreferences = { ...statsPreferences, defaultPeriodPreset: nextPreset };
+      await saveStatsPreferences(nextPreferences);
+      setStatsPreferences(nextPreferences);
+    } catch (error) {
+      showOperationFailedAlert(
+        '无法保存统计默认视图。',
+        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
+        error,
+      );
+    } finally {
+      setPendingStatsDefaultPeriod(null);
+    }
+  };
+
   const handleSelectArtistConfirmationMode = async (nextMode: ArtistConfirmationMode) => {
     const currentMode = userConfig?.artist_confirmation_mode ?? DEFAULT_ARTIST_CONFIRMATION_MODE;
     if (nextMode === currentMode || pendingArtistConfirmationMode) return;
@@ -452,8 +517,268 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
+                  setIsAppearanceOpen(false);
                   setIsThemeOpen(false);
                   setIsCalendarDefaultViewOpen(false);
+                  setIsStatsDefaultPeriodOpen(false);
+                  setIsArtistConfirmationOpen(false);
+                  setIsChekiDefaultViewOpen((open) => !open);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderBottomWidth: isChekiDefaultViewOpen ? 1 : 0,
+                  borderBottomColor: rowDividerColor,
+                }}
+              >
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: withAlpha(settingsTints.cheki, 0.13),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <AppIcon name="cheki" size={18} color={settingsTints.cheki} />
+                </View>
+
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
+                    切册默认视图
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    marginLeft: 12,
+                    marginRight: 8,
+                    maxWidth: 120,
+                    fontSize: 14,
+                    color: rowSubtitleColor,
+                    fontWeight: '500',
+                    textAlign: 'right',
+                  }}
+                  numberOfLines={1}
+                >
+                  {CHEKI_BROWSE_MODE_LABELS[
+                    pendingChekiDefaultView
+                      ?? chekiViewPreferences?.defaultBrowseMode
+                      ?? 'album'
+                  ]}
+                </Text>
+                {pendingChekiDefaultView ? (
+                  <View style={{ marginRight: 8 }}>
+                    <ActivityIndicator size="small" color={settingsTints.cheki} />
+                  </View>
+                ) : null}
+
+                <AppIcon
+                  name="disclosure"
+                  variant={isChekiDefaultViewOpen ? 'up' : 'down'}
+                  size={16}
+                  color={rowChevronColor}
+                />
+              </TouchableOpacity>
+
+              {isChekiDefaultViewOpen ? (
+                <View style={{ backgroundColor: expandedPanelColor }}>
+                  {CHEKI_DEFAULT_VIEW_OPTIONS.map((option, index) => {
+                    const selected = (
+                      pendingChekiDefaultView
+                      ?? chekiViewPreferences?.defaultBrowseMode
+                      ?? 'album'
+                    ) === option;
+                    const isLast = index === CHEKI_DEFAULT_VIEW_OPTIONS.length - 1;
+
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected, disabled: pendingChekiDefaultView !== null }}
+                        activeOpacity={0.7}
+                        disabled={pendingChekiDefaultView !== null}
+                        onPress={() => handleSelectChekiDefaultView(option)}
+                        style={{
+                          minHeight: 56,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 11,
+                          borderBottomWidth: isLast ? 0 : 1,
+                          borderBottomColor: rowDividerColor,
+                          opacity: pendingChekiDefaultView ? 0.7 : 1,
+                        }}
+                      >
+                        <View style={{ width: 46 }} />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 14,
+                            color: selected ? settingsTints.cheki : rowTextColor,
+                            fontWeight: selected ? '700' : '500',
+                          }}
+                        >
+                          {CHEKI_BROWSE_MODE_LABELS[option]}
+                        </Text>
+                        {pendingChekiDefaultView === option ? (
+                          <ActivityIndicator size="small" color={settingsTints.cheki} />
+                        ) : (
+                          <AppIcon
+                            name="radio"
+                            variant={selected ? 'selected' : 'unselected'}
+                            size={18}
+                            color={selected ? settingsTints.cheki : rowChevronColor}
+                            secondaryColor={colors.onAccent}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsAppearanceOpen(false);
+                  setIsThemeOpen(false);
+                  setIsCalendarDefaultViewOpen(false);
+                  setIsChekiDefaultViewOpen(false);
+                  setIsArtistConfirmationOpen(false);
+                  setIsStatsDefaultPeriodOpen((open) => !open);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderBottomWidth: isStatsDefaultPeriodOpen ? 1 : 0,
+                  borderBottomColor: rowDividerColor,
+                }}
+              >
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: withAlpha(settingsTints.stats, 0.13),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <AppIcon name="stats" size={18} color={settingsTints.stats} />
+                </View>
+
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
+                    统计默认视图
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    marginLeft: 12,
+                    marginRight: 8,
+                    maxWidth: 120,
+                    fontSize: 14,
+                    color: rowSubtitleColor,
+                    fontWeight: '500',
+                    textAlign: 'right',
+                  }}
+                  numberOfLines={1}
+                >
+                  {STATS_DEFAULT_PERIOD_LABELS[
+                    pendingStatsDefaultPeriod
+                      ?? statsPreferences?.defaultPeriodPreset
+                      ?? DEFAULT_STATS_PERIOD_PRESET
+                  ]}
+                </Text>
+                {pendingStatsDefaultPeriod ? (
+                  <View style={{ marginRight: 8 }}>
+                    <ActivityIndicator size="small" color={settingsTints.stats} />
+                  </View>
+                ) : null}
+
+                <AppIcon
+                  name="disclosure"
+                  variant={isStatsDefaultPeriodOpen ? 'up' : 'down'}
+                  size={16}
+                  color={rowChevronColor}
+                />
+              </TouchableOpacity>
+
+              {isStatsDefaultPeriodOpen ? (
+                <View style={{ backgroundColor: expandedPanelColor }}>
+                  {STATS_DEFAULT_PERIOD_OPTIONS.map((option, index) => {
+                    const selected = (
+                      pendingStatsDefaultPeriod
+                      ?? statsPreferences?.defaultPeriodPreset
+                      ?? DEFAULT_STATS_PERIOD_PRESET
+                    ) === option;
+                    const isLast = index === STATS_DEFAULT_PERIOD_OPTIONS.length - 1;
+
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected, disabled: pendingStatsDefaultPeriod !== null }}
+                        activeOpacity={0.7}
+                        disabled={pendingStatsDefaultPeriod !== null}
+                        onPress={() => handleSelectStatsDefaultPeriod(option)}
+                        style={{
+                          minHeight: 56,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 11,
+                          borderBottomWidth: isLast ? 0 : 1,
+                          borderBottomColor: rowDividerColor,
+                          opacity: pendingStatsDefaultPeriod ? 0.7 : 1,
+                        }}
+                      >
+                        <View style={{ width: 46 }} />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 14,
+                            color: selected ? settingsTints.stats : rowTextColor,
+                            fontWeight: selected ? '700' : '500',
+                          }}
+                        >
+                          {STATS_DEFAULT_PERIOD_LABELS[option]}
+                        </Text>
+                        {pendingStatsDefaultPeriod === option ? (
+                          <ActivityIndicator size="small" color={settingsTints.stats} />
+                        ) : (
+                          <AppIcon
+                            name="radio"
+                            variant={selected ? 'selected' : 'unselected'}
+                            size={18}
+                            color={selected ? settingsTints.stats : rowChevronColor}
+                            secondaryColor={colors.onAccent}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsThemeOpen(false);
+                  setIsCalendarDefaultViewOpen(false);
+                  setIsChekiDefaultViewOpen(false);
+                  setIsStatsDefaultPeriodOpen(false);
                   setIsArtistConfirmationOpen(false);
                   setIsAppearanceOpen((open) => !open);
                 }}
@@ -570,6 +895,8 @@ export default function SettingsScreen() {
                 onPress={() => {
                   setIsAppearanceOpen(false);
                   setIsCalendarDefaultViewOpen(false);
+                  setIsChekiDefaultViewOpen(false);
+                  setIsStatsDefaultPeriodOpen(false);
                   setIsArtistConfirmationOpen(false);
                   setIsThemeOpen((open) => !open);
                 }}
@@ -686,6 +1013,8 @@ export default function SettingsScreen() {
                 onPress={() => {
                   setIsAppearanceOpen(false);
                   setIsThemeOpen(false);
+                  setIsChekiDefaultViewOpen(false);
+                  setIsStatsDefaultPeriodOpen(false);
                   setIsArtistConfirmationOpen(false);
                   setIsCalendarDefaultViewOpen((open) => !open);
                 }}
@@ -810,6 +1139,8 @@ export default function SettingsScreen() {
                   setIsAppearanceOpen(false);
                   setIsThemeOpen(false);
                   setIsCalendarDefaultViewOpen(false);
+                  setIsChekiDefaultViewOpen(false);
+                  setIsStatsDefaultPeriodOpen(false);
                   setIsArtistConfirmationOpen((open) => !open);
                 }}
                 style={{

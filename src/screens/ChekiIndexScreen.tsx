@@ -546,7 +546,7 @@ export default function ChekiLibraryScreen() {
     let isActive = true;
     loadChekiViewPreferences().then((preferences) => {
       if (!isActive) return;
-      setViewPreferences(preferences);
+      setViewPreferences({ ...preferences, browseMode: preferences.defaultBrowseMode });
       setViewPreferencesLoaded(true);
     });
     return () => {

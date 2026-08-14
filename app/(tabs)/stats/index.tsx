@@ -480,22 +480,35 @@ export default function StatsScreen() {
     () => parseStatsRangeParams(params),
     [params.endDate, params.month, params.preset, params.startDate, params.year]
   );
-  const [period, setPeriod] = useState<StatsDateRange>(
-    () => routePeriod ?? statsRangeSession.getCurrent() ?? createPresetStatsRange('month')
-  );
+  const [period, setPeriod] = useState<StatsDateRange | null>(null);
   const [pickerMode, setPickerMode] = useState<StatsRangePickerMode | null>(null);
   const [preferredPickerMode, setPreferredPickerMode] = useState<StatsRangePickerMode | null>(null);
   const [stats, setStats] = useState<StatsState | null>(null);
   const [statsSections, setStatsSections] = useState<StatsSectionConfig[] | null>(null);
   const loadRequestIdRef = useRef(0);
 
-  const startDateArg = period.startDate ?? undefined;
-  const endDateArg = period.endDate ?? undefined;
-  const heatmapYear = period.preset === 'year' && period.startDate
+  useEffect(() => {
+    let isActive = true;
+    loadStatsPreferences().then((preferences) => {
+      if (!isActive) return;
+      setPeriod(
+        routePeriod
+          ?? statsRangeSession.getCurrent()
+          ?? createPresetStatsRange(preferences.defaultPeriodPreset),
+      );
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [routePeriod]);
+
+  const startDateArg = period?.startDate ?? undefined;
+  const endDateArg = period?.endDate ?? undefined;
+  const heatmapYear = period?.preset === 'year' && period.startDate
     ? Number(period.startDate.slice(0, 4))
     : null;
-  const trendBuckets = useMemo(() => buildStatsTrendBuckets(period), [period]);
-  const routePeriodPending = routePeriod != null && (
+  const trendBuckets = useMemo(() => (period ? buildStatsTrendBuckets(period) : []), [period]);
+  const routePeriodPending = routePeriod != null && period != null && (
     period.preset !== routePeriod.preset
     || period.startDate !== routePeriod.startDate
     || period.endDate !== routePeriod.endDate
@@ -658,7 +671,8 @@ export default function StatsScreen() {
     setPreferredPickerMode(routePeriod.preset === 'all' ? 'custom' : routePeriod.preset);
 
     setPeriod((current) => (
-      current.preset === routePeriod.preset
+      current != null
+        && current.preset === routePeriod.preset
         && current.startDate === routePeriod.startDate
         && current.endDate === routePeriod.endDate
         ? current
@@ -667,9 +681,9 @@ export default function StatsScreen() {
   }, [routePeriod]);
 
   useFocusEffect(useCallback(() => {
-    if (routePeriodPending) return;
+    if (period == null || routePeriodPending) return;
     loadData();
-  }, [loadData, routePeriodPending]));
+  }, [loadData, period, routePeriodPending]));
 
   const renderAndroidAdjustButton = useCallback(() => (
     <TouchableOpacity
@@ -685,7 +699,7 @@ export default function StatsScreen() {
   ), [colors.accent, router]);
 
   const periodParams = useCallback((): Record<string, string> => {
-    if (!period.startDate || !period.endDate) return { preset: 'all' };
+    if (!period?.startDate || !period.endDate) return { preset: 'all' };
     return { preset: period.preset, startDate: period.startDate, endDate: period.endDate };
   }, [period]);
 
@@ -715,7 +729,7 @@ export default function StatsScreen() {
     setPickerMode(mode);
   }, []);
 
-  if (!stats || !statsSections) {
+  if (!period || !stats || !statsSections) {
     return <View style={{ flex: 1, backgroundColor: colors.screen }} />;
   }
 

@@ -34,7 +34,12 @@ describe('statsPreferences', () => {
         { type: 'cheki', visible: true },
       ],
       seenSectionTypes: [...STATS_SECTION_TYPES],
+      defaultPeriodPreset: 'month',
     });
+  });
+
+  it('defaults the stats period to the current month', () => {
+    expect(createDefaultStatsPreferences().defaultPeriodPreset).toBe('month');
   });
 
   it('uses the full default without new markers when storage is empty', async () => {
@@ -78,6 +83,26 @@ describe('statsPreferences', () => {
     expect(preferences.seenSectionTypes).toEqual(STATS_SECTION_TYPES);
   });
 
+  it('keeps a valid configured default period preset', () => {
+    const preferences = sanitizeStatsPreferences({
+      sections: createDefaultStatsSections(),
+      seenSectionTypes: [...STATS_SECTION_TYPES],
+      defaultPeriodPreset: 'year',
+    });
+
+    expect(preferences.defaultPeriodPreset).toBe('year');
+  });
+
+  it('falls back to the month preset when the stored default period is invalid', () => {
+    const preferences = sanitizeStatsPreferences({
+      sections: createDefaultStatsSections(),
+      seenSectionTypes: [...STATS_SECTION_TYPES],
+      defaultPeriodPreset: 'all',
+    });
+
+    expect(preferences.defaultPeriodPreset).toBe('month');
+  });
+
   it('appends missing sections disabled and marks them unseen for an existing configuration', () => {
     const preferences = sanitizeStatsPreferences({
       sections: [
@@ -106,12 +131,14 @@ describe('statsPreferences', () => {
     const preferences = sanitizeStatsPreferences({
       sections: [{ type: 'activity', visible: true }],
       seenSectionTypes: ['activity'],
+      defaultPeriodPreset: 'year',
     });
 
     const updated = markStatsSectionsSeen(preferences, ['oshi', 'spending']);
 
     expect(updated.sections).toBe(preferences.sections);
     expect(updated.seenSectionTypes).toEqual(['activity', 'oshi', 'spending']);
+    expect(updated.defaultPeriodPreset).toBe('year');
   });
 
   it('saves sanitized preferences under the stats storage key', async () => {
@@ -121,11 +148,13 @@ describe('statsPreferences', () => {
         { type: 'activity', visible: true },
       ],
       seenSectionTypes: ['activity'],
+      defaultPeriodPreset: 'year',
     } as const;
 
     await saveStatsPreferences({
       sections: [...preferences.sections],
       seenSectionTypes: [...preferences.seenSectionTypes],
+      defaultPeriodPreset: preferences.defaultPeriodPreset,
     });
 
     expect(mockedAsyncStorage.setItem).toHaveBeenCalledWith(

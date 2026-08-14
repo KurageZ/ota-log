@@ -7,8 +7,14 @@ export type ChekiBrowseMode = 'album' | 'record';
 export type ChekiAlbumGrouping = 'artist' | 'date' | 'none';
 export type ChekiSortOrder = 'desc' | 'asc';
 
+export const CHEKI_BROWSE_MODE_LABELS: Record<ChekiBrowseMode, string> = {
+  album: '相册',
+  record: '记录',
+};
+
 export interface ChekiViewPreferences {
   browseMode: ChekiBrowseMode;
+  defaultBrowseMode: ChekiBrowseMode;
   albumGrouping: ChekiAlbumGrouping;
   albumSortOrder: ChekiSortOrder;
   recordSortOrder: ChekiSortOrder;
@@ -20,6 +26,7 @@ export interface ChekiViewPreferences {
 
 export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
   browseMode: 'album',
+  defaultBrowseMode: 'album',
   albumGrouping: 'artist',
   albumSortOrder: 'desc',
   recordSortOrder: 'desc',
@@ -61,6 +68,9 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
       : raw.browseMode === 'item'
         ? 'album'
       : DEFAULT_CHEKI_VIEW_PREFERENCES.browseMode,
+    defaultBrowseMode: isBrowseMode(raw.defaultBrowseMode)
+      ? raw.defaultBrowseMode
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.defaultBrowseMode,
     albumGrouping: isAlbumGrouping(raw.albumGrouping)
       ? raw.albumGrouping
       : legacyGrouping ?? DEFAULT_CHEKI_VIEW_PREFERENCES.albumGrouping,

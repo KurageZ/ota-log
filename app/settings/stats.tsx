@@ -19,7 +19,9 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
+  DEFAULT_STATS_PERIOD_PRESET,
   STATS_SECTION_LABELS,
+  type StatsDefaultPeriodPreset,
   type StatsSectionConfig,
   type StatsSectionType,
   createDefaultStatsPreferences,
@@ -46,6 +48,9 @@ export default function StatsSettingsScreen() {
   const { colors } = useAppTheme();
   const [sections, setSections] = useState<StatsSectionConfig[]>([]);
   const [seenSectionTypes, setSeenSectionTypes] = useState<StatsSectionType[]>([]);
+  const [defaultPeriodPreset, setDefaultPeriodPreset] = useState<StatsDefaultPeriodPreset>(
+    DEFAULT_STATS_PERIOD_PRESET,
+  );
   const [newSectionTypes, setNewSectionTypes] = useState<StatsSectionType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const sortableItemsRef = useRef<StatsSettingsSortableItem[]>([]);
@@ -63,6 +68,7 @@ export default function StatsSettingsScreen() {
 
       setSections(groupedSections);
       setSeenSectionTypes(viewedPreferences.seenSectionTypes);
+      setDefaultPeriodPreset(viewedPreferences.defaultPeriodPreset);
       setNewSectionTypes(unseenTypes);
       lastSavedSectionsRef.current = groupedSections;
 
@@ -114,6 +120,7 @@ export default function StatsSettingsScreen() {
     const sanitized = sanitizeStatsPreferences({
       sections: nextSections,
       seenSectionTypes,
+      defaultPeriodPreset,
     });
     const groupedSections = groupSections(sanitized.sections);
     const saveId = ++latestSaveIdRef.current;
@@ -122,6 +129,7 @@ export default function StatsSettingsScreen() {
     const saveOperation = saveQueueRef.current.then(() => saveStatsPreferences({
         sections: groupedSections,
         seenSectionTypes: sanitized.seenSectionTypes,
+        defaultPeriodPreset: sanitized.defaultPeriodPreset,
       }));
     saveQueueRef.current = saveOperation.catch(() => undefined);
 
@@ -138,7 +146,7 @@ export default function StatsSettingsScreen() {
         error,
       );
     }
-  }, [seenSectionTypes]);
+  }, [defaultPeriodPreset, seenSectionTypes]);
 
   const handleDragStart = useCallback(() => {
     Vibration.vibrate(50);

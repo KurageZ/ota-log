@@ -25,6 +25,7 @@ describe('chekiViewPreferences', () => {
   it('sanitizes the album and record view preferences', () => {
     expect(sanitizeChekiViewPreferences({
       browseMode: 'record',
+      defaultBrowseMode: 'record',
       albumGrouping: 'date',
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
@@ -34,6 +35,7 @@ describe('chekiViewPreferences', () => {
       albumModeHintDismissed: true,
     })).toEqual({
       browseMode: 'record',
+      defaultBrowseMode: 'record',
       albumGrouping: 'date',
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
@@ -54,6 +56,7 @@ describe('chekiViewPreferences', () => {
       albumModeHintDismissed: true,
     })).toEqual({
       browseMode: 'album',
+      defaultBrowseMode: 'album',
       albumGrouping: 'none',
       albumSortOrder: 'asc',
       recordSortOrder: 'asc',
@@ -67,6 +70,21 @@ describe('chekiViewPreferences', () => {
   it('defaults the album to large images with a uniform ratio', () => {
     expect(DEFAULT_CHEKI_VIEW_PREFERENCES.density).toBe('large');
     expect(DEFAULT_CHEKI_VIEW_PREFERENCES.useSpecAspectRatio).toBe(false);
+    expect(DEFAULT_CHEKI_VIEW_PREFERENCES.defaultBrowseMode).toBe('album');
+  });
+
+  it('falls back to the album default when the stored default browse mode is invalid', () => {
+    expect(sanitizeChekiViewPreferences({
+      browseMode: 'album',
+      defaultBrowseMode: 'timeline',
+    }).defaultBrowseMode).toBe('album');
+  });
+
+  it('keeps a user-selected default browse mode', () => {
+    expect(sanitizeChekiViewPreferences({
+      browseMode: 'album',
+      defaultBrowseMode: 'record',
+    }).defaultBrowseMode).toBe('record');
   });
 
   it('falls back to defaults when stored JSON is invalid', async () => {
@@ -77,6 +95,7 @@ describe('chekiViewPreferences', () => {
   it('saves sanitized preferences under the v2 storage key', async () => {
     const preferences = {
       browseMode: 'album' as const,
+      defaultBrowseMode: 'album' as const,
       albumGrouping: 'none' as const,
       albumSortOrder: 'asc' as const,
       recordSortOrder: 'desc' as const,
