@@ -10,6 +10,7 @@ const MIX_AND_CALL_URL = 'https://dzyxdd.github.io/MixAndCall/mix/mix/';
 export default function ToolboxScreen() {
   const { colors } = useAppTheme();
   const toolTints = colors.toolsMenu;
+  const weiboTint = colors.settingsMenu.weibo;
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -56,8 +57,15 @@ export default function ToolboxScreen() {
               label="微博关注导入"
               subtitle="从微博关注列表批量导入艺人"
               tint={toolTints.artistImport}
-              isLast
               onPress={() => router.push('/tools/weibo-following')}
+            />
+            <MenuItem
+              icon="login"
+              label="登录微博"
+              subtitle="保存微博登录状态，供抓取功能使用"
+              tint={weiboTint}
+              isLast
+              onPress={() => router.push('/weibo')}
             />
           </MenuCard>
         </View>

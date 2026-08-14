@@ -75,17 +75,18 @@ Profile 上不直接放备份、清理、微博登录、主题、日历默认视
 `/settings` 是单页设置中心。当前分组：
 
 1. **个人**：个人资料、单推设置。
-2. **外观**：首页自定义、统计自定义、切册默认视图、统计默认视图、显示模式、主题色、日历默认视图。
-3. **活动**：出演者确认方式。
-4. **小组件**（仅 iOS）：拍立得回忆的展示艺人设置。
-5. **数据与备份**：生成备份数据、保存到本地、恢复备份。
-6. **高级**：登录微博、清理未使用图片。
+2. **偏好**：外观（子页，含显示模式与主题色）、功能（子页，含切册/统计/日历默认视图与出演者确认）、首页自定义、统计自定义（子页）。
+3. **小组件**（仅 iOS）：拍立得回忆的展示艺人设置。
+4. **数据管理**：存储空间（含清理未使用图片）、备份和恢复（子页，含生成备份数据、保存到本地、恢复备份）、艺人类型转换。
+5. **高级**（仅 dev）：移除孤立艺人、清空所有数据。正式包不显示该分组。
 
-设置页内部不要再拆二级菜单来承载简单选项。显示模式、主题色、日历默认视图、切册默认视图、统计默认视图这类表单应默认折叠，点击菜单行后在原位置展开。
+设置页以分组承载入口，避免单页过长：外观（`/settings/appearance`，显示模式与主题色合并）与功能（`/settings/features`，默认视图与出演者确认合并）作为独立子页，外观与功能入口不显示当前值，点击进入查看。功能子页内每个功能一个 section，选项直接展示为单选卡片，不做折叠展开。仅备份三件套保留状态语义色（导出蓝 / 保存绿 / 恢复橙）。
+
+设置页不使用大标题（`headerLargeTitle`），与 Tab 层级保持一致即可。
 
 ### 工具箱
 
-`/tools` 承载低频但独立的工具入口。当前包含微博关注导入、Chekiroku 数据导入、Ultima stamp planner，以及 iOS「拍立得贴纸相机」Demo。新增工具时优先放这里，不要塞回 Profile。
+`/tools` 承载低频但独立的工具入口。当前包含微博关注导入、登录微博、Chekiroku 数据导入、Ultima stamp planner，以及 iOS「拍立得贴纸相机」Demo。登录微博作为微博抓取的前置状态，放在「艺人导入」分组内，与微博关注导入相邻。新增工具时优先放这里，不要塞回 Profile。
 
 ---
 
@@ -270,7 +271,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 
 文件：`src/components/SettingsMenu.tsx`
 
-包含 `SectionLabel`、`MenuCard`、`MenuItem`。
+包含 `SectionLabel`、`MenuCard`、`MenuItem`、`SettingsChoiceCard`、`MenuRowSeparator`。
 
 `SectionLabel` 规范：
 
@@ -291,6 +292,21 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - `activeOpacity` 0.6。
 
 用于 Profile、Settings、About、Tools 等导航式列表。新设置入口优先复用它。
+
+`SettingsChoiceCard` 规范：
+
+- 独立单选页的选项卡片：每行 label 15/500 + 可选描述（12，`lineHeight` 17）+ trailing radio。
+- 单选选中项使用 `radio selected`（accent 实心 + 白点），`pending` 时显示 spinner 并禁用。
+- 支持可选 `leadingColorOf` 在 label 前展示色点（如主题色选项）。
+- 行间分隔使用 `MenuRowSeparator`（`leadingInset` 16）。
+- 用于外观、功能等子页内的直选单选，不折叠。
+
+`MenuRowSeparator` 规范：
+
+- 行分隔线使用 `divider`，高度 `hairlineWidth`。
+- 左侧 `marginLeft: 62`，与文字起始位置平齐（跳过 16 padding + 34 icon + 12 间距）；右侧 `marginRight: 16`，不触达卡片边界。
+- 通过可选 `leadingInset` 调整左侧缩进；无 icon 的独立单选页（如 `/settings/appearance`、`/settings/features`）传 16。
+- `MenuItem` 与 `SettingsChoiceCard` 的行间分隔统一使用该组件。
 
 ### AnimatedPressable
 
@@ -818,7 +834,7 @@ Shell：
 | 设置 | `settings` |
 | 工具箱 | `tools` |
 | 关于 | `info` |
-| 微博登录 | `globe-outline` |
+| 微博登录 | `login` |
 | 艺人导入 | `people-circle-outline` |
 | 备份 | `download-outline` / `save-outline` / `cloud-upload-outline` |
 | 清理图片 | `images-outline` |

@@ -1,9 +1,25 @@
 import { ReactNode } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AppIcon, type AppIconName } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
 
 export type MenuBadge = number | string | 'spinner';
+
+/** 行分隔线：左侧与文字平齐（跳过 icon），右侧不触达卡片边界。 */
+export function MenuRowSeparator({ leadingInset = 62 }: { leadingInset?: number }) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View
+      style={{
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: colors.divider,
+        marginLeft: leadingInset,
+        marginRight: 16,
+      }}
+    />
+  );
+}
 
 export function SectionLabel({ label, style }: { label: string; style?: StyleProp<ViewStyle> }) {
   const { colors } = useAppTheme();
@@ -87,67 +103,163 @@ export function MenuItem({
   const resolvedTint = tint ?? colors.accent;
 
   return (
-    <TouchableOpacity
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: subtitle ? 13 : 14,
-        borderBottomWidth: isLast ? 0 : 1,
-        borderBottomColor: colors.divider,
-        opacity: disabled ? 0.5 : 1,
-      }}
-      onPress={onPress}
-      activeOpacity={disabled ? 1 : 0.6}
-      disabled={disabled}
-    >
-      <View
+    <View>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          backgroundColor: `${resolvedTint}22`,
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
+          paddingHorizontal: 16,
+          paddingVertical: subtitle ? 13 : 14,
+          opacity: disabled ? 0.5 : 1,
         }}
+        onPress={onPress}
+        activeOpacity={disabled ? 1 : 0.6}
+        disabled={disabled}
       >
-        <AppIcon name={icon} size={18} color={resolvedTint} />
-      </View>
-
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, color: colors.text, fontWeight: '500' }}>
-          {label}
-        </Text>
-        {subtitle ? (
-          <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-
-      {badge === 'spinner' ? (
-        <View style={{ marginRight: 8 }}>
-          <ActivityIndicator size="small" color={resolvedTint} />
-        </View>
-      ) : null}
-
-      {badge != null && badge !== 'spinner' && !(typeof badge === 'number' && badge <= 0) ? (
         <View
           style={{
-            borderRadius: 99,
-            backgroundColor: `${resolvedTint}20`,
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-            marginLeft: 8,
-            marginRight: 8,
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            backgroundColor: `${resolvedTint}22`,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
           }}
         >
-          <Text style={{ fontSize: 12, fontWeight: '700', color: resolvedTint }}>{badge}</Text>
+          <AppIcon name={icon} size={18} color={resolvedTint} />
         </View>
-      ) : null}
 
-      <AppIcon name="disclosure" variant="forward" size={16} color={colors.chevron} />
-    </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 15, color: colors.text, fontWeight: '500' }}>
+            {label}
+          </Text>
+          {subtitle ? (
+            <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        {badge === 'spinner' ? (
+          <View style={{ marginRight: 8 }}>
+            <ActivityIndicator size="small" color={resolvedTint} />
+          </View>
+        ) : null}
+
+        {badge != null && badge !== 'spinner' && !(typeof badge === 'number' && badge <= 0) ? (
+          <View
+            style={{
+              borderRadius: 99,
+              backgroundColor: `${resolvedTint}20`,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              marginLeft: 8,
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: resolvedTint }}>{badge}</Text>
+          </View>
+        ) : null}
+
+        <AppIcon name="disclosure" variant="forward" size={16} color={colors.chevron} />
+      </TouchableOpacity>
+
+      {!isLast ? <MenuRowSeparator /> : null}
+    </View>
+  );
+}
+
+/** 独立单选页的选项卡片：label + 可选描述 + radio，保存中显示 spinner。 */
+export function SettingsChoiceCard<T extends string>({
+  options,
+  value,
+  pending,
+  labelOf,
+  descriptionOf,
+  leadingColorOf,
+  onSelect,
+}: {
+  options: readonly T[];
+  value: T;
+  pending: T | null;
+  labelOf: (option: T) => string;
+  descriptionOf?: (option: T) => string | undefined;
+  leadingColorOf?: (option: T) => string | undefined;
+  onSelect: (option: T) => void;
+}) {
+  const { colors } = useAppTheme();
+
+  return (
+    <MenuCard>
+      {options.map((option, index) => {
+        const selected = (pending ?? value) === option;
+        const description = descriptionOf?.(option);
+        const leadingColor = leadingColorOf?.(option);
+        const isLast = index === options.length - 1;
+
+        return (
+          <View key={option}>
+            <TouchableOpacity
+              accessibilityRole="radio"
+              accessibilityState={{ selected, disabled: pending !== null }}
+              activeOpacity={0.7}
+              disabled={pending !== null}
+              onPress={() => onSelect(option)}
+              style={{
+                minHeight: description ? 64 : 52,
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 11,
+                opacity: pending ? 0.7 : 1,
+              }}
+            >
+              {leadingColor ? (
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    backgroundColor: leadingColor,
+                    marginRight: 12,
+                  }}
+                />
+              ) : null}
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: colors.text,
+                    fontWeight: selected ? '700' : '500',
+                  }}
+                >
+                  {labelOf(option)}
+                </Text>
+                {description ? (
+                  <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+                    {description}
+                  </Text>
+                ) : null}
+              </View>
+              {pending === option ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <AppIcon
+                  name="radio"
+                  variant={selected ? 'selected' : 'unselected'}
+                  size={18}
+                  color={selected ? colors.accent : colors.chevron}
+                  secondaryColor={colors.onAccent}
+                />
+              )}
+            </TouchableOpacity>
+            {!isLast ? <MenuRowSeparator leadingInset={16} /> : null}
+          </View>
+        );
+      })}
+    </MenuCard>
   );
 }

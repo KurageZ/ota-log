@@ -1,105 +1,26 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, DevSettings, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, DevSettings, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useDB } from '../../src/context/DBContext';
-import { Artist, ArtistConfirmationMode, UserConfig } from '../../src/types/models';
+import { Artist, UserConfig } from '../../src/types/models';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
-import { cleanupUnreferencedLocalMedia, scanUnreferencedLocalMedia } from '../../src/utils/localMedia';
 import { formatBytes, getStorageTotalBytes } from '../../src/utils/storageUsage';
-import { exportFullBackup, importBackup, shareBackupFile } from '../../src/utils/backup';
 import { findOrphanArtistIds, removeOrphanArtists } from '../../src/db/maintenance';
 import { resetAppForDevelopment } from '../../src/utils/developerReset';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
-import { AppIcon } from '../../src/components/AppIcon';
-import { MenuBadge, MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
+import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
-import { withAlpha } from '../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
-import {
-  AppAppearance,
-  AppCalendarDefaultView,
-  AppThemeId,
-  APP_APPEARANCE_LABELS,
-  APP_CALENDAR_DEFAULT_VIEW_LABELS,
-  APP_THEME_LABELS,
-} from '../../src/theme/config';
 import { loadChekiPhotoWidgetPreferences } from '../../src/widgets/chekiPhotoWidgetPreferences';
-import {
-  CHEKI_BROWSE_MODE_LABELS,
-  type ChekiBrowseMode,
-  type ChekiViewPreferences,
-  loadChekiViewPreferences,
-  saveChekiViewPreferences,
-} from '../../src/utils/chekiViewPreferences';
-import {
-  DEFAULT_STATS_PERIOD_PRESET,
-  STATS_DEFAULT_PERIOD_LABELS,
-  type StatsDefaultPeriodPreset,
-  type StatsPreferences,
-  loadStatsPreferences,
-  saveStatsPreferences,
-} from '../../src/utils/statsPreferences';
-import {
-  ARTIST_CONFIRMATION_MODE_DESCRIPTIONS,
-  ARTIST_CONFIRMATION_MODE_LABELS,
-  ARTIST_CONFIRMATION_MODE_SUMMARIES,
-  DEFAULT_ARTIST_CONFIRMATION_MODE,
-} from '../../src/utils/artistConfirmation';
-
-type BackupExportState =
-  | { status: 'idle' }
-  | { status: 'exporting' }
-  | { status: 'ready'; fileUri: string; filename: string; mediaCount: number; createdAt: string }
-  | { status: 'failed' };
-
-const APPEARANCE_OPTIONS: AppAppearance[] = ['system', 'light', 'dark'];
-const THEME_OPTIONS: AppThemeId[] = ['monoChrome', 'classicViolet', 'nightNeon'];
-const CALENDAR_VIEW_OPTIONS: AppCalendarDefaultView[] = ['month', 'timeline'];
-const CHEKI_DEFAULT_VIEW_OPTIONS: ChekiBrowseMode[] = ['album', 'record'];
-const STATS_DEFAULT_PERIOD_OPTIONS: StatsDefaultPeriodPreset[] = ['week', 'month', 'year'];
-const ARTIST_CONFIRMATION_OPTIONS: ArtistConfirmationMode[] = ['always', 'matches_only', 'never'];
-
-function formatBackupCreatedAt(isoString: string): string {
-  const date = new Date(isoString);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hours}:${minutes}`;
-}
 
 export default function SettingsScreen() {
-  const {
-    colors,
-    themeId,
-    appearance,
-    calendarDefaultView,
-    setThemeId,
-    setAppearance,
-    setCalendarDefaultView,
-  } = useAppTheme();
+  const { colors } = useAppTheme();
   const db = useDB();
 
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [widgetArtistIds, setWidgetArtistIds] = useState<string[]>([]);
-  const [chekiViewPreferences, setChekiViewPreferences] = useState<ChekiViewPreferences | null>(null);
-  const [statsPreferences, setStatsPreferences] = useState<StatsPreferences | null>(null);
-  const [backupExportState, setBackupExportState] = useState<BackupExportState>({ status: 'idle' });
-  const [isImportingBackup, setIsImportingBackup] = useState(false);
-  const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
-  const [isThemeOpen, setIsThemeOpen] = useState(false);
-  const [isCalendarDefaultViewOpen, setIsCalendarDefaultViewOpen] = useState(false);
-  const [isChekiDefaultViewOpen, setIsChekiDefaultViewOpen] = useState(false);
-  const [isStatsDefaultPeriodOpen, setIsStatsDefaultPeriodOpen] = useState(false);
-  const [isArtistConfirmationOpen, setIsArtistConfirmationOpen] = useState(false);
-  const [pendingAppearance, setPendingAppearance] = useState<AppAppearance | null>(null);
-  const [pendingThemeId, setPendingThemeId] = useState<AppThemeId | null>(null);
-  const [pendingCalendarDefaultView, setPendingCalendarDefaultView] = useState<AppCalendarDefaultView | null>(null);
-  const [pendingChekiDefaultView, setPendingChekiDefaultView] = useState<ChekiBrowseMode | null>(null);
-  const [pendingStatsDefaultPeriod, setPendingStatsDefaultPeriod] = useState<StatsDefaultPeriodPreset | null>(null);
-  const [pendingArtistConfirmationMode, setPendingArtistConfirmationMode] = useState<ArtistConfirmationMode | null>(null);
   const [isClearingAllData, setIsClearingAllData] = useState(false);
   const [isRemovingOrphanArtists, setIsRemovingOrphanArtists] = useState(false);
   const [storageTotalBytes, setStorageTotalBytes] = useState<number | null>(null);
@@ -111,20 +32,16 @@ export default function SettingsScreen() {
     } catch {
       setStorageTotalBytes(null);
     }
-    const [config, artists, photoArtistIds, widgetPreferences, chekiPreferences, statsPrefs] = await Promise.all([
+    const [config, artists, photoArtistIds, widgetPreferences] = await Promise.all([
       db.userConfig.getConfig(),
       db.artists.findAll(),
       db.cheki.findDistinctPhotoArtistIds(),
       loadChekiPhotoWidgetPreferences(),
-      loadChekiViewPreferences(),
-      loadStatsPreferences(),
     ]);
     const availableArtistIds = new Set(photoArtistIds);
     setUserConfig(config);
     setAllArtists(artists);
     setWidgetArtistIds(widgetPreferences.artistIds.filter((artistId) => availableArtistIds.has(artistId)));
-    setChekiViewPreferences(chekiPreferences);
-    setStatsPreferences(statsPrefs);
   }, [db]);
 
   useFocusEffect(
@@ -143,224 +60,6 @@ export default function SettingsScreen() {
     parentName: oshiArtist.parent_id ? artistNameMap[oshiArtist.parent_id] : null,
   }) : null;
   const widgetArtists = allArtists.filter((artist) => widgetArtistIds.includes(artist.id));
-
-  const handleCleanupUnusedMedia = async () => {
-    try {
-      const scan = await scanUnreferencedLocalMedia(db.rawDb);
-      if (scan.unused === 0) {
-        Alert.alert('无需清理', '没有发现未使用的本地图片。');
-        return;
-      }
-
-      Alert.alert(
-        '清理未使用图片',
-        `发现 ${scan.unused} 个未使用图片文件，预计释放 ${formatBytes(scan.bytes)}。确认删除？`,
-        [
-          { text: '取消', style: 'cancel' },
-          {
-            text: '删除',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const result = await cleanupUnreferencedLocalMedia(db.rawDb);
-                Alert.alert(
-                  '清理完成',
-                  `已删除 ${result.deleted} 个文件，释放 ${formatBytes(result.bytesFreed)}。${result.failed > 0 ? `失败 ${result.failed} 个。` : ''}`,
-                );
-              } catch (error) {
-                showOperationFailedAlert(
-                  '图片清理失败。',
-                  '请稍后再试一次；如果问题持续出现，可以稍后重新扫描后再处理。',
-                  error,
-                );
-              }
-            },
-          },
-        ],
-      );
-    } catch (error) {
-      showOperationFailedAlert(
-        '图片清理失败。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再检查。',
-        error,
-      );
-    }
-  };
-
-  const handleExportFullBackup = async () => {
-    if (backupExportState.status === 'exporting') return;
-
-    setBackupExportState({ status: 'exporting' });
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const result = await exportFullBackup(db);
-      setBackupExportState({
-        status: 'ready',
-        fileUri: result.destinationUri,
-        filename: result.filename,
-        mediaCount: result.mediaCount,
-        createdAt: new Date().toISOString(),
-      });
-      Alert.alert('备份完成', '现在可以点击“保存到本地”了。');
-    } catch (error) {
-      setBackupExportState({ status: 'failed' });
-      showOperationFailedAlert(
-        '保存失败。',
-        '请检查设备剩余空间后再试一次。',
-        error,
-      );
-    }
-  };
-
-  const handleShareBackup = async () => {
-    if (backupExportState.status !== 'ready') {
-      Alert.alert('缺少备份', '先生成一份完整备份，然后再保存到本地。');
-      return;
-    }
-
-    try {
-      await shareBackupFile(backupExportState.fileUri);
-    } catch (error) {
-      showOperationFailedAlert('无法保存。', '请稍后再试一次。', error);
-    }
-  };
-
-  const handleImportBackup = async () => {
-    if (isImportingBackup) return;
-
-    Alert.alert('恢复备份', '恢复数据会覆盖现有的数据，确认继续吗？', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '恢复',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsImportingBackup(true);
-            const restored = await importBackup(db);
-            if (!restored) return;
-            await reloadSettingsContext();
-            Alert.alert('恢复完成', '数据已恢复。');
-          } catch (error) {
-            showOperationFailedAlert(
-              '恢复失败。',
-              '请确认选择的是正确的备份文件后再试一次。',
-              error,
-            );
-          } finally {
-            setIsImportingBackup(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleSelectAppearance = async (nextAppearance: AppAppearance) => {
-    if (nextAppearance === appearance || pendingAppearance) return;
-
-    setPendingAppearance(nextAppearance);
-    try {
-      await setAppearance(nextAppearance);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存显示模式。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingAppearance(null);
-    }
-  };
-
-  const handleSelectThemeId = async (nextThemeId: AppThemeId) => {
-    if (nextThemeId === themeId || pendingThemeId) return;
-
-    setPendingThemeId(nextThemeId);
-    try {
-      await setThemeId(nextThemeId);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存主题色。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingThemeId(null);
-    }
-  };
-
-  const handleSelectCalendarDefaultView = async (nextView: AppCalendarDefaultView) => {
-    if (nextView === calendarDefaultView || pendingCalendarDefaultView) return;
-
-    setPendingCalendarDefaultView(nextView);
-    try {
-      await setCalendarDefaultView(nextView);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存日历默认视图。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingCalendarDefaultView(null);
-    }
-  };
-
-  const handleSelectChekiDefaultView = async (nextView: ChekiBrowseMode) => {
-    if (!chekiViewPreferences || nextView === chekiViewPreferences.defaultBrowseMode || pendingChekiDefaultView) return;
-
-    setPendingChekiDefaultView(nextView);
-    try {
-      const nextPreferences = { ...chekiViewPreferences, defaultBrowseMode: nextView };
-      await saveChekiViewPreferences(nextPreferences);
-      setChekiViewPreferences(nextPreferences);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存切册默认视图。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingChekiDefaultView(null);
-    }
-  };
-
-  const handleSelectStatsDefaultPeriod = async (nextPreset: StatsDefaultPeriodPreset) => {
-    if (!statsPreferences || nextPreset === statsPreferences.defaultPeriodPreset || pendingStatsDefaultPeriod) return;
-
-    setPendingStatsDefaultPeriod(nextPreset);
-    try {
-      const nextPreferences = { ...statsPreferences, defaultPeriodPreset: nextPreset };
-      await saveStatsPreferences(nextPreferences);
-      setStatsPreferences(nextPreferences);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存统计默认视图。',
-        '请稍后再试一次；如果问题持续出现，可以重启应用后再尝试修改。',
-        error,
-      );
-    } finally {
-      setPendingStatsDefaultPeriod(null);
-    }
-  };
-
-  const handleSelectArtistConfirmationMode = async (nextMode: ArtistConfirmationMode) => {
-    const currentMode = userConfig?.artist_confirmation_mode ?? DEFAULT_ARTIST_CONFIRMATION_MODE;
-    if (nextMode === currentMode || pendingArtistConfirmationMode) return;
-
-    setPendingArtistConfirmationMode(nextMode);
-    try {
-      await db.userConfig.updateConfig({ artist_confirmation_mode: nextMode });
-      setUserConfig((current) => current ? { ...current, artist_confirmation_mode: nextMode } : current);
-    } catch (error) {
-      showOperationFailedAlert(
-        '无法保存出演者确认设置。',
-        '请稍后再试一次。',
-        error,
-      );
-    } finally {
-      setPendingArtistConfirmationMode(null);
-    }
-  };
 
   const handleClearAllData = async () => {
     if (isClearingAllData) return;
@@ -441,33 +140,12 @@ export default function SettingsScreen() {
     }
   };
 
-  const backupMenuBadge: MenuBadge | undefined = (() => {
-    if (backupExportState.status === 'exporting') return 'spinner';
-    if (backupExportState.status === 'ready') return '已完成';
-    if (backupExportState.status === 'failed') return '重试';
-    return undefined;
-  })();
-  const saveBackupBadge = backupExportState.status === 'ready' ? '可保存' : undefined;
-  const saveBackupLabel = backupExportState.status === 'ready'
-    ? `保存到本地 (${formatBackupCreatedAt(backupExportState.createdAt)})`
-    : '保存到本地';
-  const importBackupBadge: MenuBadge | undefined = isImportingBackup ? 'spinner' : undefined;
-
-  const rowTextColor = colors.text;
-  const rowSubtitleColor = colors.textSecondary;
-  const rowDividerColor = colors.divider;
-  const rowChevronColor = colors.chevron;
-  const expandedPanelColor = colors.cardMuted;
   const settingsTints = colors.settingsMenu;
-  const themeControlTint = settingsTints.theme;
   const identityTint = settingsTints.profile;
   const oshiTint = settingsTints.oshi;
   const appearanceTint = settingsTints.appearance;
-  const calendarControlTint = settingsTints.calendar;
-  const artistConfirmationTint = settingsTints.calendar;
-  const importTint = settingsTints.backupExport;
-  const saveTint = settingsTints.backupSave;
-  const restoreTint = settingsTints.backupRestore;
+  const preferenceTint = settingsTints.stats;
+  const dataTint = settingsTints.backupExport;
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -498,8 +176,21 @@ export default function SettingsScreen() {
         </View>
 
         <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="外观" />
+          <SectionLabel label="偏好" />
           <MenuCard>
+            <MenuItem
+              icon="appearance"
+              label="外观"
+              tint={appearanceTint}
+              onPress={() => router.push('/settings/appearance')}
+            />
+            <MenuItem
+              icon="viewSettings"
+              label="功能"
+              subtitle="默认视图与出演者确认方式"
+              tint={preferenceTint}
+              onPress={() => router.push('/settings/features')}
+            />
             <MenuItem
               icon="filter"
               label="首页自定义"
@@ -511,757 +202,10 @@ export default function SettingsScreen() {
               icon="stats"
               label="统计自定义"
               subtitle="编辑统计内容顺序和显示状态"
-              tint={settingsTints.stats}
+              tint={preferenceTint}
+              isLast
               onPress={() => router.push('/settings/stats')}
             />
-            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsAppearanceOpen(false);
-                  setIsThemeOpen(false);
-                  setIsCalendarDefaultViewOpen(false);
-                  setIsStatsDefaultPeriodOpen(false);
-                  setIsArtistConfirmationOpen(false);
-                  setIsChekiDefaultViewOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isChekiDefaultViewOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(settingsTints.cheki, 0.13),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="cheki" size={18} color={settingsTints.cheki} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    切册默认视图
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 120,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  numberOfLines={1}
-                >
-                  {CHEKI_BROWSE_MODE_LABELS[
-                    pendingChekiDefaultView
-                      ?? chekiViewPreferences?.defaultBrowseMode
-                      ?? 'album'
-                  ]}
-                </Text>
-                {pendingChekiDefaultView ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={settingsTints.cheki} />
-                  </View>
-                ) : null}
-
-                <AppIcon
-                  name="disclosure"
-                  variant={isChekiDefaultViewOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isChekiDefaultViewOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {CHEKI_DEFAULT_VIEW_OPTIONS.map((option, index) => {
-                    const selected = (
-                      pendingChekiDefaultView
-                      ?? chekiViewPreferences?.defaultBrowseMode
-                      ?? 'album'
-                    ) === option;
-                    const isLast = index === CHEKI_DEFAULT_VIEW_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected, disabled: pendingChekiDefaultView !== null }}
-                        activeOpacity={0.7}
-                        disabled={pendingChekiDefaultView !== null}
-                        onPress={() => handleSelectChekiDefaultView(option)}
-                        style={{
-                          minHeight: 56,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 11,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingChekiDefaultView ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: selected ? settingsTints.cheki : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}
-                        >
-                          {CHEKI_BROWSE_MODE_LABELS[option]}
-                        </Text>
-                        {pendingChekiDefaultView === option ? (
-                          <ActivityIndicator size="small" color={settingsTints.cheki} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? settingsTints.cheki : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-
-            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsAppearanceOpen(false);
-                  setIsThemeOpen(false);
-                  setIsCalendarDefaultViewOpen(false);
-                  setIsChekiDefaultViewOpen(false);
-                  setIsArtistConfirmationOpen(false);
-                  setIsStatsDefaultPeriodOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isStatsDefaultPeriodOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(settingsTints.stats, 0.13),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="stats" size={18} color={settingsTints.stats} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    统计默认视图
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 120,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  numberOfLines={1}
-                >
-                  {STATS_DEFAULT_PERIOD_LABELS[
-                    pendingStatsDefaultPeriod
-                      ?? statsPreferences?.defaultPeriodPreset
-                      ?? DEFAULT_STATS_PERIOD_PRESET
-                  ]}
-                </Text>
-                {pendingStatsDefaultPeriod ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={settingsTints.stats} />
-                  </View>
-                ) : null}
-
-                <AppIcon
-                  name="disclosure"
-                  variant={isStatsDefaultPeriodOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isStatsDefaultPeriodOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {STATS_DEFAULT_PERIOD_OPTIONS.map((option, index) => {
-                    const selected = (
-                      pendingStatsDefaultPeriod
-                      ?? statsPreferences?.defaultPeriodPreset
-                      ?? DEFAULT_STATS_PERIOD_PRESET
-                    ) === option;
-                    const isLast = index === STATS_DEFAULT_PERIOD_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected, disabled: pendingStatsDefaultPeriod !== null }}
-                        activeOpacity={0.7}
-                        disabled={pendingStatsDefaultPeriod !== null}
-                        onPress={() => handleSelectStatsDefaultPeriod(option)}
-                        style={{
-                          minHeight: 56,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 11,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingStatsDefaultPeriod ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: selected ? settingsTints.stats : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}
-                        >
-                          {STATS_DEFAULT_PERIOD_LABELS[option]}
-                        </Text>
-                        {pendingStatsDefaultPeriod === option ? (
-                          <ActivityIndicator size="small" color={settingsTints.stats} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? settingsTints.stats : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-
-            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsThemeOpen(false);
-                  setIsCalendarDefaultViewOpen(false);
-                  setIsChekiDefaultViewOpen(false);
-                  setIsStatsDefaultPeriodOpen(false);
-                  setIsArtistConfirmationOpen(false);
-                  setIsAppearanceOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isAppearanceOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(appearanceTint, 0.13),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="appearance" size={18} color={appearanceTint} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    显示模式
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 120,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  numberOfLines={1}
-                >
-                  {APP_APPEARANCE_LABELS[pendingAppearance ?? appearance]}
-                </Text>
-                {pendingAppearance ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={themeControlTint} />
-                  </View>
-                ) : null}
-
-                <AppIcon
-                  name="disclosure"
-                  variant={isAppearanceOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isAppearanceOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {APPEARANCE_OPTIONS.map((option, index) => {
-                    const selected = (pendingAppearance ?? appearance) === option;
-                    const isLast = index === APPEARANCE_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        activeOpacity={0.7}
-                        disabled={pendingAppearance !== null}
-                        onPress={() => handleSelectAppearance(option)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 13,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingAppearance ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: selected ? themeControlTint : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}
-                        >
-                          {APP_APPEARANCE_LABELS[option]}
-                        </Text>
-                        {pendingAppearance === option ? (
-                          <ActivityIndicator size="small" color={themeControlTint} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? themeControlTint : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-
-            <View style={{ borderBottomWidth: 1, borderBottomColor: rowDividerColor }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsAppearanceOpen(false);
-                  setIsCalendarDefaultViewOpen(false);
-                  setIsChekiDefaultViewOpen(false);
-                  setIsStatsDefaultPeriodOpen(false);
-                  setIsArtistConfirmationOpen(false);
-                  setIsThemeOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isThemeOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: `${themeControlTint}22`,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="theme" size={18} color={themeControlTint} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    主题色
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 120,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  numberOfLines={1}
-                >
-                  {APP_THEME_LABELS[pendingThemeId ?? themeId]}
-                </Text>
-                {pendingThemeId ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={themeControlTint} />
-                  </View>
-                ) : null}
-
-                <AppIcon
-                  name="disclosure"
-                  variant={isThemeOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isThemeOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {THEME_OPTIONS.map((option, index) => {
-                    const selected = (pendingThemeId ?? themeId) === option;
-                    const isLast = index === THEME_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        activeOpacity={0.7}
-                        disabled={pendingThemeId !== null}
-                        onPress={() => handleSelectThemeId(option)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 13,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingThemeId ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: selected ? themeControlTint : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}
-                        >
-                          {APP_THEME_LABELS[option]}
-                        </Text>
-                        {pendingThemeId === option ? (
-                          <ActivityIndicator size="small" color={themeControlTint} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? themeControlTint : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-
-            <View>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsAppearanceOpen(false);
-                  setIsThemeOpen(false);
-                  setIsChekiDefaultViewOpen(false);
-                  setIsStatsDefaultPeriodOpen(false);
-                  setIsArtistConfirmationOpen(false);
-                  setIsCalendarDefaultViewOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isCalendarDefaultViewOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(calendarControlTint, 0.13),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="calendar" size={18} color={calendarControlTint} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    日历默认视图
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 120,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  numberOfLines={1}
-                >
-                  {APP_CALENDAR_DEFAULT_VIEW_LABELS[pendingCalendarDefaultView ?? calendarDefaultView]}
-                </Text>
-                {pendingCalendarDefaultView ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={calendarControlTint} />
-                  </View>
-                ) : null}
-
-                <AppIcon
-                  name="disclosure"
-                  variant={isCalendarDefaultViewOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isCalendarDefaultViewOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {CALENDAR_VIEW_OPTIONS.map((option, index) => {
-                    const selected = (pendingCalendarDefaultView ?? calendarDefaultView) === option;
-                    const isLast = index === CALENDAR_VIEW_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        activeOpacity={0.7}
-                        disabled={pendingCalendarDefaultView !== null}
-                        onPress={() => handleSelectCalendarDefaultView(option)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 13,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingCalendarDefaultView ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: selected ? calendarControlTint : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}
-                        >
-                          {APP_CALENDAR_DEFAULT_VIEW_LABELS[option]}
-                        </Text>
-                        {pendingCalendarDefaultView === option ? (
-                          <ActivityIndicator size="small" color={calendarControlTint} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? calendarControlTint : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          </MenuCard>
-        </View>
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="活动" />
-          <MenuCard>
-            <View>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityState={{ expanded: isArtistConfirmationOpen }}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setIsAppearanceOpen(false);
-                  setIsThemeOpen(false);
-                  setIsCalendarDefaultViewOpen(false);
-                  setIsChekiDefaultViewOpen(false);
-                  setIsStatsDefaultPeriodOpen(false);
-                  setIsArtistConfirmationOpen((open) => !open);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: isArtistConfirmationOpen ? 1 : 0,
-                  borderBottomColor: rowDividerColor,
-                }}
-              >
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(artistConfirmationTint, 0.13),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="artists" size={18} color={artistConfirmationTint} />
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, color: rowTextColor, fontWeight: '500' }}>
-                    出演者确认
-                  </Text>
-                </View>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    marginLeft: 12,
-                    marginRight: 8,
-                    maxWidth: 110,
-                    fontSize: 14,
-                    color: rowSubtitleColor,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                >
-                  {ARTIST_CONFIRMATION_MODE_SUMMARIES[
-                    pendingArtistConfirmationMode
-                      ?? userConfig?.artist_confirmation_mode
-                      ?? DEFAULT_ARTIST_CONFIRMATION_MODE
-                  ]}
-                </Text>
-                {pendingArtistConfirmationMode ? (
-                  <View style={{ marginRight: 8 }}>
-                    <ActivityIndicator size="small" color={artistConfirmationTint} />
-                  </View>
-                ) : null}
-                <AppIcon
-                  name="disclosure"
-                  variant={isArtistConfirmationOpen ? 'up' : 'down'}
-                  size={16}
-                  color={rowChevronColor}
-                />
-              </TouchableOpacity>
-
-              {isArtistConfirmationOpen ? (
-                <View style={{ backgroundColor: expandedPanelColor }}>
-                  {ARTIST_CONFIRMATION_OPTIONS.map((option, index) => {
-                    const selected = (
-                      pendingArtistConfirmationMode
-                      ?? userConfig?.artist_confirmation_mode
-                      ?? DEFAULT_ARTIST_CONFIRMATION_MODE
-                    ) === option;
-                    const isLast = index === ARTIST_CONFIRMATION_OPTIONS.length - 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={option}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected, disabled: pendingArtistConfirmationMode !== null }}
-                        activeOpacity={0.7}
-                        disabled={pendingArtistConfirmationMode !== null}
-                        onPress={() => handleSelectArtistConfirmationMode(option)}
-                        style={{
-                          minHeight: 56,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 11,
-                          borderBottomWidth: isLast ? 0 : 1,
-                          borderBottomColor: rowDividerColor,
-                          opacity: pendingArtistConfirmationMode ? 0.7 : 1,
-                        }}
-                      >
-                        <View style={{ width: 46 }} />
-                        <View style={{ flex: 1, paddingRight: 12 }}>
-                          <Text style={{
-                            fontSize: 14,
-                            color: selected ? artistConfirmationTint : rowTextColor,
-                            fontWeight: selected ? '700' : '500',
-                          }}>
-                            {ARTIST_CONFIRMATION_MODE_LABELS[option]}
-                          </Text>
-                          <Text style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: rowSubtitleColor }}>
-                            {ARTIST_CONFIRMATION_MODE_DESCRIPTIONS[option]}
-                          </Text>
-                        </View>
-                        {pendingArtistConfirmationMode === option ? (
-                          <ActivityIndicator size="small" color={artistConfirmationTint} />
-                        ) : (
-                          <AppIcon
-                            name="radio"
-                            variant={selected ? 'selected' : 'unselected'}
-                            size={18}
-                            color={selected ? artistConfirmationTint : rowChevronColor}
-                            secondaryColor={colors.onAccent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
           </MenuCard>
         </View>
 
@@ -1286,87 +230,57 @@ export default function SettingsScreen() {
         ) : null}
 
         <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="数据与备份" />
+          <SectionLabel label="数据管理" />
           <MenuCard>
             <MenuItem
               icon="document"
               label="存储空间"
               subtitle={storageTotalBytes != null ? `已用 ${formatBytes(storageTotalBytes)}` : '查看照片、切册与数据库占用'}
-              tint={importTint}
+              tint={dataTint}
               onPress={() => router.push('/settings/storage')}
+            />
+            <MenuItem
+              icon="backupDownload"
+              label="备份和恢复"
+              subtitle="生成、保存或恢复完整备份"
+              tint={settingsTints.backupRestore}
+              onPress={() => router.push('/settings/backup-restore')}
             />
             <MenuItem
               icon="artists"
               label="艺人类型转换"
               subtitle="批量设置个人或团体，并转换普通所属关系"
-              tint={settingsTints.profile}
-              onPress={() => router.push('/settings/artist-type-conversion')}
-            />
-            <MenuItem
-              icon="backupDownload"
-              label="生成备份数据"
-              badge={backupMenuBadge}
-              tint={importTint}
-              onPress={handleExportFullBackup}
-            />
-            <MenuItem
-              icon="backupSave"
-              label={saveBackupLabel}
-              badge={saveBackupBadge}
-              tint={saveTint}
-              onPress={handleShareBackup}
-            />
-            <MenuItem
-              icon="backupRestore"
-              label="恢复备份"
-              badge={importBackupBadge}
-              tint={restoreTint}
+              tint={dataTint}
               isLast
-              onPress={handleImportBackup}
+              onPress={() => router.push('/settings/artist-type-conversion')}
             />
           </MenuCard>
         </View>
 
-        <View>
-          <SectionLabel label="高级" />
-          <MenuCard>
-            <MenuItem
-              icon="weibo"
-              label="登录微博"
-              subtitle="登录微博配置抓取功能"
-              tint={settingsTints.weibo}
-              onPress={() => router.push('/weibo')}
-            />
-            <MenuItem
-              icon="maintenance"
-              label="清理未使用图片"
-              tint={settingsTints.cleanup}
-              isLast={!showDeveloperOptions}
-              onPress={handleCleanupUnusedMedia}
-            />
-            {showDeveloperOptions ? (
-              <>
-                <MenuItem
-                  icon="artists"
-                  label="移除孤立艺人"
-                  subtitle="移除没有活动或拍立得关联的艺人"
-                  badge={isRemovingOrphanArtists ? 'spinner' : undefined}
-                  tint={settingsTints.cleanup}
-                  onPress={handleRemoveOrphanArtists}
-                />
-                <MenuItem
-                  icon="trash"
-                  label="清空所有数据"
-                  subtitle="删除全部数据并恢复初始状态"
-                  badge={isClearingAllData ? 'spinner' : undefined}
-                  tint={colors.danger}
-                  isLast
-                  onPress={handleClearAllData}
-                />
-              </>
-            ) : null}
-          </MenuCard>
-        </View>
+        {showDeveloperOptions ? (
+          <View>
+            <SectionLabel label="高级" />
+            <MenuCard>
+              <MenuItem
+                icon="artists"
+                label="移除孤立艺人"
+                subtitle="移除没有活动或拍立得关联的艺人"
+                badge={isRemovingOrphanArtists ? 'spinner' : undefined}
+                tint={settingsTints.cleanup}
+                onPress={handleRemoveOrphanArtists}
+              />
+              <MenuItem
+                icon="trash"
+                label="清空所有数据"
+                subtitle="删除全部数据并恢复初始状态"
+                badge={isClearingAllData ? 'spinner' : undefined}
+                tint={colors.danger}
+                isLast
+                onPress={handleClearAllData}
+              />
+            </MenuCard>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

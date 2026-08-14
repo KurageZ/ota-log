@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect } from 'expo-router';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
-import { MenuCard, SectionLabel } from '../../src/components/SettingsMenu';
+import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
+import { cleanupUnreferencedLocalMedia, scanUnreferencedLocalMedia } from '../../src/utils/localMedia';
+import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   type StorageCategoryId,
@@ -159,6 +161,50 @@ export default function StorageSettingsScreen() {
     0,
   ) ?? 0;
 
+  const handleCleanupUnusedMedia = async () => {
+    try {
+      const scan = await scanUnreferencedLocalMedia(db.rawDb);
+      if (scan.unused === 0) {
+        Alert.alert('无需清理', '没有发现未使用的本地图片。');
+        return;
+      }
+
+      Alert.alert(
+        '清理未使用图片',
+        `发现 ${scan.unused} 个未使用图片文件，预计释放 ${formatBytes(scan.bytes)}。确认删除？`,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '删除',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const result = await cleanupUnreferencedLocalMedia(db.rawDb);
+                Alert.alert(
+                  '清理完成',
+                  `已删除 ${result.deleted} 个文件，释放 ${formatBytes(result.bytesFreed)}。${result.failed > 0 ? `失败 ${result.failed} 个。` : ''}`,
+                );
+                await reload();
+              } catch (error) {
+                showOperationFailedAlert(
+                  '图片清理失败。',
+                  '请稍后再试一次；如果问题持续出现，可以稍后重新扫描后再处理。',
+                  error,
+                );
+              }
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      showOperationFailedAlert(
+        '图片清理失败。',
+        '请稍后再试一次；如果问题持续出现，可以重启应用后再检查。',
+        error,
+      );
+    }
+  };
+
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen options={{ title: '存储空间' }} />
@@ -241,6 +287,19 @@ export default function StorageSettingsScreen() {
             </MenuCard>
           </>
         )}
+
+        <View style={{ height: 16 }} />
+        <SectionLabel label="维护" />
+        <MenuCard>
+          <MenuItem
+            icon="maintenance"
+            label="清理未使用图片"
+            subtitle="删除未被活动、切册或艺人引用的本地图片"
+            tint={colors.settingsMenu.cleanup}
+            isLast
+            onPress={handleCleanupUnusedMedia}
+          />
+        </MenuCard>
       </ScrollView>
     </SafeAreaView>
   );
