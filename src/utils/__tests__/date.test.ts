@@ -1,4 +1,9 @@
-import { formatChineseDateWithWeekday, formatDateInput, normalizeDateInput } from '../date';
+import {
+  formatChineseDateWithWeekday,
+  formatDateWithWeekday,
+  formatDateInput,
+  normalizeDateInput,
+} from '../date';
 
 describe('Chinese date formatting', () => {
   test('includes the weekday and keeps the year by default', () => {
@@ -7,6 +12,14 @@ describe('Chinese date formatting', () => {
 
   test('returns invalid input unchanged', () => {
     expect(formatChineseDateWithWeekday('2026-02-30')).toBe('2026-02-30');
+  });
+
+  test('keeps the dash date format and appends the weekday', () => {
+    expect(formatDateWithWeekday('2026-08-13')).toBe('2026-08-13 周四');
+  });
+
+  test('returns invalid input unchanged', () => {
+    expect(formatDateWithWeekday('2026-02-30')).toBe('2026-02-30');
   });
 });
 

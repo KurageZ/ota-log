@@ -27,6 +27,15 @@ export function formatChineseDateWithWeekday(
   return `${yearLabel}${month}月${day}日 ${weekday}`;
 }
 
+/** 返回 `YYYY-MM-DD 周X`，保留输入中的横杠日期格式。 */
+export function formatDateWithWeekday(isoDate: string): string {
+  if (!isValidISODate(isoDate)) return isoDate;
+  const [, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Number(isoDate.slice(0, 4)), month - 1, day);
+  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+  return `${isoDate} ${weekday}`;
+}
+
 export function formatTimeInput(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 4);
   if (digits.length <= 2) return digits;

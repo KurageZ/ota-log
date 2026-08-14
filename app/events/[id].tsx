@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
   Image, Modal, Linking, useWindowDimensions, Platform, Vibration, ActivityIndicator, TextStyle,
@@ -14,7 +14,7 @@ import {
   Event, Artist, Cheki, ChekiManualEntry, Photo, EventStatus,
   EventSession, EventTimetableEntry, UserConfig,
 } from '../../src/types/models';
-import { formatDate, daysUntil } from '../../src/utils/date';
+import { formatDateWithWeekday, formatDate, daysUntil } from '../../src/utils/date';
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
@@ -94,23 +94,19 @@ function SessionSummaryRow({
   index,
   isLast,
   embedded = false,
-  eventStatus,
-  addingSessionId,
-  onAddToCalendar,
+  countdownDays = null,
 }: {
   session: EventSession;
   index: number;
   isLast: boolean;
   embedded?: boolean;
-  eventStatus: EventStatus;
-  addingSessionId: string | null;
-  onAddToCalendar: (session: EventSession) => void;
+  countdownDays?: number | null;
 }) {
   const { colors } = useAppTheme();
   const location = [session.city, session.venue].filter(Boolean).join(' · ');
   const timeSummary = formatEventTimes(session.open_time, session.start_time) || '时间待定';
+  const dateSummary = formatDateWithWeekday(session.session_date);
   const displayTitle = session.title || (embedded ? null : `场次 ${index + 1}`);
-  const calendarSubject = session.title || (embedded ? '活动' : `场次 ${index + 1}`);
 
   return (
     <View
@@ -144,8 +140,24 @@ function SessionSummaryRow({
             color: colors.text,
           }}
         >
-          {session.session_date}  {timeSummary}
+          {dateSummary}
         </Text>
+        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <AppIcon name="time" size={14} color={colors.textSecondary} />
+          <Text
+            style={{
+              flex: 1,
+              fontSize: 14.5,
+              lineHeight: 20,
+              fontWeight: '500',
+              fontVariant: ['tabular-nums'],
+              color: colors.textSecondary,
+            }}
+            numberOfLines={1}
+          >
+            {timeSummary}
+          </Text>
+        </View>
         {location ? (
           <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <AppIcon name="eventLocation" size={14} color={colors.textSecondary} />
@@ -155,22 +167,107 @@ function SessionSummaryRow({
           </View>
         ) : null}
       </View>
-      {eventStatus !== 'cancelled' ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={`将${calendarSubject}添加到日历`}
-          activeOpacity={0.7}
-          disabled={addingSessionId != null}
-          onPress={() => onAddToCalendar(session)}
-          style={{
-            width: 44, height: 44, borderRadius: 22,
-            alignItems: 'center', justifyContent: 'center',
-            backgroundColor: withAlpha(colors.accent, 0.1),
-            opacity: addingSessionId && addingSessionId !== session.id ? 0.4 : 1,
-          }}
-        >
-          <AppIcon name="calendar" size={18} color={colors.accent} />
-        </TouchableOpacity>
+      {countdownDays != null ? (
+        <View style={{ alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center' }}>
+          <Text
+            style={{
+              fontSize: 20,
+              lineHeight: 24,
+              fontWeight: '900',
+              fontVariant: ['tabular-nums'],
+              color: colors.accent,
+            }}
+          >
+            {countdownDays === 0 ? '今天' : `${countdownDays} 天`}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * 场次紧凑行：参考 EventRow 的设计（标题 + 单行元信息 + 分隔线），
+ * 仅展示在场次间存在差异的日期 / 时间 / 地点字段。
+ */
+function SessionCompactRow({
+  session,
+  index,
+  isLast,
+  showDate,
+  showTime,
+  showLocation,
+}: {
+  session: EventSession;
+  index: number;
+  isLast: boolean;
+  showDate: boolean;
+  showTime: boolean;
+  showLocation: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const sessionTime = formatEventTimes(session.open_time, session.start_time) || '时间待定';
+  const sessionLocation = [session.city, session.venue].filter(Boolean).join(' · ');
+  const metaPieces: Array<{ key: string; node: React.ReactNode }> = [];
+  if (showDate && session.session_date) {
+    metaPieces.push({
+      key: 'date',
+      node: (
+        <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, color: colors.textSecondary }}>
+          {formatDateWithWeekday(session.session_date)}
+        </Text>
+      ),
+    });
+  }
+  if (showTime && sessionTime) {
+    metaPieces.push({
+      key: 'time',
+      node: (
+        <>
+          <AppIcon name="time" size={12} color={colors.textMuted} />
+          <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, color: colors.textSecondary }}>
+            {sessionTime}
+          </Text>
+        </>
+      ),
+    });
+  }
+  if (showLocation && sessionLocation) {
+    metaPieces.push({
+      key: 'location',
+      node: (
+        <>
+          <AppIcon name="eventLocation" size={12} color={colors.textMuted} />
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, lineHeight: 16, color: colors.textSecondary }}>
+            {sessionLocation}
+          </Text>
+        </>
+      ),
+    });
+  }
+
+  return (
+    <View style={{
+      minHeight: 52,
+      paddingVertical: 8,
+      justifyContent: 'center',
+      borderBottomWidth: isLast ? 0 : 1,
+      borderBottomColor: colors.divider,
+    }}>
+      <Text numberOfLines={1} style={{ fontSize: 13.5, lineHeight: 18, fontWeight: '700', color: colors.text }}>
+        {session.title?.trim() || `场次 ${index + 1}`}
+      </Text>
+      {metaPieces.length > 0 ? (
+        <View style={{ marginTop: 5, flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 }}>
+          {metaPieces.map((piece, index) => (
+            <Fragment key={piece.key}>
+              {index > 0 ? (
+                <Text style={{ fontSize: 12, lineHeight: 16, color: colors.textSecondary }}>·</Text>
+              ) : null}
+              {piece.node}
+            </Fragment>
+          ))}
+        </View>
       ) : null}
     </View>
   );
@@ -331,11 +428,54 @@ export default function EventDetailScreen() {
   const [statusMenuAnchor, setStatusMenuAnchor] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
+  const [calendarSessionPickerVisible, setCalendarSessionPickerVisible] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const statusPillRef = useRef<View | null>(null);
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextLinkPressRef = useRef(false);
   const allArtistsMap = useMemo(() => new Map(allArtists.map(a => [a.id, a])), [allArtists]);
+  const overviewCountdownDays = useMemo(() => {
+    if (!event) return null;
+    if (event.status !== 'planned' && event.status !== 'wishlist') return null;
+    const d = daysUntil(event.event_date);
+    return d >= 0 ? d : null;
+  }, [event]);
+  const multiSessionOverview = useMemo(() => {
+    if (sessions.length <= 1) return null;
+    const dates = sessions.map((session) => session.session_date).sort();
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+    const dateSummary = startDate === endDate
+      ? formatDateWithWeekday(startDate)
+      : `${formatDateWithWeekday(startDate)} – ${formatDateWithWeekday(endDate)}`;
+    const locations = sessions
+      .map((session) => [session.city, session.venue].filter(Boolean).join(' · '))
+      .filter(Boolean);
+    const locationSummary = locations.length === 0
+      ? null
+      : locations.every((location) => location === locations[0])
+        ? locations[0]
+        : `${locations[0]} 等多地`;
+    return { startDate, dateSummary, locationSummary };
+  }, [sessions]);
+  const multiOverviewCountdownDays = useMemo(() => {
+    if (!event || !multiSessionOverview) return null;
+    if (event.status !== 'planned' && event.status !== 'wishlist') return null;
+    const d = daysUntil(multiSessionOverview.startDate);
+    return d >= 0 ? d : null;
+  }, [event, multiSessionOverview]);
+  const sessionMetaDiffs = useMemo(() => {
+    if (sessions.length <= 1) return { dates: false, times: false, locations: false };
+    return {
+      dates: new Set(sessions.map((session) => session.session_date)).size > 1,
+      times: new Set(sessions.map((session) => (
+        formatEventTimes(session.open_time, session.start_time) || '时间待定'
+      ))).size > 1,
+      locations: new Set(sessions.map((session) => (
+        [session.city, session.venue].filter(Boolean).join(' · ')
+      ))).size > 1,
+    };
+  }, [sessions]);
   const prioritizedArtists = useMemo(() => {
     const oshiArtist = oshiArtistId ? allArtistsMap.get(oshiArtistId) : null;
     const oshiParentId = oshiArtist?.parent_id ?? null;
@@ -474,6 +614,16 @@ export default function EventDetailScreen() {
       );
     } finally {
       setAddingSessionId(null);
+    }
+  };
+
+  const handleRequestAddToCalendar = () => {
+    if (!event || shareBusy) return;
+    setShareMenuVisible(false);
+    if (sessions.length === 1) {
+      void handleAddToSystemCalendar(sessions[0]);
+    } else if (sessions.length > 1) {
+      setCalendarSessionPickerVisible(true);
     }
   };
 
@@ -884,7 +1034,7 @@ export default function EventDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* 活动概览 */}
-        <Card cardBg={cardBg}>
+        <Card cardBg={cardBg} style={{ paddingTop: 20, paddingBottom: 20 }}>
           <Text style={{ fontSize: 24, fontWeight: '900', color: colors.heading,
             letterSpacing: -0.5, lineHeight: 29, marginBottom: 14 }}>
             {event.title}
@@ -907,21 +1057,6 @@ export default function EventDetailScreen() {
               <EventRatingStars score={event.review_score} size="detail" onChange={handleScoreChange} />
             ) : null}
           </View>
-          {event.status !== 'completed' && event.status !== 'cancelled' && (() => {
-            const d = daysUntil(event.event_date);
-            if (d < 0) return null;
-            return (
-              <View style={{
-                backgroundColor: colors.heroBg, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
-                marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.heroEyebrow }}>距演出</Text>
-                <Text style={{ color: colors.heroText, fontSize: 20, fontWeight: '900' }}>
-                  {d === 0 ? '就是今天！' : `${d} 天`}
-                </Text>
-              </View>
-            );
-          })()}
           {sessions.length === 1 ? (
             <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.divider }}>
               <SessionSummaryRow
@@ -929,10 +1064,45 @@ export default function EventDetailScreen() {
                 index={0}
                 isLast
                 embedded
-                eventStatus={event.status}
-                addingSessionId={addingSessionId}
-                onAddToCalendar={handleAddToSystemCalendar}
+                countdownDays={overviewCountdownDays}
               />
+            </View>
+          ) : multiSessionOverview ? (
+            <View style={{
+              marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.divider,
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+            }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.88}
+                  style={{
+                    fontSize: 16,
+                    lineHeight: 23,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                    color: colors.text,
+                  }}
+                >
+                  {multiSessionOverview.dateSummary}
+                </Text>
+                {multiSessionOverview.locationSummary ? (
+                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <AppIcon name="eventLocation" size={14} color={colors.textSecondary} />
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 14.5, lineHeight: 20, fontWeight: '500', color: colors.textSecondary }}>
+                      {multiSessionOverview.locationSummary}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              {multiOverviewCountdownDays != null ? (
+                <View style={{ alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, lineHeight: 24, fontWeight: '900', fontVariant: ['tabular-nums'], color: colors.accent }}>
+                    {multiOverviewCountdownDays === 0 ? '今天' : `${multiOverviewCountdownDays} 天`}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </Card>
@@ -941,16 +1111,16 @@ export default function EventDetailScreen() {
         {sessions.length > 1 ? (
           <>
             <SectionTitle label="场次" />
-            <Card cardBg={cardBg}>
+            <Card cardBg={cardBg} style={{ paddingTop: 8, paddingBottom: 8 }}>
               {sessions.map((session, index) => (
-                <SessionSummaryRow
+                <SessionCompactRow
                   key={session.id}
                   session={session}
                   index={index}
                   isLast={index === sessions.length - 1}
-                  eventStatus={event.status}
-                  addingSessionId={addingSessionId}
-                  onAddToCalendar={handleAddToSystemCalendar}
+                  showDate={sessionMetaDiffs.dates}
+                  showTime={sessionMetaDiffs.times}
+                  showLocation={sessionMetaDiffs.locations}
                 />
               ))}
             </Card>
@@ -1089,6 +1259,21 @@ export default function EventDetailScreen() {
                         {artist ? (
                           <View style={{ width: 28, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
                             <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={28} isOshi={artist.id === oshiArtistId} />
+                          </View>
+                        ) : displayName ? (
+                          <View style={{ width: 28, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              backgroundColor: colors.oshiAvatarBg,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Text style={{ fontSize: 12.5, lineHeight: 17, fontWeight: '700', color: colors.textSecondary }}>
+                                {displayName.charAt(0)}
+                              </Text>
+                            </View>
                           </View>
                         ) : null}
                         <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
@@ -1393,6 +1578,86 @@ export default function EventDetailScreen() {
             </Text>
           </View>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="添加到日历"
+          disabled={shareBusy}
+          activeOpacity={0.6}
+          onPress={handleRequestAddToCalendar}
+          style={{
+            minHeight: 60,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            borderTopWidth: 1,
+            borderTopColor: colors.divider,
+            opacity: shareBusy ? 0.5 : 1,
+          }}
+        >
+          <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft }}>
+            <AppIcon name="calendar" size={18} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
+              添加到日历
+            </Text>
+            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+              {sessions.length > 1 ? '选择要添加到系统日历的场次' : '将活动添加到系统日历'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </BottomSheetDialog>
+
+      <BottomSheetDialog
+        visible={calendarSessionPickerVisible}
+        title="添加到日历"
+        onClose={() => setCalendarSessionPickerVisible(false)}
+        scrollable
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}
+      >
+        {sessions.map((session, index) => {
+          const sessionTitle = session.title?.trim() || `场次 ${index + 1}`;
+          const sessionTime = formatEventTimes(session.open_time, session.start_time) || '时间待定';
+          const sessionLocation = [session.city, session.venue].filter(Boolean).join(' · ');
+          const meta = [formatDateWithWeekday(session.session_date), sessionTime, sessionLocation]
+            .filter(Boolean)
+            .join('  ');
+          return (
+            <TouchableOpacity
+              key={session.id}
+              accessibilityRole="button"
+              accessibilityLabel={`将${sessionTitle}添加到日历`}
+              disabled={addingSessionId != null}
+              activeOpacity={0.6}
+              onPress={() => {
+                setCalendarSessionPickerVisible(false);
+                void handleAddToSystemCalendar(session);
+              }}
+              style={{
+                minHeight: 60,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                borderBottomWidth: index === sessions.length - 1 ? 0 : 1,
+                borderBottomColor: colors.divider,
+                opacity: addingSessionId != null ? 0.5 : 1,
+              }}
+            >
+              <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft }}>
+                <AppIcon name="calendar" size={18} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
+                  {sessionTitle}
+                </Text>
+                <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+                  {meta}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </BottomSheetDialog>
 
       {copyToastMessage ? (
