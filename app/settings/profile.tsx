@@ -36,7 +36,9 @@ export default function ProfileSettingsScreen() {
         aspect: [1, 1],
       });
       if (!result.canceled && result.assets[0]) {
-        const permanentUri = await copyToDocuments(result.assets[0].uri);
+        const permanentUri = await copyToDocuments(result.assets[0].uri, {
+          filenamePrefix: 'profile_avatar',
+        });
         setAvatarUri(permanentUri);
       }
     } catch (error) {

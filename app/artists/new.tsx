@@ -79,7 +79,9 @@ export default function NewArtistScreen() {
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      const permanentUri = await copyToDocuments(result.assets[0].uri);
+      const permanentUri = await copyToDocuments(result.assets[0].uri, {
+        filenamePrefix: 'artist_avatar',
+      });
       setPickedUri(permanentUri);
       setAvatarUrl('');
     }

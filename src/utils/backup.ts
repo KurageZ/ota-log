@@ -302,7 +302,15 @@ async function createUniqueFile(parentUri: string, filename: string): Promise<Fi
 
 function getRestoredMediaFilenamePrefix(filename: string): string {
   if (filename.startsWith('weibo_avatar_')) return 'weibo_avatar';
+  if (filename.startsWith('artist_avatar_')) return 'artist_avatar';
   if (filename.startsWith('artist_bg_') || filename.startsWith('showcase_bg_')) return 'artist_bg';
+  if (
+    filename.startsWith('cheki')
+    || filename.startsWith('sticker_source_')
+    || filename.startsWith('sticker_camera_')
+  ) {
+    return 'cheki';
+  }
   return 'photo';
 }
 

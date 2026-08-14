@@ -6,6 +6,7 @@ import { useDB } from '../../src/context/DBContext';
 import { Artist, ArtistConfirmationMode, UserConfig } from '../../src/types/models';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { cleanupUnreferencedLocalMedia, scanUnreferencedLocalMedia } from '../../src/utils/localMedia';
+import { formatBytes, getStorageTotalBytes } from '../../src/utils/storageUsage';
 import { exportFullBackup, importBackup, shareBackupFile } from '../../src/utils/backup';
 import { findOrphanArtistIds, removeOrphanArtists } from '../../src/db/maintenance';
 import { resetAppForDevelopment } from '../../src/utils/developerReset';
@@ -59,12 +60,6 @@ const CHEKI_DEFAULT_VIEW_OPTIONS: ChekiBrowseMode[] = ['album', 'record'];
 const STATS_DEFAULT_PERIOD_OPTIONS: StatsDefaultPeriodPreset[] = ['week', 'month', 'year'];
 const ARTIST_CONFIRMATION_OPTIONS: ArtistConfirmationMode[] = ['always', 'matches_only', 'never'];
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
 function formatBackupCreatedAt(isoString: string): string {
   const date = new Date(isoString);
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -107,9 +102,15 @@ export default function SettingsScreen() {
   const [pendingArtistConfirmationMode, setPendingArtistConfirmationMode] = useState<ArtistConfirmationMode | null>(null);
   const [isClearingAllData, setIsClearingAllData] = useState(false);
   const [isRemovingOrphanArtists, setIsRemovingOrphanArtists] = useState(false);
+  const [storageTotalBytes, setStorageTotalBytes] = useState<number | null>(null);
   const showDeveloperOptions = __DEV__;
 
   const reloadSettingsContext = useCallback(async () => {
+    try {
+      setStorageTotalBytes(getStorageTotalBytes());
+    } catch {
+      setStorageTotalBytes(null);
+    }
     const [config, artists, photoArtistIds, widgetPreferences, chekiPreferences, statsPrefs] = await Promise.all([
       db.userConfig.getConfig(),
       db.artists.findAll(),
@@ -1287,6 +1288,13 @@ export default function SettingsScreen() {
         <View style={{ marginBottom: 16 }}>
           <SectionLabel label="数据与备份" />
           <MenuCard>
+            <MenuItem
+              icon="document"
+              label="存储空间"
+              subtitle={storageTotalBytes != null ? `已用 ${formatBytes(storageTotalBytes)}` : '查看照片、切册与数据库占用'}
+              tint={importTint}
+              onPress={() => router.push('/settings/storage')}
+            />
             <MenuItem
               icon="artists"
               label="艺人类型转换"
