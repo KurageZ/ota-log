@@ -890,9 +890,7 @@ export function ChekiRecordForm({
 
         <FormSectionLabel label="价格" />
         <FormCard>
-          <FormFieldLabel>
-            {mode === 'create' ? '单价（每张）' : '新增拍立得默认单价'}
-          </FormFieldLabel>
+          <FormFieldLabel>单价（每张）</FormFieldLabel>
           <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: unitPriceValid ? colors.inputBorder : colors.danger, backgroundColor: colors.input }}>
             <Text style={{ marginRight: 6, fontSize: 15, color: colors.textMuted }}>¥</Text>
             <TextInput
@@ -915,11 +913,6 @@ export function ChekiRecordForm({
                 : newItemCount > 0
                   ? `现有 ¥${retainedTotalPrice} + 新增 ${newItemCount} 张，合计 ¥${calculatedTotal}`
                   : `现有拍立得合计 ¥${calculatedTotal}`}
-            </Text>
-          ) : null}
-          {mode === 'edit' ? (
-            <Text style={{ marginTop: 6, fontSize: 12, lineHeight: 18, color: colors.textMuted }}>
-              这里只设置本次新增拍立得的单价；已有单价请在单张编辑页修改。
             </Text>
           ) : null}
         </FormCard>

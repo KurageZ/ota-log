@@ -346,12 +346,7 @@ export default function ChekiRecordDetailScreen() {
         ) : null}
 
         <View style={{ marginTop: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <FormSectionLabel label="拍立得" />
-            <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 18, color: colors.textSecondary }}>
-              {photoItems.length > 0 ? `${photoItems.length} 张有图` : '无图片'}
-            </Text>
-          </View>
+          <FormSectionLabel label="拍立得" />
           {photoItems.length > 0 || hasMissingImages ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {photoItems.map((item) => {
