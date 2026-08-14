@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
-  Image, Modal, Linking, useWindowDimensions, Platform, Vibration, ActivityIndicator,
+  Image, Modal, Linking, useWindowDimensions, Platform, Vibration, ActivityIndicator, TextStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -59,6 +59,9 @@ const CHEKI_PREVIEW_LIMIT = 9;
 const TOAST_DURATION_MS = 1600;
 const TIMETABLE_TIME_COLUMN_WIDTH = 102;
 const DETAIL_LIST_ITEM_MIN_HEIGHT = 56;
+const DETAILS_PREVIEW_LINES = 3;
+const ARTIST_LIST_ITEM_VERTICAL_PADDING = 10;
+const TIMETABLE_ENTRY_VERTICAL_PADDING = 6;
 
 function InfoPhotoThumb({ photo, isDark, onPress }: {
   photo: Photo; isDark: boolean; onPress: () => void;
@@ -104,7 +107,7 @@ function SessionSummaryRow({
   onAddToCalendar: (session: EventSession) => void;
 }) {
   const { colors } = useAppTheme();
-  const location = [session.venue, session.city].filter(Boolean).join(' · ');
+  const location = [session.city, session.venue].filter(Boolean).join(' · ');
   const timeSummary = formatEventTimes(session.open_time, session.start_time) || '时间待定';
   const displayTitle = session.title || (embedded ? null : `场次 ${index + 1}`);
   const calendarSubject = session.title || (embedded ? '活动' : `场次 ${index + 1}`);
@@ -319,6 +322,7 @@ export default function EventDetailScreen() {
   const [collapsedTimetableSessionIds, setCollapsedTimetableSessionIds] = useState<Set<string>>(() => new Set());
   const [artistsExpanded, setArtistsExpanded] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [detailsOverflows, setDetailsOverflows] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [oshiIsAttributed, setOshiIsAttributed] = useState(false);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
@@ -381,6 +385,11 @@ export default function EventDetailScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setDetailsExpanded(false);
+    setDetailsOverflows(false);
+  }, [event?.id, event?.details]);
 
 
   const load = useCallback(async () => {
@@ -691,6 +700,7 @@ export default function EventDetailScreen() {
 
   const bg = colors.screen;
   const cardBg = colors.card;
+  const detailsTextStyle: TextStyle = { marginBottom: 10, fontSize: 14, color: colors.textSecondary, lineHeight: 22 };
   const oshiArtist = oshiArtistId ? (allArtistsMap.get(oshiArtistId) ?? null) : null;
   const oshiMatchSource = oshiArtistId
     ? getOshiMatchSource(artists, oshiArtistId, oshiArtist, oshiIsAttributed)
@@ -884,7 +894,7 @@ export default function EventDetailScreen() {
               <OshiMatchBadge oshiArtistName={oshiArtistName} outerHeight={32} />
             </View>
           ) : null}
-          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
+          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <EventStatusChip
               status={event.status}
               size="detail"
@@ -968,18 +978,36 @@ export default function EventDetailScreen() {
               ) : null}
               {event.details ? (
                 <View style={{ marginTop: infoPhotos.length > 0 ? 12 : 0 }}>
-                  {detailsExpanded ? (
-                    <Text style={{ marginBottom: 10, fontSize: 14, color: colors.textSecondary, lineHeight: 22 }}>
+                  <View
+                    pointerEvents="none"
+                    aria-hidden
+                    accessible={false}
+                    style={{ position: 'absolute', left: 0, right: 0, opacity: 0 }}
+                  >
+                    <Text
+                      onTextLayout={(e) => (
+                        setDetailsOverflows(e.nativeEvent.lines.length > DETAILS_PREVIEW_LINES)
+                      )}
+                      style={detailsTextStyle}
+                    >
                       {event.details}
                     </Text>
+                  </View>
+                  <Text
+                    numberOfLines={detailsExpanded ? undefined : DETAILS_PREVIEW_LINES}
+                    style={detailsTextStyle}
+                  >
+                    {event.details}
+                  </Text>
+                  {detailsOverflows ? (
+                    <ExpansionToggle
+                      accessibilityLabel="演出详情"
+                      expanded={detailsExpanded}
+                      collapsedLabel="展开详情"
+                      expandedLabel="收起详情"
+                      onPress={() => setDetailsExpanded((current) => !current)}
+                    />
                   ) : null}
-                  <ExpansionToggle
-                    accessibilityLabel="演出详情"
-                    expanded={detailsExpanded}
-                    collapsedLabel="展开详情"
-                    expandedLabel="收起详情"
-                    onPress={() => setDetailsExpanded((current) => !current)}
-                  />
                 </View>
               ) : null}
             </Card>
@@ -1001,10 +1029,10 @@ export default function EventDetailScreen() {
                 <Card
                   cardBg={cardBg}
                   key={session.id}
-                  style={hasMultipleTimetables ? {
-                    paddingTop: 6,
-                    paddingBottom: isCollapsed ? 6 : 16,
-                  } : undefined}
+                  style={{
+                    paddingTop: TIMETABLE_ENTRY_VERTICAL_PADDING,
+                    paddingBottom: TIMETABLE_ENTRY_VERTICAL_PADDING,
+                  }}
                 >
                   {hasMultipleTimetables ? (
                     <TouchableOpacity
@@ -1045,7 +1073,8 @@ export default function EventDetailScreen() {
                         activeOpacity={0.72}
                         style={{
                           minHeight: DETAIL_LIST_ITEM_MIN_HEIGHT,
-                          flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6,
+                          flexDirection: 'row', alignItems: 'center', gap: 10,
+                          paddingVertical: TIMETABLE_ENTRY_VERTICAL_PADDING,
                           borderBottomWidth: entryIndex === entries.length - 1 ? 0 : 1,
                           borderBottomColor: colors.divider,
                         }}
@@ -1088,7 +1117,12 @@ export default function EventDetailScreen() {
         {artists.length > 0 ? (
           <>
             <SectionTitle label="出演者" />
-            <Card cardBg={cardBg} style={hiddenArtistCount > 0 ? { paddingBottom: 0 } : undefined}>
+            <Card
+              cardBg={cardBg}
+              style={hiddenArtistCount > 0
+                ? { paddingTop: ARTIST_LIST_ITEM_VERTICAL_PADDING, paddingBottom: 0 }
+                : { paddingTop: ARTIST_LIST_ITEM_VERTICAL_PADDING, paddingBottom: ARTIST_LIST_ITEM_VERTICAL_PADDING }}
+            >
               {visibleArtists.map((artist, index) => {
                 const isLast = index === visibleArtists.length - 1;
                 const isOshi = artist.id === oshiArtistId;
@@ -1099,7 +1133,8 @@ export default function EventDetailScreen() {
                     onPress={() => router.push(`/artists/${artist.id}`)}
                     style={{
                       minHeight: DETAIL_LIST_ITEM_MIN_HEIGHT,
-                      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+                      flexDirection: 'row', alignItems: 'center',
+                      paddingVertical: ARTIST_LIST_ITEM_VERTICAL_PADDING,
                       borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.divider,
                     }}
                   >
