@@ -468,9 +468,17 @@ export default function CalendarScreen() {
     const imageSource: ImageSourcePropType | null = summary.latestPhotoUri
       ? { uri: summary.latestPhotoUri }
       : resolveAvatarSource(summary.fallbackArtistAvatarUri);
+    const secondImageSource: ImageSourcePropType | null = summary.secondPhotoUri
+      ? { uri: summary.secondPhotoUri }
+      : null;
+    const thirdImageSource: ImageSourcePropType | null = summary.thirdPhotoUri
+      ? { uri: summary.thirdPhotoUri }
+      : null;
     const isNoPhotoOnly = !summary.latestPhotoUri;
     const visualPhotoCount = Math.min(summary.photoCount, 4);
     const backplateCount = isNoPhotoOnly ? 0 : Math.min(Math.max(visualPhotoCount - 1, 0), 2);
+    const hasSecondPhoto = secondImageSource !== null;
+    const hasThirdPhoto = thirdImageSource !== null;
 
     return (
       <View style={{
@@ -479,28 +487,72 @@ export default function CalendarScreen() {
         marginTop: 5,
       }}>
         {backplateCount >= 2 ? (
-          <View style={{
-            position: 'absolute',
-            top: 6,
-            left: 2,
-            width: 28,
-            height: 39,
-            borderRadius: 5,
-            backgroundColor: colors.card,
-            transform: [{ rotate: '-12deg' }],
-          }} />
+          hasThirdPhoto ? (
+            <View style={{
+              position: 'absolute',
+              top: 6,
+              left: 2,
+              width: 28,
+              height: 39,
+              borderRadius: 5,
+              transform: [{ rotate: '-12deg' }],
+            }}>
+              <Image
+                source={thirdImageSource}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 4,
+                  backgroundColor: colors.accentSofter,
+                }}
+              />
+            </View>
+          ) : (
+            <View style={{
+              position: 'absolute',
+              top: 6,
+              left: 2,
+              width: 28,
+              height: 39,
+              borderRadius: 5,
+              backgroundColor: colors.card,
+              transform: [{ rotate: '-12deg' }],
+            }} />
+          )
         ) : null}
         {backplateCount >= 1 ? (
-          <View style={{
-            position: 'absolute',
-            top: 5,
-            right: 2,
-            width: 28,
-            height: 39,
-            borderRadius: 5,
-            backgroundColor: colors.card,
-            transform: [{ rotate: backplateCount >= 2 ? '9deg' : '8deg' }],
-          }} />
+          hasSecondPhoto ? (
+            <View style={{
+              position: 'absolute',
+              top: 5,
+              right: 2,
+              width: 28,
+              height: 39,
+              borderRadius: 5,
+              transform: [{ rotate: backplateCount >= 2 ? '9deg' : '8deg' }],
+            }}>
+              <Image
+                source={secondImageSource}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 4,
+                  backgroundColor: colors.accentSofter,
+                }}
+              />
+            </View>
+          ) : (
+            <View style={{
+              position: 'absolute',
+              top: 5,
+              right: 2,
+              width: 28,
+              height: 39,
+              borderRadius: 5,
+              backgroundColor: colors.card,
+              transform: [{ rotate: backplateCount >= 2 ? '9deg' : '8deg' }],
+            }} />
+          )
         ) : null}
         <View style={{
           position: 'absolute',
@@ -936,7 +988,7 @@ export default function CalendarScreen() {
         <View style={{ alignItems: 'center', paddingVertical: 24, marginBottom: 12 }}>
           <AppIcon name="cheki" size={24} color={colors.textMuted} />
           <Text style={{ marginTop: 8, fontSize: 14, color: colors.textMuted }}>
-            这一天暂无拍立得
+            这一天还没有拍立得
           </Text>
         </View>
       ) : null}
@@ -951,7 +1003,7 @@ export default function CalendarScreen() {
         <View style={{ alignItems: 'center', paddingVertical: 20, marginBottom: 12 }}>
           <AppIcon name="calendar" size={24} color={colors.textMuted} />
           <Text style={{ marginTop: 8, fontSize: 14, color: colors.textMuted }}>
-            这一天暂无活动
+            这一天还没有活动
           </Text>
         </View>
       )}
@@ -1004,7 +1056,7 @@ export default function CalendarScreen() {
         <View style={{ alignItems: 'center', paddingVertical: 20, marginBottom: 12 }}>
           <AppIcon name="dateItem" size={24} color={colors.textMuted} />
           <Text style={{ marginTop: 8, fontSize: 14, color: colors.textMuted }}>
-            这一天暂无重要日期
+            这一天还没有重要日期
           </Text>
         </View>
       )}
@@ -1080,7 +1132,7 @@ export default function CalendarScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 60 }}>
               <AppIcon name="calendar" size={24} color={colors.textMuted} />
               <Text style={{ marginTop: 10, fontSize: 14, color: colors.textMuted }}>
-                暂无活动记录
+                还没有活动记录
               </Text>
             </View>
           }

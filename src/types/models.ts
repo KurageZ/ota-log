@@ -181,6 +181,8 @@ export interface ChekiCalendarDaySummary {
   noPhotoCount: number;
   artistCount: number;
   latestPhotoUri: string | null;
+  secondPhotoUri: string | null;
+  thirdPhotoUri: string | null;
   fallbackArtistAvatarUri: string | null;
 }
 

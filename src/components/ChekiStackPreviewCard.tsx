@@ -67,6 +67,13 @@ export function ChekiStackPreviewCard({
 }: Props) {
   const { colors, isDark } = useAppTheme();
   const hasCardChrome = chrome === 'card';
+  const thumbnailShadow = {
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 1,
+  };
   const canPress = typeof onPress === 'function';
   const fallbackCardWidth = Math.max(
     48,
@@ -140,15 +147,7 @@ export function ChekiStackPreviewCard({
                     height: resolvedCardHeight,
                     borderRadius: 10,
                     zIndex: index + 1,
-                    ...(isLastVisible
-                      ? {
-                          shadowColor: colors.shadow,
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.16,
-                          shadowRadius: 10,
-                          elevation: 2,
-                        }
-                      : null),
+                    ...thumbnailShadow,
                   }}
                 >
                   <Image
@@ -193,11 +192,7 @@ export function ChekiStackPreviewCard({
                   width: cardWidth,
                   height: resolvedCardHeight,
                   borderRadius: 10,
-                  shadowColor: colors.shadow,
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.13,
-                  shadowRadius: 18,
-                  elevation: 3,
+                  ...thumbnailShadow,
                 }}
               >
                 <Image

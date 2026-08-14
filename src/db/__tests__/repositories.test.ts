@@ -681,6 +681,8 @@ describe('Cheki repositories', () => {
         noPhotoCount: 0,
         artistCount: 1,
         latestPhotoUri: 'file:///cheki-1.jpg',
+        secondPhotoUri: null,
+        thirdPhotoUri: null,
         fallbackArtistAvatarUri: null,
       },
       {
@@ -690,9 +692,62 @@ describe('Cheki repositories', () => {
         noPhotoCount: 3,
         artistCount: 1,
         latestPhotoUri: null,
+        secondPhotoUri: null,
+        thirdPhotoUri: null,
         fallbackArtistAvatarUri: 'file:///artist-1-avatar.jpg',
       },
     ]);
+  });
+
+  test('calendar summaries expose the second latest photo for stacking', async () => {
+    rawDb.prepare(
+      `INSERT INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      'cheki-3-17-a',
+      null,
+      'artist-1',
+      'file:///cheki-3-17-a.jpg',
+      '2026-03-17',
+      null,
+      null,
+      '2026-03-17T10:00:00.000Z'
+    );
+    rawDb.prepare(
+      `INSERT INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      'cheki-3-17-b',
+      null,
+      'artist-1',
+      'file:///cheki-3-17-b.jpg',
+      '2026-03-17',
+      null,
+      null,
+      '2026-03-17T11:00:00.000Z'
+    );
+    rawDb.prepare(
+      `INSERT INTO cheki (id, event_id, artist_id, photo_uri, date, price, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      'cheki-3-17-c',
+      null,
+      'artist-1',
+      'file:///cheki-3-17-c.jpg',
+      '2026-03-17',
+      null,
+      null,
+      '2026-03-17T12:00:00.000Z'
+    );
+
+    const summaries = await chekiRepository.findCalendarSummariesByMonth(2026, 3);
+    expect(summaries.find((summary) => summary.date === '2026-03-17')).toEqual(
+      expect.objectContaining({
+        latestPhotoUri: 'file:///cheki-3-17-c.jpg',
+        secondPhotoUri: 'file:///cheki-3-17-b.jpg',
+        thirdPhotoUri: 'file:///cheki-3-17-a.jpg',
+      }),
+    );
   });
 
   test('findNextPlannedByArtistId returns the nearest planned event for the artist', async () => {

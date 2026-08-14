@@ -96,7 +96,7 @@ export class ChekiRepository {
       photo_count: number;
       no_photo_count: number;
       artist_count: number;
-      latest_photo_uri: string | null;
+      photo_uris: string | null;
       fallback_artist_avatar_uri: string | null;
     }>(
       `SELECT
@@ -110,16 +110,18 @@ export class ChekiRepository {
                 AND NOT EXISTS (SELECT 1 FROM cheki_item_images image WHERE image.item_id = i.id))) AS no_photo_count,
          COUNT(DISTINCT r.artist_id) AS artist_count,
          (
-           SELECT COALESCE(f.photo_uri, b.photo_uri)
-           FROM cheki_records rr
-           JOIN cheki_items ii ON ii.record_id = rr.id
-           LEFT JOIN cheki_item_images f ON f.item_id = ii.id AND f.side = 'front'
-           LEFT JOIN cheki_item_images b ON b.item_id = ii.id AND b.side = 'back'
-           WHERE strftime('%Y-%m-%d', COALESCE(rr.date, rr.created_at))
-             = strftime('%Y-%m-%d', COALESCE(r.date, r.created_at))
-           ORDER BY COALESCE(rr.date, rr.created_at) DESC, rr.created_at DESC, ii.sort_order
-           LIMIT 1
-         ) AS latest_photo_uri,
+           SELECT group_concat(photo_uri, char(10))
+           FROM (
+             SELECT COALESCE(f.photo_uri, b.photo_uri) AS photo_uri
+             FROM cheki_records rr
+             JOIN cheki_items ii ON ii.record_id = rr.id
+             LEFT JOIN cheki_item_images f ON f.item_id = ii.id AND f.side = 'front'
+             LEFT JOIN cheki_item_images b ON b.item_id = ii.id AND b.side = 'back'
+             WHERE strftime('%Y-%m-%d', COALESCE(rr.date, rr.created_at))
+               = strftime('%Y-%m-%d', COALESCE(r.date, r.created_at))
+             ORDER BY COALESCE(rr.date, rr.created_at) DESC, rr.created_at DESC, ii.sort_order, ii.id
+           )
+         ) AS photo_uris,
          (
            SELECT a.avatar_uri
            FROM cheki_records rr
@@ -141,15 +143,20 @@ export class ChekiRepository {
        ORDER BY record_date`,
       [`${year}-${String(month).padStart(2, '0')}`],
     );
-    return rows.map((row) => ({
-      date: row.record_date,
-      totalCount: row.total_count,
-      photoCount: row.photo_count,
-      noPhotoCount: row.no_photo_count,
-      artistCount: row.artist_count,
-      latestPhotoUri: row.latest_photo_uri,
-      fallbackArtistAvatarUri: row.fallback_artist_avatar_uri,
-    }));
+    return rows.map((row) => {
+      const photoUris = (row.photo_uris ?? '').split('\n').filter(Boolean);
+      return {
+        date: row.record_date,
+        totalCount: row.total_count,
+        photoCount: row.photo_count,
+        noPhotoCount: row.no_photo_count,
+        artistCount: row.artist_count,
+        latestPhotoUri: photoUris[0] ?? null,
+        secondPhotoUri: photoUris[1] ?? null,
+        thirdPhotoUri: photoUris[2] ?? null,
+        fallbackArtistAvatarUri: row.fallback_artist_avatar_uri,
+      };
+    });
   }
 
   async findDistinctArtistIds(): Promise<string[]> {
