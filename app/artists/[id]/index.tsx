@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import SegmentedControl from '@expo/ui/community/segmented-control';
 import {
   GlassView,
   isGlassEffectAPIAvailable,
@@ -844,30 +845,20 @@ export default function ArtistDetailScreen() {
                 >
                   {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-                    <TabSwitcherSurface
+                    <ArtistSectionTabs
+                      activeTab={activeTab}
+                      eventCount={events.length}
+                      chekiCount={totalChekiCount}
+                      onSelect={handleSelectTab}
                       usesLiquidGlass={usesLiquidGlass}
                       overlayIsDark={pDark}
                       fallbackBackground={cardAltBg}
                       fallbackBorderWidth={lowerCardBorderWidth}
                       fallbackBorderColor={backdropDivider}
-                    >
-                      <TabButton
-                        label={`活动 · ${events.length}`}
-                        active={false}
-                        onPress={() => handleSelectTab('events')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                      <TabButton
-                        label={`拍立得 · ${totalChekiCount}`}
-                        active
-                        onPress={() => handleSelectTab('cheki')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                    </TabSwitcherSurface>
+                      activeBg={tabActiveBg}
+                      activeTextColor={tabActiveText}
+                      inactiveTextColor={tabInactiveText}
+                    />
                   </View>
                 </View>
               </View>
@@ -1062,27 +1053,17 @@ export default function ArtistDetailScreen() {
                 ) : null}
 
                 <View style={{ paddingHorizontal: 16 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      backgroundColor: colors.cardAlt,
-                      borderRadius: 14,
-                      padding: 4,
-                      borderWidth: lowerCardBorderWidth,
-                      borderColor: colors.divider,
-                    }}
-                  >
-                    <TabButton
-                      label={`活动 · ${events.length}`}
-                      active={false}
-                      onPress={() => handleSelectTab('events')}
-                    />
-                    <TabButton
-                      label={`拍立得 · ${totalChekiCount}`}
-                      active
-                      onPress={() => handleSelectTab('cheki')}
-                    />
-                  </View>
+                  <ArtistSectionTabs
+                    activeTab={activeTab}
+                    eventCount={events.length}
+                    chekiCount={totalChekiCount}
+                    onSelect={handleSelectTab}
+                    usesLiquidGlass={false}
+                    overlayIsDark={isDark}
+                    fallbackBackground={colors.cardAlt}
+                    fallbackBorderWidth={lowerCardBorderWidth}
+                    fallbackBorderColor={colors.divider}
+                  />
                 </View>
 
                 {renderChekiSummary(colors.accent)}
@@ -1200,30 +1181,20 @@ export default function ArtistDetailScreen() {
                 >
                   {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-                    <TabSwitcherSurface
+                    <ArtistSectionTabs
+                      activeTab={activeTab}
+                      eventCount={events.length}
+                      chekiCount={totalChekiCount}
+                      onSelect={handleSelectTab}
                       usesLiquidGlass={usesLiquidGlass}
                       overlayIsDark={pDark}
                       fallbackBackground={cardAltBg}
                       fallbackBorderWidth={lowerCardBorderWidth}
                       fallbackBorderColor={backdropDivider}
-                    >
-                      <TabButton
-                        label={`活动 · ${events.length}`}
-                        active
-                        onPress={() => handleSelectTab('events')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                      <TabButton
-                        label={`拍立得 · ${totalChekiCount}`}
-                        active={false}
-                        onPress={() => handleSelectTab('cheki')}
-                        activeBg={tabActiveBg}
-                        activeTextColor={tabActiveText}
-                        inactiveTextColor={tabInactiveText}
-                      />
-                    </TabSwitcherSurface>
+                      activeBg={tabActiveBg}
+                      activeTextColor={tabActiveText}
+                      inactiveTextColor={tabInactiveText}
+                    />
                   </View>
                 </View>
               </View>
@@ -1445,27 +1416,17 @@ export default function ArtistDetailScreen() {
                 ) : null}
 
                 <View style={{ paddingHorizontal: 16 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      backgroundColor: colors.cardAlt,
-                      borderRadius: 14,
-                      padding: 4,
-                      borderWidth: lowerCardBorderWidth,
-                      borderColor: colors.divider,
-                    }}
-                  >
-                    <TabButton
-                      label={`活动 · ${events.length}`}
-                      active
-                      onPress={() => handleSelectTab('events')}
-                    />
-                    <TabButton
-                      label={`拍立得 · ${totalChekiCount}`}
-                      active={false}
-                      onPress={() => handleSelectTab('cheki')}
-                    />
-                  </View>
+                  <ArtistSectionTabs
+                    activeTab={activeTab}
+                    eventCount={events.length}
+                    chekiCount={totalChekiCount}
+                    onSelect={handleSelectTab}
+                    usesLiquidGlass={false}
+                    overlayIsDark={isDark}
+                    fallbackBackground={colors.cardAlt}
+                    fallbackBorderWidth={lowerCardBorderWidth}
+                    fallbackBorderColor={colors.divider}
+                  />
                 </View>
 
                 <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
@@ -1644,6 +1605,79 @@ function HeaderTextButton({
     >
       {control}
     </View>
+  );
+}
+
+function ArtistSectionTabs({
+  activeTab,
+  eventCount,
+  chekiCount,
+  onSelect,
+  usesLiquidGlass,
+  overlayIsDark,
+  fallbackBackground,
+  fallbackBorderWidth,
+  fallbackBorderColor,
+  activeBg,
+  activeTextColor,
+  inactiveTextColor,
+}: {
+  activeTab: TabKey;
+  eventCount: number;
+  chekiCount: number;
+  onSelect: (tab: TabKey) => void;
+  usesLiquidGlass: boolean;
+  overlayIsDark: boolean;
+  fallbackBackground: string;
+  fallbackBorderWidth: number;
+  fallbackBorderColor: string;
+  activeBg?: string;
+  activeTextColor?: string;
+  inactiveTextColor?: string;
+}) {
+  const values = [`活动 · ${eventCount}`, `拍立得 · ${chekiCount}`];
+
+  if (Platform.OS === 'ios') {
+    return (
+      <SegmentedControl
+        testID="artist-section-segmented-control"
+        values={values}
+        selectedIndex={activeTab === 'events' ? 0 : 1}
+        appearance={overlayIsDark ? 'dark' : 'light'}
+        onChange={({ nativeEvent }) => {
+          const selectedTab = TAB_KEYS[nativeEvent.selectedSegmentIndex];
+          if (selectedTab) onSelect(selectedTab);
+        }}
+        style={{ height: 32 }}
+      />
+    );
+  }
+
+  return (
+    <TabSwitcherSurface
+      usesLiquidGlass={usesLiquidGlass}
+      overlayIsDark={overlayIsDark}
+      fallbackBackground={fallbackBackground}
+      fallbackBorderWidth={fallbackBorderWidth}
+      fallbackBorderColor={fallbackBorderColor}
+    >
+      <TabButton
+        label={values[0]}
+        active={activeTab === 'events'}
+        onPress={() => onSelect('events')}
+        activeBg={activeBg}
+        activeTextColor={activeTextColor}
+        inactiveTextColor={inactiveTextColor}
+      />
+      <TabButton
+        label={values[1]}
+        active={activeTab === 'cheki'}
+        onPress={() => onSelect('cheki')}
+        activeBg={activeBg}
+        activeTextColor={activeTextColor}
+        inactiveTextColor={inactiveTextColor}
+      />
+    </TabSwitcherSurface>
   );
 }
 

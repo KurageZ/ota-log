@@ -222,5 +222,34 @@ describe('ArtistDetailScreen background layout', () => {
     );
     expect(tabSwitchers).toHaveLength(2);
     expect(tabSwitchers.every((node) => node.props.style?.position !== 'absolute')).toBe(true);
+
+    const nativeSegmentedControls = renderer.root.findAll(
+      (node) => node.props.testID === 'artist-section-segmented-control'
+        && Array.isArray(node.props.values)
+        && typeof node.props.selectedIndex === 'number',
+    );
+    expect(nativeSegmentedControls).toHaveLength(2);
+    expect(nativeSegmentedControls.every((node) => node.props.selectedIndex === 0)).toBe(true);
+    expect(nativeSegmentedControls.every(
+      (node) => node.props.values.join('|') === '活动 · 0|拍立得 · 0',
+    )).toBe(true);
+
+    const eventsSegmentedControl = nativeSegmentedControls.find(
+      (node) => node.props.selectedIndex === 0,
+    );
+    expect(eventsSegmentedControl).toBeDefined();
+
+    await act(async () => {
+      eventsSegmentedControl!.props.onChange({
+        nativeEvent: { selectedSegmentIndex: 1, value: '拍立得 · 0' },
+      });
+    });
+
+    const switchedSegmentedControls = renderer.root.findAll(
+      (node) => node.props.testID === 'artist-section-segmented-control'
+        && Array.isArray(node.props.values)
+        && typeof node.props.selectedIndex === 'number',
+    );
+    expect(switchedSegmentedControls.every((node) => node.props.selectedIndex === 1)).toBe(true);
   });
 });
