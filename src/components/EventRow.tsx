@@ -51,7 +51,7 @@ export function EventRow({
             {title}
           </Text>
           {subtitle != null ? (
-            <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 }}>
+            <View style={{ marginTop: 7, flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 }}>
               {subtitle}
             </View>
           ) : null}

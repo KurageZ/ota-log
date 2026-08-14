@@ -1006,28 +1006,7 @@ export default function StatsScreen() {
         <>
           <SectionHeader title="单推" colors={colors} />
           {oshiArtistId ? (
-            <SurfaceCard colors={colors}>
-              {oshiArtist ? <OshiCardTitle artist={oshiArtist} /> : null}
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                <StatBox
-                  label="相关活动"
-                  value={oshiCompletedCount}
-                  sub={statusCounts.completed > 0 ? `活动 · 占比 ${oshiEventRatio}%` : '暂无已完成活动'}
-                  colors={colors}
-                  compact
-                  backgroundColor={colors.accentSoft}
-                  onPress={() => goToEvents({ artist_id: oshiArtistId, status: 'completed' })}
-                />
-                <StatBox
-                  label="单推拍立得"
-                  value={oshiChekiCount}
-                  sub={chekiCount > 0 ? `拍立得 · 占比 ${oshiChekiRatio}%` : '暂无拍立得'}
-                  colors={colors}
-                  compact
-                  backgroundColor={colors.accentSoft}
-                  onPress={() => goToCheki({ artist_id: oshiArtistId })}
-                />
-              </View>
+            <>
               {recentOshiEvent ? (
                 <EventCard
                   event={recentOshiEvent}
@@ -1041,44 +1020,58 @@ export default function StatsScreen() {
                     </>
                   }
                   showStatus={false}
-                  style={{
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: trendBuckets.length > 0 ? 14 : 0,
-                    backgroundColor: colors.accentSoft,
-                    shadowOpacity: 0,
-                    shadowRadius: 0,
-                    elevation: 0,
-                  }}
                 />
               ) : (
-                <View style={{ borderRadius: 14, padding: 14, backgroundColor: colors.accentSoft }}>
+                <SurfaceCard colors={colors}>
                   <Text style={{ fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
                     {periodNoun}范围内没有相关活动
                   </Text>
-                </View>
+                </SurfaceCard>
               )}
-              {trendBuckets.length > 0 ? (
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-                      活跃度
-                    </Text>
-                    <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-                      活动与拍立得
-                    </Text>
-                  </View>
-                  <TrendBarChart
-                    counts={monthlyOshiActivityCounts}
-                    labels={trendBuckets.map((bucket) => bucket.label)}
+              <SurfaceCard colors={colors}>
+                {oshiArtist ? <OshiCardTitle artist={oshiArtist} /> : null}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                  <StatBox
+                    label="相关活动"
+                    value={oshiCompletedCount}
+                    sub={statusCounts.completed > 0 ? `活动 · 占比 ${oshiEventRatio}%` : '暂无已完成活动'}
                     colors={colors}
-                    showBarValues={period.preset === 'month'}
-                    prioritizeDataLabels={period.preset === 'month'}
-                    showAllLabels={period.preset === 'year'}
+                    compact
+                    backgroundColor={colors.accentSoft}
+                    onPress={() => goToEvents({ artist_id: oshiArtistId, status: 'completed' })}
+                  />
+                  <StatBox
+                    label="单推拍立得"
+                    value={oshiChekiCount}
+                    sub={chekiCount > 0 ? `拍立得 · 占比 ${oshiChekiRatio}%` : '暂无拍立得'}
+                    colors={colors}
+                    compact
+                    backgroundColor={colors.accentSoft}
+                    onPress={() => goToCheki({ artist_id: oshiArtistId })}
                   />
                 </View>
-              ) : null}
-            </SurfaceCard>
+                {trendBuckets.length > 0 ? (
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                        活跃度
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                        活动与拍立得
+                      </Text>
+                    </View>
+                    <TrendBarChart
+                      counts={monthlyOshiActivityCounts}
+                      labels={trendBuckets.map((bucket) => bucket.label)}
+                      colors={colors}
+                      showBarValues={period.preset === 'month'}
+                      prioritizeDataLabels={period.preset === 'month'}
+                      showAllLabels={period.preset === 'year'}
+                    />
+                  </View>
+                ) : null}
+              </SurfaceCard>
+            </>
           ) : (
             <EmptyCard
               title="未设置单推"
