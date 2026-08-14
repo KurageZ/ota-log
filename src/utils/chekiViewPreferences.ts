@@ -15,6 +15,7 @@ export interface ChekiViewPreferences {
   density: ChekiGridDensity;
   useSpecAspectRatio: boolean;
   showRecordThumbnails: boolean;
+  albumModeHintDismissed: boolean;
 }
 
 export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
@@ -25,6 +26,7 @@ export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
   density: 'large',
   useSpecAspectRatio: false,
   showRecordThumbnails: true,
+  albumModeHintDismissed: false,
 };
 
 function isBrowseMode(value: unknown): value is ChekiBrowseMode {
@@ -77,6 +79,9 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
     showRecordThumbnails: typeof raw.showRecordThumbnails === 'boolean'
       ? raw.showRecordThumbnails
       : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails,
+    albumModeHintDismissed: typeof raw.albumModeHintDismissed === 'boolean'
+      ? raw.albumModeHintDismissed
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.albumModeHintDismissed,
   };
 }
 

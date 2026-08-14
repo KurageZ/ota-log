@@ -425,19 +425,22 @@ function BrowseModeOptions({
             onPress={() => onChange(option.value)}
             style={{
               flex: 1,
-              minHeight: 72,
+              minHeight: 56,
               paddingHorizontal: 12,
-              paddingVertical: 12,
+              paddingVertical: 10,
               borderRadius: 14,
               borderWidth: selected ? 1.5 : 1,
               borderColor: selected ? colors.accent : colors.inputBorder,
               backgroundColor: selected ? colors.accentSofter : colors.card,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt }}>
                 <AppIcon name={option.icon} size={17} color={selected ? colors.onAccent : colors.textSecondary} />
               </View>
+              <Text style={{ flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '800', color: colors.heading }}>
+                {option.label}
+              </Text>
               <AppIcon
                 name="radio"
                 variant={selected ? 'selected' : 'unselected'}
@@ -446,9 +449,6 @@ function BrowseModeOptions({
                 secondaryColor={colors.card}
               />
             </View>
-            <Text style={{ marginTop: 8, fontSize: 15, lineHeight: 20, fontWeight: '800', color: colors.heading }}>
-              {option.label}
-            </Text>
           </TouchableOpacity>
         );
       })}
@@ -779,22 +779,29 @@ export default function ChekiLibraryScreen() {
 
   const filterSections = useMemo<FilterSection[]>(() => {
     const result: FilterSection[] = [];
-    // 日期之下统一为「其他条件」：正向开关 chips 横向排列、独立切换，规格放在最后一位
+    // 日期之下为「图片状态」与「其他条件」：图片状态单独成节，其他条件保留正向开关 chips 与规格
     const otherGroups: FilterChipGroup[] = [];
     if (isRecordMode) {
-      otherGroups.push({
+      result.push({
         key: 'image_status',
-        options: [
-          { value: 'none', label: '无图片' },
-          { value: 'partial', label: '部分有图' },
-          { value: 'complete', label: '全部有图' },
-        ],
-        value: recordFilterDraft.imageStatus,
-        onChange: (value) => setRecordFilterDraft((current) => ({
-          ...current,
-          imageStatus: value === 'none' || value === 'partial' || value === 'complete' ? value : null,
-        })),
-        showAllChip: true,
+        title: '图片状态',
+        value: null,
+        onChange: () => {},
+        options: [],
+        chipGroups: [{
+          key: 'image_status',
+          options: [
+            { value: 'none', label: '无图片' },
+            { value: 'partial', label: '部分有图' },
+            { value: 'complete', label: '全部有图' },
+          ],
+          value: recordFilterDraft.imageStatus,
+          onChange: (value) => setRecordFilterDraft((current) => ({
+            ...current,
+            imageStatus: value === 'none' || value === 'partial' || value === 'complete' ? value : null,
+          })),
+          showAllChip: true,
+        }],
       });
     }
     const hasLinkedEvent = isRecordMode ? recordFilterDraft.hasLinkedEvent : itemFilterDraft.hasLinkedEvent;
@@ -981,6 +988,10 @@ export default function ChekiLibraryScreen() {
 
   const handleChangeRecordThumbnails = useCallback((showRecordThumbnails: boolean) => {
     persistViewPreferences({ ...viewPreferences, showRecordThumbnails });
+  }, [persistViewPreferences, viewPreferences]);
+
+  const handleDismissAlbumModeHint = useCallback(() => {
+    persistViewPreferences({ ...viewPreferences, albumModeHintDismissed: true });
   }, [persistViewPreferences, viewPreferences]);
 
   const handleChangeSpecAspectRatio = useCallback((useSpecAspectRatio: boolean) => {
@@ -1363,7 +1374,7 @@ export default function ChekiLibraryScreen() {
                 onChange={handleChangeBrowseMode}
               />
             </View>
-            {!isRecordMode ? (
+            {!isRecordMode && !viewPreferences.albumModeHintDismissed ? (
               <View
                 accessibilityRole="alert"
                 style={{
@@ -1383,9 +1394,18 @@ export default function ChekiLibraryScreen() {
                     相册仅展示已添加图片的拍立得
                   </Text>
                   <Text style={{ marginTop: 3, fontSize: 12.5, lineHeight: 19, color: colors.textSecondary }}>
-                    没有图片的记录不会出现在这里，请切换到「记录」查看全部记录。
+                    无图记录请切换到「记录」模式查看全部记录。
                   </Text>
                 </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="不再提示"
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  onPress={handleDismissAlbumModeHint}
+                  style={{ padding: 2, marginTop: -2, marginRight: -2 }}
+                >
+                  <AppIcon name="close" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
               </View>
             ) : null}
           </View>

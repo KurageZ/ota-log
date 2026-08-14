@@ -134,8 +134,8 @@ export function ChekiRecordListItem({
         )}
 
         <View style={{ flex: 1, minWidth: 0, minHeight: showThumbnail ? previewHeight : 64, justifyContent: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: showThumbnail ? 12 : 10 }}>
+            <View style={{ flex: 1, minWidth: 0, gap: showThumbnail ? 7 : 5 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text
                   numberOfLines={1}

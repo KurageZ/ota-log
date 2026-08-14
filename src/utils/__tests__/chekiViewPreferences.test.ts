@@ -31,6 +31,7 @@ describe('chekiViewPreferences', () => {
       density: 'small',
       useSpecAspectRatio: false,
       showRecordThumbnails: false,
+      albumModeHintDismissed: true,
     })).toEqual({
       browseMode: 'record',
       albumGrouping: 'date',
@@ -39,6 +40,7 @@ describe('chekiViewPreferences', () => {
       density: 'small',
       useSpecAspectRatio: false,
       showRecordThumbnails: false,
+      albumModeHintDismissed: true,
     });
   });
 
@@ -49,6 +51,7 @@ describe('chekiViewPreferences', () => {
       sortOrder: 'asc',
       density: 'large',
       showRecordThumbnails: false,
+      albumModeHintDismissed: true,
     })).toEqual({
       browseMode: 'album',
       albumGrouping: 'none',
@@ -57,6 +60,7 @@ describe('chekiViewPreferences', () => {
       density: 'large',
       useSpecAspectRatio: false,
       showRecordThumbnails: false,
+      albumModeHintDismissed: true,
     });
   });
 
@@ -79,6 +83,7 @@ describe('chekiViewPreferences', () => {
       density: 'small' as const,
       useSpecAspectRatio: false,
       showRecordThumbnails: false,
+      albumModeHintDismissed: true,
     };
     await saveChekiViewPreferences(preferences);
     expect(mockedAsyncStorage.setItem).toHaveBeenCalledWith(
