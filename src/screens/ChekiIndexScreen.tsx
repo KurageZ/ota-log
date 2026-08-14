@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, Platform, type LayoutChangeEvent,
+  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, ActivityIndicator, Platform, type LayoutChangeEvent,
 } from 'react-native';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useDB } from '../context/DBContext';
@@ -74,6 +74,12 @@ import {
 } from '../utils/chekiSearch';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { toggleBatchSelection } from '../utils/filterSelection';
+import {
+  buildChekiDeepLinkState,
+  createClearedChekiDeepLinkParams,
+  getChekiDeepLinkSignature,
+  type ChekiFilterRouteParams,
+} from '../utils/chekiDeepLink';
 
 type ChekiGalleryItem =
   | { type: 'record'; key: string; record: ChekiRecordWithItems }
@@ -339,14 +345,6 @@ function browseItemToCheki(item: ChekiBrowseItem): Cheki {
   };
 }
 
-function parseArtistIdsParam(value: string | string[] | undefined): string[] {
-  const rawValues = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(rawValues
-    .flatMap((item) => item.split(','))
-    .map((item) => item.trim())
-    .filter(Boolean))];
-}
-
 function SegmentedOptions({
   colors,
   options,
@@ -482,27 +480,7 @@ function useReducedMotionEnabled(): boolean {
 }
 
 export default function ChekiLibraryScreen() {
-  const {
-    artist_id: filterArtistParam,
-    event_id: filterEventId,
-    year: yearParam,
-    month: monthParam,
-    date: dateParam,
-    startDate: startDateParam,
-    endDate: endDateParam,
-    preset: presetParam,
-    browse: browseParam,
-  } = useLocalSearchParams<{
-    artist_id?: string | string[];
-    event_id?: string;
-    year?: string;
-    month?: string;
-    date?: string;
-    startDate?: string;
-    endDate?: string;
-    preset?: string;
-    browse?: string;
-  }>();
+  const params = useLocalSearchParams<ChekiFilterRouteParams>();
   const db = useDB();
   const { colors, isDark } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
@@ -512,25 +490,12 @@ export default function ChekiLibraryScreen() {
   const tabBarScroll = isAndroid ? androidHeader.scrollProps : iosTabBarScroll;
   const reducedMotion = useReducedMotionEnabled();
 
-  const filterYear = yearParam ? Number(yearParam) : undefined;
-  const filterMonth = monthParam ? Number(monthParam) : undefined;
-  const filterDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
-  const filterStartDate = startDateParam && /^\d{4}-\d{2}-\d{2}$/.test(startDateParam) ? startDateParam : undefined;
-  const filterEndDate = endDateParam && /^\d{4}-\d{2}-\d{2}$/.test(endDateParam) ? endDateParam : undefined;
-  const opensInRecordMode = browseParam === 'record';
-  const selectedArtistIds = useMemo(() => parseArtistIdsParam(filterArtistParam), [filterArtistParam]);
-  const hasRecordDeepLink = Boolean(
-    filterArtistParam
-    || filterEventId
-    || filterDate
-    || filterStartDate
-    || filterYear
-    || presetParam === 'all'
-    || opensInRecordMode
-  );
+  const deepLinkSignature = getChekiDeepLinkSignature(params);
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [viewPreferences, setViewPreferences] = useState<ChekiViewPreferences>(DEFAULT_CHEKI_VIEW_PREFERENCES);
+  const [viewPreferencesLoaded, setViewPreferencesLoaded] = useState(false);
+  const consumedDeepLinkRef = useRef<string | null>(null);
   const [viewSettingsVisible, setViewSettingsVisible] = useState(false);
   const [galleryViewportHeight, setGalleryViewportHeight] = useState(0);
   const [galleryHeaderHeight, setGalleryHeaderHeight] = useState(0);
@@ -568,26 +533,7 @@ export default function ChekiLibraryScreen() {
   const searchTokens = useMemo(() => tokenizeChekiSearchQuery(debouncedKeyword), [debouncedKeyword]);
   const [filterVisible, setFilterVisible] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<ChekiDatePickerMode | null>(null);
-  const [recordFilters, setRecordFilters] = useState<ChekiRecordFilters>(() => ({
-    ...EMPTY_CHEKI_RECORD_FILTERS,
-    artistIds: [...selectedArtistIds],
-    eventId: filterEventId ?? null,
-    date: filterDate
-      ? { mode: 'day', startDate: filterDate, endDate: filterDate }
-      : filterStartDate && filterEndDate
-        ? { mode: 'custom', startDate: filterStartDate, endDate: filterEndDate }
-        : filterYear
-          ? {
-              mode: filterMonth ? 'month' : 'year',
-              startDate: filterMonth
-                ? `${filterYear}-${String(filterMonth).padStart(2, '0')}-01`
-                : `${filterYear}-01-01`,
-              endDate: filterMonth
-                ? `${filterYear}-${String(filterMonth).padStart(2, '0')}-31`
-                : `${filterYear}-12-31`,
-            }
-          : null,
-  }));
+  const [recordFilters, setRecordFilters] = useState<ChekiRecordFilters>(EMPTY_CHEKI_RECORD_FILTERS);
   const [itemFilters, setItemFilters] = useState<ChekiItemFilters>(EMPTY_CHEKI_ITEM_FILTERS);
   const [recordFilterDraft, setRecordFilterDraft] = useState<ChekiRecordFilters>(recordFilters);
   const [itemFilterDraft, setItemFilterDraft] = useState<ChekiItemFilters>(itemFilters);
@@ -604,41 +550,45 @@ export default function ChekiLibraryScreen() {
   useEffect(() => {
     let isActive = true;
     loadChekiViewPreferences().then((preferences) => {
-      if (isActive) setViewPreferences(
-        hasRecordDeepLink
-          ? { ...preferences, browseMode: 'record' }
-          : preferences,
-      );
+      if (!isActive) return;
+      setViewPreferences(preferences);
+      setViewPreferencesLoaded(true);
     });
     return () => {
       isActive = false;
     };
-  }, [hasRecordDeepLink]);
+  }, []);
 
   useEffect(() => {
-    if (!hasRecordDeepLink) return;
-    const date = filterDate
-      ? { mode: 'day' as const, startDate: filterDate, endDate: filterDate }
-      : filterStartDate && filterEndDate
-        ? { mode: 'custom' as const, startDate: filterStartDate, endDate: filterEndDate }
-        : filterYear
-          ? {
-              mode: filterMonth ? 'month' as const : 'year' as const,
-              startDate: filterMonth
-                ? `${filterYear}-${String(filterMonth).padStart(2, '0')}-01`
-                : `${filterYear}-01-01`,
-              endDate: filterMonth
-                ? `${filterYear}-${String(filterMonth).padStart(2, '0')}-${new Date(filterYear, filterMonth, 0).getDate()}`
-                : `${filterYear}-12-31`,
-            }
-          : null;
-    setRecordFilters({
-      ...EMPTY_CHEKI_RECORD_FILTERS,
-      artistIds: [...selectedArtistIds],
-      eventId: filterEventId ?? null,
-      date,
-    });
-  }, [filterDate, filterEndDate, filterEventId, filterMonth, filterStartDate, filterYear, hasRecordDeepLink, selectedArtistIds]);
+    if (!viewPreferencesLoaded || consumedDeepLinkRef.current === deepLinkSignature) return;
+    const incoming = buildChekiDeepLinkState(params, viewPreferences.browseMode);
+    consumedDeepLinkRef.current = deepLinkSignature;
+    if (!incoming.hasDeepLink) return;
+
+    if (incoming.filterAction === 'replace') {
+      if (incoming.targetMode === 'record') {
+        setRecordFilters(cloneChekiRecordFilters(incoming.filters));
+        setRecordFilterDraft(cloneChekiRecordFilters(incoming.filters));
+      } else {
+        setItemFilters(cloneChekiItemFilters(incoming.filters));
+        setItemFilterDraft(cloneChekiItemFilters(incoming.filters));
+      }
+    } else if (incoming.filterAction === 'clearDate') {
+      if (incoming.targetMode === 'record') {
+        setRecordFilters((current) => ({ ...current, date: null }));
+        setRecordFilterDraft((current) => ({ ...current, date: null }));
+      } else {
+        setItemFilters((current) => ({ ...current, date: null }));
+        setItemFilterDraft((current) => ({ ...current, date: null }));
+      }
+    }
+    setViewPreferences((current) => (
+      current.browseMode === incoming.targetMode
+        ? current
+        : { ...current, browseMode: incoming.targetMode }
+    ));
+    router.setParams(createClearedChekiDeepLinkParams());
+  }, [deepLinkSignature, params, viewPreferences.browseMode, viewPreferencesLoaded]);
 
   const load = useCallback(async () => {
     const [items, records, artists, events, config] = await Promise.all([
@@ -808,7 +758,7 @@ export default function ChekiLibraryScreen() {
     () => Object.fromEntries([...artistMap.values()].map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [artistMap],
   );
-  const filterEvent = filterEventId ? eventMap.get(filterEventId) ?? null : null;
+  const filterEvent = appliedEventId ? eventMap.get(appliedEventId) ?? null : null;
   const draftArtistIds = isRecordMode ? recordFilterDraft.artistIds : itemFilterDraft.artistIds;
   const draftDate = isRecordMode ? recordFilterDraft.date : itemFilterDraft.date;
   const setDraftArtistIds = useCallback((artistIds: string[]) => {
@@ -1535,6 +1485,19 @@ export default function ChekiLibraryScreen() {
         </BottomSheetDialog>
     </>
   );
+
+  if (!viewPreferencesLoaded) {
+    return (
+      <View
+        accessibilityRole="progressbar"
+        accessibilityLabel="正在加载电子切册"
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg }}
+      >
+        <ActivityIndicator color={colors.accent} />
+        <Text style={{ marginTop: 10, fontSize: 13, color: colors.textSecondary }}>正在加载电子切册…</Text>
+      </View>
+    );
+  }
 
   if (isAndroid) {
     return (
