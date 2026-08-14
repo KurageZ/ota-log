@@ -6,7 +6,6 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,7 @@ import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { hapticDragEnd, hapticDragReorder, hapticDragStart, hapticError } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   DEFAULT_STATS_PERIOD_PRESET,
@@ -140,6 +140,7 @@ export default function StatsSettingsScreen() {
       if (saveId === latestSaveIdRef.current) {
         setSections(lastSavedSectionsRef.current);
       }
+      hapticError();
       showOperationFailedAlert(
         '无法保存统计设置',
         '本次更改未保存，请再试一次。',
@@ -148,11 +149,24 @@ export default function StatsSettingsScreen() {
     }
   }, [defaultPeriodPreset, seenSectionTypes]);
 
+  const dragDidMoveRef = useRef(false);
+
   const handleDragStart = useCallback(() => {
-    Vibration.vibrate(50);
+    dragDidMoveRef.current = false;
+    hapticDragStart();
+  }, []);
+
+  const handleDragReorder = useCallback(() => {
+    dragDidMoveRef.current = true;
+    hapticDragReorder();
   }, []);
 
   const handleSortableDrop = useCallback((id: string, _position: number, allPositions?: Record<string, number>) => {
+    const didMove = dragDidMoveRef.current;
+    dragDidMoveRef.current = false;
+    if (didMove) {
+      hapticDragEnd();
+    }
     if (id === STATS_SECTION_DISABLED_DIVIDER_ID || !allPositions) return;
 
     const currentItems = sortableItemsRef.current;
@@ -268,6 +282,7 @@ export default function StatsSettingsScreen() {
           id={id}
           data={item}
           {...sortableProps}
+          onMove={handleDragReorder}
           style={{
             height: STATS_SECTION_SORTABLE_ITEM_HEIGHT,
             justifyContent: item.disabledCount === 0 ? 'center' : 'flex-end',
@@ -294,13 +309,14 @@ export default function StatsSettingsScreen() {
         data={item}
         {...sortableProps}
         onDragStart={handleDragStart}
+        onMove={handleDragReorder}
         onDrop={handleSortableDrop}
         style={{ paddingBottom: 10 }}
       >
         {renderSectionRow(item.section)}
       </SortableItem>
     );
-  }, [colors.textMuted, handleDragStart, handleSortableDrop, renderSectionRow]);
+  }, [colors.textMuted, handleDragReorder, handleDragStart, handleSortableDrop, renderSectionRow]);
 
   const renderResetAction = useCallback(() => (
     <TouchableOpacity

@@ -1,7 +1,7 @@
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
-  Image, Modal, Linking, useWindowDimensions, Platform, Vibration, ActivityIndicator, TextStyle,
+  Image, Modal, Linking, useWindowDimensions, Platform, ActivityIndicator, TextStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -36,6 +36,7 @@ import {
   showFailureAlert,
   showOperationFailedAlert,
 } from '../../src/utils/failureAlert';
+import { hapticCopySuccess } from '../../src/utils/haptics';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
@@ -661,18 +662,14 @@ export default function EventDetailScreen() {
     if (!event?.url) return;
     suppressNextLinkPressRef.current = true;
     Clipboard.setString(event.url);
-    if (Platform.OS !== 'web') {
-      Vibration.vibrate(10);
-    }
+    hapticCopySuccess();
     showCopyToast('活动链接已复制');
   }, [event?.url, showCopyToast]);
 
   const handleCopyEventShare = useCallback(() => {
     if (!simpleShareAction || shareBusy) return;
     Clipboard.setString(simpleShareAction.text);
-    if (Platform.OS !== 'web') {
-      Vibration.vibrate(10);
-    }
+    hapticCopySuccess();
     setShareMenuVisible(false);
     showCopyToast(simpleShareAction.toastLabel);
   }, [shareBusy, showCopyToast, simpleShareAction]);

@@ -7,7 +7,6 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +24,7 @@ import type { HydratedDateItem } from '../../src/repositories/DateItemRepository
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { toISODate } from '../../src/utils/date';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { hapticDragEnd, hapticDragReorder, hapticDragStart, hapticError } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   DEFAULT_RECENT_COMPLETED_DISPLAY_LIMIT,
@@ -217,6 +217,7 @@ export default function HomeSettingsScreen() {
         cards: sanitized,
       });
     } catch (error) {
+      hapticError();
       showOperationFailedAlert(
         '无法保存首页设置。',
         '请稍后再试一次；如果问题持续出现，可以重启应用后再调整。',
@@ -233,11 +234,24 @@ export default function HomeSettingsScreen() {
     await persistPreferences(nextPinnedInfo, cards);
   }, [cards, persistPreferences]);
 
+  const dragDidMoveRef = useRef(false);
+
   const handleDragStart = useCallback(() => {
-    Vibration.vibrate(50);
+    dragDidMoveRef.current = false;
+    hapticDragStart();
+  }, []);
+
+  const handleDragReorder = useCallback(() => {
+    dragDidMoveRef.current = true;
+    hapticDragReorder();
   }, []);
 
   const handleSortableDrop = useCallback((id: string, _position: number, allPositions?: Record<string, number>) => {
+    const didMove = dragDidMoveRef.current;
+    dragDidMoveRef.current = false;
+    if (didMove) {
+      hapticDragEnd();
+    }
     if (id === HOME_CARD_DISABLED_DIVIDER_ID || !allPositions) return;
 
     const currentItems = sortableItemsRef.current;
@@ -586,6 +600,7 @@ export default function HomeSettingsScreen() {
           id={id}
           data={item}
           {...sortableProps}
+          onMove={handleDragReorder}
           style={{
             height: HOME_CARD_SORTABLE_ITEM_HEIGHT,
             justifyContent: item.disabledCount === 0 ? 'center' : 'flex-end',
@@ -612,13 +627,14 @@ export default function HomeSettingsScreen() {
         data={item}
         {...sortableProps}
         onDragStart={handleDragStart}
+        onMove={handleDragReorder}
         onDrop={handleSortableDrop}
         style={{ paddingBottom: 10 }}
       >
         {renderCardRow(item.card)}
       </SortableItem>
     );
-  }, [colors.textMuted, handleDragStart, handleSortableDrop, renderCardRow]);
+  }, [colors.textMuted, handleDragReorder, handleDragStart, handleSortableDrop, renderCardRow]);
 
   const renderResetAction = useCallback(() => (
     <TouchableOpacity
