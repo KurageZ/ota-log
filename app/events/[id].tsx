@@ -240,7 +240,6 @@ function ExpansionToggle({
       onPress={onPress}
       style={{
         minHeight: 44,
-        marginTop: 4,
         borderTopWidth: 1,
         borderTopColor: colors.divider,
         flexDirection: 'row',
@@ -954,7 +953,7 @@ export default function EventDetailScreen() {
         {(infoPhotos.length > 0 || event.details) ? (
           <>
             <SectionTitle label="详情" />
-            <Card cardBg={cardBg}>
+            <Card cardBg={cardBg} style={event.details ? { paddingBottom: 0 } : undefined}>
               {infoPhotos.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {infoPhotos.map((photo) => (
@@ -1089,7 +1088,7 @@ export default function EventDetailScreen() {
         {artists.length > 0 ? (
           <>
             <SectionTitle label="出演者" />
-            <Card cardBg={cardBg}>
+            <Card cardBg={cardBg} style={hiddenArtistCount > 0 ? { paddingBottom: 0 } : undefined}>
               {visibleArtists.map((artist, index) => {
                 const isLast = index === visibleArtists.length - 1;
                 const isOshi = artist.id === oshiArtistId;
