@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, ActivityIndicator, Platform, type LayoutChangeEvent,
 } from 'react-native';
@@ -13,7 +13,6 @@ import type { ChekiViewerItem } from '../types/chekiViewer';
 import type { FullscreenImageTransitionOrigin } from '../components/FullscreenImageViewer';
 import {
   buildChekiViewerItems,
-  calculateChekiGridLayout,
   ChekiArtistGroup,
   ChekiGridDensity,
   ChekiGridColumns,
@@ -21,6 +20,12 @@ import {
   groupChekiRecordsByArtist,
   sortChekisDesc,
 } from '../utils/cheki';
+import {
+  CHEKI_BARE_THUMBNAIL_RADIUS,
+  CHEKI_GRID_GAP,
+  ChekiGridThumbnail,
+  useChekiAlbumGridLayout,
+} from '../components/ChekiAlbumThumbnail';
 import { showDeleteFailedAlert } from '../utils/failureAlert';
 import { ThemeColors, useAppTheme } from '../theme/appTheme';
 import { ChekiRecordListItem } from '../components/ChekiRecordListItem';
@@ -87,71 +92,6 @@ type ChekiGalleryItem =
   | { type: 'header'; key: string; groupKey: string; group: ChekiArtistGroup }
   | { type: 'dateHeader'; key: string; title: string; count: number }
   | { type: 'row'; key: string; groupKey: string; chekis: Cheki[]; viewerChekis: Cheki[]; isLastPhotoRow: boolean };
-
-const CHEKI_GRID_GAP = 8;
-const CHEKI_ASPECT_RATIO = 86 / 54;
-const CHEKI_BARE_THUMBNAIL_RADIUS = 10;
-function ChekiGridThumbnail({
-  uri,
-  width,
-  height,
-  colors,
-  imageRef,
-  aspectRatio,
-}: {
-  uri: string;
-  width: number;
-  height: number;
-  colors: ThemeColors;
-  imageRef?: Ref<Image>;
-  aspectRatio: number | null;
-}) {
-  const usesSpecLayout = aspectRatio !== null;
-  const cardInset = usesSpecLayout ? Math.max(5, Math.round(width * 0.07)) : 0;
-  const fitInside = (maxWidth: number, maxHeight: number) => {
-    if (aspectRatio === null) return { width: maxWidth, height: maxHeight };
-    const widthFromHeight = maxHeight * aspectRatio;
-    return widthFromHeight <= maxWidth
-      ? { width: widthFromHeight, height: maxHeight }
-      : { width: maxWidth, height: maxWidth / aspectRatio };
-  };
-  const fitted = fitInside(width - cardInset * 2, height - cardInset * 2);
-
-  return (
-    <View
-      style={{
-        width,
-        height,
-        padding: cardInset,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: usesSpecLayout ? 12 : 0,
-        backgroundColor: usesSpecLayout ? colors.cardAlt : 'transparent',
-      }}
-    >
-      <View
-        style={{
-          ...fitted,
-          borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
-          backgroundColor: colors.card,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: usesSpecLayout ? 3 : 0 },
-          shadowOpacity: usesSpecLayout ? 0.18 : 0,
-          shadowRadius: usesSpecLayout ? 5 : 0,
-          elevation: usesSpecLayout ? 3 : 0,
-        }}
-      >
-        <Image
-          ref={imageRef}
-          source={{ uri }}
-          resizeMethod="resize"
-          resizeMode="contain"
-          style={{ width: '100%', height: '100%', borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS }}
-        />
-      </View>
-    </View>
-  );
-}
 
 function ChekiThumbnailButton({
   cheki,
@@ -499,21 +439,12 @@ export default function ChekiLibraryScreen() {
     240,
     (galleryViewportHeight || screenHeight) - galleryHeaderHeight - 40,
   );
-  const gridLayout = useMemo(
-    () => calculateChekiGridLayout({
-      density: viewPreferences.density,
-      availableWidth: galleryContentWidth,
-      availableHeight: galleryAvailableHeight,
-      gap: CHEKI_GRID_GAP,
-      aspectRatio: viewPreferences.useSpecAspectRatio ? 1 : CHEKI_ASPECT_RATIO,
-    }),
-    [
-      galleryAvailableHeight,
-      galleryContentWidth,
-      viewPreferences.density,
-      viewPreferences.useSpecAspectRatio,
-    ],
-  );
+  const gridLayout = useChekiAlbumGridLayout({
+    density: viewPreferences.density,
+    availableWidth: galleryContentWidth,
+    availableHeight: galleryAvailableHeight,
+    useSpecAspectRatio: viewPreferences.useSpecAspectRatio,
+  });
   const columns = gridLayout.columns;
   const chekiW = gridLayout.itemWidth;
   const chekiH = gridLayout.itemHeight;

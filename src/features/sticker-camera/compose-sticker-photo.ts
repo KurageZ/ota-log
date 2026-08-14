@@ -4,18 +4,22 @@ import {
   BlurStyle,
   ClipOp,
   FilterMode,
+  FontWeight,
   ImageFormat,
   MipmapMode,
   Skia,
+  TextAlign,
   type SkData,
   type SkImage,
   type SkMaskFilter,
   type SkPaint,
+  type SkParagraph,
   type SkSurface,
 } from '@shopify/react-native-skia';
 import {
   getPreviewMatchedResizeHeight,
-  resolveStickerLayout,
+  resolveStickerStackLayouts,
+  type StickerLayout,
 } from './sticker-preset';
 import type { StickerAsset } from './sticker-overlay';
 import { deleteTemporaryStickerFile } from './file-utils';
@@ -31,6 +35,14 @@ export interface ComposedStickerPhoto {
   width: number;
   height: number;
 }
+
+export interface ComposeStickerPhotoOptions {
+  watermark?: boolean;
+}
+
+const WATERMARK_TEXT = 'ota log';
+const WATERMARK_TEXT_WIDTH_RATIO = 0.024;
+const WATERMARK_BOTTOM_RATIO = 0.02;
 
 function outputFilename(): string {
   return `sticker_camera_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
@@ -76,16 +88,9 @@ function drawBackground(
 function drawSticker(
   surface: SkSurface,
   sticker: SkImage,
-  width: number,
-  height: number,
+  layout: StickerLayout,
 ): { paints: SkPaint[]; maskFilter: SkMaskFilter } {
   const canvas = surface.getCanvas();
-  const layout = resolveStickerLayout(
-    width,
-    height,
-    sticker.width(),
-    sticker.height(),
-  );
   const centerX = layout.x + (layout.width / 2);
   const centerY = layout.y + (layout.height / 2);
   const imageRect = Skia.XYWHRect(layout.x, layout.y, layout.width, layout.height);
@@ -130,21 +135,52 @@ function drawSticker(
   return { paints: [shadowPaint, imagePaint], maskFilter };
 }
 
+function drawWatermark(
+  surface: SkSurface,
+  width: number,
+  height: number,
+): SkParagraph {
+  const canvas = surface.getCanvas();
+  const fontSize = Math.max(18, Math.round(width * WATERMARK_TEXT_WIDTH_RATIO));
+  // 该版本 Skia 的 ParagraphBuilder 原生没有导出 dispose，只能留给 GC；
+  // 真正需要释放的 paragraph 由调用方在 finally 中统一 dispose。
+  const builder = Skia.ParagraphBuilder.Make({ textAlign: TextAlign.Center });
+  builder.pushStyle({
+    color: Skia.Color('rgba(255, 255, 255, 0.78)'),
+    fontFamilies: ['sans-serif'],
+    fontSize,
+    fontStyle: { weight: FontWeight.Bold },
+    heightMultiplier: 1,
+    locale: 'zh-CN',
+  });
+  builder.addText(WATERMARK_TEXT);
+  const paragraph = builder.build();
+  paragraph.layout(width);
+
+  // 中间最下方：水平居中，贴底部留出边距。
+  const bottomPadding = Math.max(14, Math.round(height * WATERMARK_BOTTOM_RATIO));
+  paragraph.paint(canvas, 0, height - paragraph.getHeight() - bottomPadding);
+  return paragraph;
+}
+
 export async function composeStickerPhoto(
   photo: CapturedPhoto,
-  sticker: StickerAsset,
+  stickers: StickerAsset[],
+  options: ComposeStickerPhotoOptions = {},
 ): Promise<ComposedStickerPhoto> {
+  if (stickers.length === 0) throw new Error('至少需要一张贴纸');
   const resizeHeight = getPreviewMatchedResizeHeight(photo.width, photo.height);
   let normalizedPhotoUri: string | null = null;
   let backgroundData: SkData | null = null;
-  let stickerData: SkData | null = null;
   let backgroundImage: SkImage | null = null;
-  let stickerImage: SkImage | null = null;
+  const stickerData: SkData[] = [];
+  const stickerImages: SkImage[] = [];
   let surface: SkSurface | null = null;
   let snapshot: SkImage | null = null;
   let backgroundPaint: SkPaint | null = null;
-  let stickerPaints: SkPaint[] = [];
-  let maskFilter: SkMaskFilter | null = null;
+  let watermark: SkParagraph | null = null;
+  const stickerPaints: SkPaint[] = [];
+  const maskFilters: SkMaskFilter[] = [];
 
   try {
     const normalized = await manipulateAsync(
@@ -158,9 +194,11 @@ export async function composeStickerPhoto(
     const background = await decodeImage(normalized.uri);
     backgroundData = background.data;
     backgroundImage = background.image;
-    const decodedSticker = await decodeImage(sticker.uri);
-    stickerData = decodedSticker.data;
-    stickerImage = decodedSticker.image;
+    for (const sticker of stickers) {
+      const decodedSticker = await decodeImage(sticker.uri);
+      stickerData.push(decodedSticker.data);
+      stickerImages.push(decodedSticker.image);
+    }
 
     surface = Skia.Surface.MakeOffscreen(outputSize.width, outputSize.height);
     if (!surface) throw new Error('无法创建图片合成画布');
@@ -168,14 +206,17 @@ export async function composeStickerPhoto(
     backgroundPaint = Skia.Paint();
     backgroundPaint.setAntiAlias(true);
     drawBackground(surface, backgroundImage, outputSize.width, outputSize.height, backgroundPaint);
-    const stickerResources = drawSticker(
-      surface,
-      stickerImage,
-      outputSize.width,
-      outputSize.height,
-    );
-    stickerPaints = stickerResources.paints;
-    maskFilter = stickerResources.maskFilter;
+    const layouts = resolveStickerStackLayouts(outputSize.width, outputSize.height, stickers);
+    stickerImages.forEach((stickerImage, index) => {
+      const layout = layouts[index];
+      if (!layout) return;
+      const stickerResources = drawSticker(surface!, stickerImage, layout);
+      stickerPaints.push(...stickerResources.paints);
+      maskFilters.push(stickerResources.maskFilter);
+    });
+    if (options.watermark) {
+      watermark = drawWatermark(surface!, outputSize.width, outputSize.height);
+    }
 
     surface.flush();
     snapshot = surface.makeImageSnapshot();
@@ -193,12 +234,13 @@ export async function composeStickerPhoto(
     deleteTemporaryStickerFile(normalizedPhotoUri);
     dispose(snapshot);
     for (const paint of stickerPaints) dispose(paint);
-    dispose(maskFilter);
+    for (const maskFilter of maskFilters) dispose(maskFilter);
     dispose(backgroundPaint);
     dispose(surface);
-    dispose(stickerImage);
+    dispose(watermark);
+    for (const stickerImage of stickerImages) dispose(stickerImage);
     dispose(backgroundImage);
-    dispose(stickerData);
+    for (const data of stickerData) dispose(data);
     dispose(backgroundData);
   }
 }

@@ -26,7 +26,7 @@ export default function ToolboxScreen() {
               <MenuItem
                 icon="camera"
                 label="拍立得贴纸相机"
-                subtitle="选择一张照片作为贴纸，合成到拍摄成果中"
+                subtitle="选择拍立得作贴纸，拍摄合成后保存分享"
                 tint={toolTints.planner}
                 isLast
                 onPress={() => router.push('/tools/cheki-sticker-camera')}

@@ -10,53 +10,27 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
-import { deleteTemporaryStickerFile } from '../features/sticker-camera/file-utils';
 import {
   composeStickerPhoto,
+  type CapturedPhoto,
   type ComposedStickerPhoto,
 } from '../features/sticker-camera/compose-sticker-photo';
+import { StickerPicker } from '../features/sticker-camera/sticker-picker';
 import {
   StickerOverlay,
   type StickerAsset,
 } from '../features/sticker-camera/sticker-overlay';
 import { STICKER_CAMERA_ASPECT_RATIO } from '../features/sticker-camera/sticker-preset';
 import { useAppTheme } from '../theme/appTheme';
-import { copyToDocuments } from '../utils/copyToDocuments';
-import { showFailureAlert, showPhotoLibraryPermissionAlert } from '../utils/failureAlert';
+import { showFailureAlert } from '../utils/failureAlert';
 
-type ScreenPhase = 'selecting' | 'camera' | 'result';
-type BusyAction = 'selecting' | 'capturing' | 'composing' | 'saving' | 'sharing' | null;
-
-async function prepareStickerAsset(asset: ImagePicker.ImagePickerAsset): Promise<StickerAsset> {
-  const resizeWidth = asset.width > 1600 ? 1600 : undefined;
-  const normalized = await manipulateAsync(
-    asset.uri,
-    resizeWidth ? [{ resize: { width: resizeWidth } }] : [],
-    { compress: 0.92, format: SaveFormat.JPEG },
-  );
-
-  try {
-    const uri = await copyToDocuments(normalized.uri, {
-      filenamePrefix: 'sticker_source',
-      maxDimension: 1600,
-      sourceSize: { width: normalized.width, height: normalized.height },
-    });
-    return {
-      uri,
-      width: normalized.width,
-      height: normalized.height,
-    };
-  } finally {
-    deleteTemporaryStickerFile(normalized.uri);
-  }
-}
+type ScreenPhase = 'picker' | 'camera' | 'result';
+type BusyAction = 'capturing' | 'composing' | 'saving' | 'sharing' | null;
 
 function IconButton({
   icon,
@@ -113,94 +87,6 @@ function UnsupportedScreen() {
   );
 }
 
-function StickerSelectionScreen({
-  busy,
-  onSelect,
-}: {
-  busy: boolean;
-  onSelect: () => void;
-}) {
-  const { colors } = useAppTheme();
-
-  return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 24 }}
-      style={{ flex: 1, backgroundColor: colors.screen }}
-    >
-      <View style={{ position: 'absolute', top: 14, left: 16 }}>
-        <IconButton icon="close" label="关闭" onPress={() => router.back()} disabled={busy} />
-      </View>
-      <View style={{ alignItems: 'center', gap: 14 }}>
-        <View
-          style={{
-            width: 82,
-            height: 82,
-            borderRadius: 24,
-            borderCurve: 'continuous',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.accentSoft,
-          }}
-        >
-          <AppIcon name="camera" size={38} color={colors.accent} />
-        </View>
-        <Text style={{ color: colors.heading, fontSize: 25, fontWeight: '900', textAlign: 'center' }}>
-          拍立得贴纸相机
-        </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 22, textAlign: 'center' }}>
-          选择一张照片作为固定贴纸。拍摄完成后，贴纸会真正合成到照片右下角。
-        </Text>
-      </View>
-
-      <View
-        style={{
-          padding: 16,
-          borderRadius: 18,
-          borderCurve: 'continuous',
-          backgroundColor: colors.card,
-          gap: 10,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <AppIcon name="image" size={18} color={colors.accent} />
-          <Text style={{ flex: 1, color: colors.text, fontSize: 14, fontWeight: '700' }}>单张固定预设</Text>
-        </View>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 20 }}>
-          Demo 暂不支持拖动、缩放、旋转和多张贴纸，输出照片固定为 3:4。
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        activeOpacity={0.78}
-        disabled={busy}
-        onPress={onSelect}
-        style={{
-          minHeight: 52,
-          borderRadius: 16,
-          borderCurve: 'continuous',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'row',
-          gap: 9,
-          backgroundColor: colors.accent,
-          opacity: busy ? 0.65 : 1,
-        }}
-      >
-        {busy ? (
-          <ActivityIndicator size="small" color={colors.onAccent} />
-        ) : (
-          <AppIcon name="images" size={20} color={colors.onAccent} />
-        )}
-        <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>
-          {busy ? '正在准备贴纸…' : '选择一张照片'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-}
-
 function CameraPermissionScreen({
   canAskAgain,
   onRequest,
@@ -248,7 +134,7 @@ function CameraPermissionScreen({
 }
 
 function CameraStage({
-  sticker,
+  stickers,
   cameraRef,
   cameraReady,
   busyAction,
@@ -257,7 +143,7 @@ function CameraStage({
   onCapture,
   onChangeSticker,
 }: {
-  sticker: StickerAsset;
+  stickers: StickerAsset[];
   cameraRef: React.RefObject<CameraView | null>;
   cameraReady: boolean;
   busyAction: BusyAction;
@@ -298,7 +184,7 @@ function CameraStage({
             onMountError={(event) => onCameraError(event.message)}
             style={{ position: 'absolute', inset: 0 }}
           />
-          <StickerOverlay asset={sticker} canvasWidth={canvasWidth} canvasHeight={canvasHeight} />
+          <StickerOverlay assets={stickers} canvasWidth={canvasWidth} canvasHeight={canvasHeight} />
           <View style={{ position: 'absolute', top: 12, left: 12 }}>
             <IconButton icon="close" label="关闭贴纸相机" onPress={() => router.back()} disabled={isBusy} />
           </View>
@@ -337,10 +223,31 @@ function CameraStage({
             }}
           >
             <Image
-              source={{ uri: sticker.uri }}
-              resizeMode="cover"
+              source={{ uri: stickers[stickers.length - 1]?.uri }}
+              resizeMode="contain"
               style={{ width: '100%', height: '100%', borderRadius: 9 }}
             />
+            {stickers.length > 1 ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  right: -7,
+                  top: -7,
+                  minWidth: 22,
+                  height: 22,
+                  paddingHorizontal: 5,
+                  borderRadius: 11,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 2px 7px rgba(0, 0, 0, 0.28)',
+                }}
+              >
+                <Text style={{ color: '#111114', fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                  {stickers.length}
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -364,12 +271,12 @@ function CameraStage({
           </TouchableOpacity>
 
           <View style={{ width: 52, alignItems: 'center' }}>
-            {isBusy ? <ActivityIndicator color="#ffffff" /> : <AppIcon name="sparkles" size={24} color="rgba(255,255,255,0.72)" />}
+            {isBusy ? <ActivityIndicator color="#ffffff" /> : null}
           </View>
         </View>
 
         <Text style={{ color: 'rgba(255,255,255,0.68)', fontSize: 12, textAlign: 'center' }}>
-          {busyAction === 'composing' ? '正在把贴纸合成到照片…' : '贴纸使用固定预设并写入最终照片'}
+          {busyAction === 'composing' ? '正在把贴纸合成到照片…' : `${stickers.length} 张贴纸将按固定位置写入照片`}
         </Text>
       </View>
     </SafeAreaView>
@@ -380,20 +287,22 @@ function ResultStage({
   result,
   busyAction,
   saved,
+  watermarkEnabled,
   onSave,
   onShare,
   onRetake,
-  onChangeSticker,
+  onToggleWatermark,
 }: {
   result: ComposedStickerPhoto;
   busyAction: BusyAction;
   saved: boolean;
+  watermarkEnabled: boolean;
   onSave: () => void;
   onShare: () => void;
   onRetake: () => void;
-  onChangeSticker: () => void;
+  onToggleWatermark: () => void;
 }) {
-  const isBusy = busyAction === 'saving' || busyAction === 'sharing';
+  const isBusy = busyAction === 'composing' || busyAction === 'saving' || busyAction === 'sharing';
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: '#050506' }}>
@@ -401,7 +310,7 @@ function ResultStage({
         <View style={{ height: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <IconButton icon="close" label="关闭结果" onPress={() => router.back()} disabled={isBusy} />
           <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800' }}>已生成</Text>
-          <IconButton icon="images" label="更换贴纸" onPress={onChangeSticker} disabled={isBusy} />
+          <View style={{ width: 44, height: 44 }} />
         </View>
 
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -412,9 +321,48 @@ function ResultStage({
           />
         </View>
 
-        <Text style={{ color: 'rgba(255,255,255,0.58)', fontSize: 11, textAlign: 'center', fontVariant: ['tabular-nums'] }}>
-          {result.width} × {result.height} JPEG
-        </Text>
+        <TouchableOpacity
+          accessibilityRole="switch"
+          accessibilityLabel="添加 App 水印"
+          accessibilityState={{ checked: watermarkEnabled }}
+          activeOpacity={0.7}
+          disabled={isBusy}
+          onPress={onToggleWatermark}
+          style={{
+            minHeight: 44,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 2,
+          }}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>
+            添加 App 水印
+          </Text>
+          {busyAction === 'composing' ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <View
+              style={{
+                width: 48,
+                height: 28,
+                borderRadius: 14,
+                padding: 3,
+                backgroundColor: watermarkEnabled ? '#ffffff' : 'rgba(255,255,255,0.22)',
+              }}
+            >
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: watermarkEnabled ? '#111114' : 'rgba(255,255,255,0.85)',
+                  alignSelf: watermarkEnabled ? 'flex-end' : 'flex-start',
+                }}
+              />
+            </View>
+          )}
+        </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
@@ -484,52 +432,30 @@ function ResultStage({
 export default function ChekiStickerCameraScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
-  const [phase, setPhase] = useState<ScreenPhase>('selecting');
+  const [phase, setPhase] = useState<ScreenPhase>('picker');
+  const [pickerReturnPhase, setPickerReturnPhase] = useState<'camera' | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
-  const [sticker, setSticker] = useState<StickerAsset | null>(null);
+  const [stickers, setStickers] = useState<StickerAsset[]>([]);
   const [result, setResult] = useState<ComposedStickerPhoto | null>(null);
+  const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [cameraReady, setCameraReady] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const selectSticker = useCallback(async () => {
-    if (busyAction) return;
-    setBusyAction('selecting');
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        showPhotoLibraryPermissionAlert();
-        return;
-      }
+  const confirmStickers = useCallback(async (assets: StickerAsset[]) => {
+    setStickers(assets);
+    setResult(null);
+    setCapturedPhoto(null);
+    setWatermarkEnabled(true);
+    setSaved(false);
+    setCameraReady(false);
+    setPickerReturnPhase(null);
+    setPhase('camera');
 
-      const selection = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        allowsMultipleSelection: false,
-        quality: 1,
-      });
-      if (selection.canceled || !selection.assets[0]) return;
-
-      const prepared = await prepareStickerAsset(selection.assets[0]);
-      setSticker(prepared);
-      setResult(null);
-      setSaved(false);
-      setCameraReady(false);
-      setPhase('camera');
-
-      if (!cameraPermission?.granted && cameraPermission?.canAskAgain !== false) {
-        await requestCameraPermission();
-      }
-    } catch (error) {
-      showFailureAlert({
-        title: '贴纸准备失败',
-        reason: '无法读取或处理所选照片。',
-        nextStep: '请重新选择一张照片后再试。',
-        details: error,
-      });
-    } finally {
-      setBusyAction(null);
+    if (!cameraPermission?.granted && cameraPermission?.canAskAgain !== false) {
+      await requestCameraPermission();
     }
-  }, [busyAction, cameraPermission?.canAskAgain, cameraPermission?.granted, requestCameraPermission]);
+  }, [cameraPermission?.canAskAgain, cameraPermission?.granted, requestCameraPermission]);
 
   const requestOrOpenCameraSettings = useCallback(async () => {
     if (cameraPermission?.canAskAgain === false) {
@@ -540,7 +466,7 @@ export default function ChekiStickerCameraScreen() {
   }, [cameraPermission?.canAskAgain, requestCameraPermission]);
 
   const capture = useCallback(async () => {
-    if (!cameraRef.current || !sticker || !cameraReady || busyAction) return;
+    if (!cameraRef.current || stickers.length === 0 || !cameraReady || busyAction) return;
     setBusyAction('capturing');
     let previewPaused = false;
     try {
@@ -553,7 +479,8 @@ export default function ChekiStickerCameraScreen() {
       await cameraRef.current.pausePreview();
       previewPaused = true;
       setBusyAction('composing');
-      const composed = await composeStickerPhoto(photo, sticker);
+      setCapturedPhoto({ uri: photo.uri, width: photo.width, height: photo.height });
+      const composed = await composeStickerPhoto(photo, stickers, { watermark: watermarkEnabled });
       setResult(composed);
       setSaved(false);
       setPhase('result');
@@ -574,7 +501,31 @@ export default function ChekiStickerCameraScreen() {
     } finally {
       setBusyAction(null);
     }
-  }, [busyAction, cameraReady, sticker]);
+  }, [busyAction, cameraReady, stickers, watermarkEnabled]);
+
+  const toggleWatermark = useCallback(async () => {
+    if (!capturedPhoto || busyAction) return;
+    const nextWatermark = !watermarkEnabled;
+    setWatermarkEnabled(nextWatermark);
+    setBusyAction('composing');
+    try {
+      const composed = await composeStickerPhoto(capturedPhoto, stickers, {
+        watermark: nextWatermark,
+      });
+      setResult(composed);
+      setSaved(false);
+    } catch (error) {
+      setWatermarkEnabled(!nextWatermark);
+      showFailureAlert({
+        title: '水印合成失败',
+        reason: '无法为这张照片添加水印。',
+        nextStep: '请稍后重新尝试，或直接保存不带水印的照片。',
+        details: error,
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }, [busyAction, capturedPhoto, stickers, watermarkEnabled]);
 
   const saveResult = useCallback(async () => {
     if (!result || busyAction || saved) return;
@@ -627,8 +578,21 @@ export default function ChekiStickerCameraScreen() {
 
   if (process.env.EXPO_OS !== 'ios') return <UnsupportedScreen />;
 
-  if (phase === 'selecting' || !sticker) {
-    return <StickerSelectionScreen busy={busyAction === 'selecting'} onSelect={() => void selectSticker()} />;
+  if (phase === 'picker' || stickers.length === 0) {
+    return (
+      <StickerPicker
+        initialSelection={stickers}
+        onCancel={() => {
+          if (pickerReturnPhase) {
+            setPhase(pickerReturnPhase);
+            setPickerReturnPhase(null);
+            return;
+          }
+          router.back();
+        }}
+        onConfirm={confirmStickers}
+      />
+    );
   }
 
   if (!cameraPermission) {
@@ -654,24 +618,23 @@ export default function ChekiStickerCameraScreen() {
         result={result}
         busyAction={busyAction}
         saved={saved}
+        watermarkEnabled={watermarkEnabled}
         onSave={() => void saveResult()}
         onShare={() => void shareResult()}
         onRetake={() => {
+          setWatermarkEnabled(true);
+          setCapturedPhoto(null);
           setCameraReady(false);
           setPhase('camera');
         }}
-        onChangeSticker={() => {
-          setPhase('selecting');
-          setResult(null);
-          setSaved(false);
-        }}
+        onToggleWatermark={() => void toggleWatermark()}
       />
     );
   }
 
   return (
     <CameraStage
-      sticker={sticker}
+      stickers={stickers}
       cameraRef={cameraRef}
       cameraReady={cameraReady}
       busyAction={busyAction}
@@ -685,7 +648,8 @@ export default function ChekiStickerCameraScreen() {
       onCapture={() => void capture()}
       onChangeSticker={() => {
         setCameraReady(false);
-        setPhase('selecting');
+        setPickerReturnPhase('camera');
+        setPhase('picker');
       }}
     />
   );
