@@ -1304,9 +1304,9 @@ export default function ArtistDetailScreen() {
                             title={section.title}
                             count={section.data.length}
                             colors={colors}
-                            variant="media"
                             titleColor={backdropText}
-                            countColor={sectionCountColor}
+                            pillBackgroundColor={actionPillBackground}
+                            pillTextColor={backdropText}
                           />
                           {section.data.map((event) => (
                             <EventCard

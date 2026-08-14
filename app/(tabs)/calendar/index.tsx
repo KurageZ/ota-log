@@ -18,6 +18,7 @@ import {
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { EventCard } from '../../../src/components/EventCard';
+import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
 import { formatEventTimes } from '../../../src/components/EventPrimitives';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
 import { ExpandableList } from '../../../src/components/ExpandableList';
@@ -834,23 +835,22 @@ export default function CalendarScreen() {
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginRight: 8 }} />
-        <Text style={{ fontSize: 17, lineHeight: 35, fontWeight: '800', color: colors.heading }}>
-          拍立得
-        </Text>
-        <View style={{ marginLeft: 7, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
-          <Text style={{ fontSize: 11, fontWeight: '900', color: colors.accent }}>
-            {totalChekiCount}张
-          </Text>
-        </View>
-        <View style={{ flex: 1 }} />
-        {totalChekiCount > 0 ? (
-          <TouchableOpacity onPress={openChekiLibraryForSelectedDate} activeOpacity={0.7}>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.accent }}>查看全部</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      <EventSectionHeader
+        title="拍立得"
+        count={totalChekiCount}
+        countSuffix=" 张"
+        colors={colors}
+        trailing={
+          <>
+            <View style={{ flex: 1 }} />
+            {totalChekiCount > 0 ? (
+              <TouchableOpacity onPress={openChekiLibraryForSelectedDate} activeOpacity={0.7}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.accent }}>查看全部</Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        }
+      />
 
       {hasPhotoChekiCard ? (
         <CalendarDetailCard title="拍立得">
@@ -925,17 +925,7 @@ export default function CalendarScreen() {
         </View>
       ) : null}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginRight: 8 }} />
-        <Text style={{ fontSize: 17, lineHeight: 35, fontWeight: '800', color: colors.heading }}>
-          当天活动
-        </Text>
-        <View style={{ marginLeft: 7, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
-          <Text style={{ fontSize: 11, fontWeight: '900', color: colors.accent }}>
-            {dayEvents.length}个
-          </Text>
-        </View>
-      </View>
+      <EventSectionHeader title="当天活动" count={dayEvents.length} countSuffix=" 个" colors={colors} />
 
       {dayEvents.length > 0 ? (
         dayEvents.map((event) => (
@@ -950,17 +940,7 @@ export default function CalendarScreen() {
         </View>
       )}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginRight: 8 }} />
-        <Text style={{ fontSize: 17, lineHeight: 35, fontWeight: '800', color: colors.heading }}>
-          重要日期
-        </Text>
-        <View style={{ marginLeft: 7, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: colors.accentSofter }}>
-          <Text style={{ fontSize: 11, fontWeight: '900', color: colors.accent }}>
-            {dayDateItemOccurrences.length}个
-          </Text>
-        </View>
-      </View>
+      <EventSectionHeader title="重要日期" count={dayDateItemOccurrences.length} countSuffix=" 个" colors={colors} />
 
       {dayDateItemOccurrences.length > 0 ? (
         <View style={{ gap: 8, marginBottom: 14 }}>
@@ -1073,16 +1053,7 @@ export default function CalendarScreen() {
             />
           ) : undefined}
           renderSectionHeader={({ section }) => (
-            <View style={{
-              paddingVertical: 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}>
-              <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginRight: 8 }} />
-              <Text style={{ fontSize: 17, lineHeight: 35, fontWeight: '800', color: isDark ? colors.accentBorder : colors.accent }}>
-                {section.title}
-              </Text>
-            </View>
+            <EventSectionHeader title={section.title} count={section.data.length} colors={colors} />
           )}
           renderItem={({ item }) => (
             <View>

@@ -244,11 +244,6 @@ function sortChekiRecords<T extends { date: string | null; created_at: string }>
   return sortOrder === 'asc' ? sorted.reverse() : sorted;
 }
 
-function formatRecordMonth(month: string): string {
-  const [year, monthNumber] = month.split('-');
-  return `${year}年${Number(monthNumber)}月`;
-}
-
 function formatAlbumDate(date: string): string {
   if (date === '__undated__') return '日期未填写';
   return formatChineseDateWithWeekday(date, { omitCurrentYear: true });
@@ -263,7 +258,7 @@ function buildRecordMonthItems(
       {
         type: 'recordSectionHeader' as const,
         key: `record-section:${key}`,
-        title: key === '__undated__' ? '日期未填写' : formatRecordMonth(key),
+        title: key === '__undated__' ? '日期未填写' : key,
         count: items.length,
       },
       ...items.map((record) => ({

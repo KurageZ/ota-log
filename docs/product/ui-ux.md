@@ -186,6 +186,7 @@ DEFAULT_CALENDAR_DEFAULT_VIEW = 'month';
 | 正文 | 14 | 400-500 | 备注、说明，`lineHeight` 约 20-22 |
 | 次级信息 | 12.5-13 | 400-600 | 日期、地点、副标题 |
 | 三级信息 | 11-12 | 400-600 | 空态辅助、标签说明 |
+| 列表 Section 标题 | 17 | 800 | 月份/日期分组标题，accent 色 + 计数胶囊，`lineHeight: 35`，左侧 3x16 accent 竖条 |
 | SectionLabel | 17 | 500 | `lineHeight: 35`，左侧 3x16 accent 竖条 |
 | Badge / chip | 10-12 | 600-800 | 状态、计数、单推 |
 | Setlist | 14 | 400 | `fontFamily: 'monospace'` |
@@ -196,6 +197,19 @@ DEFAULT_CALENDAR_DEFAULT_VIEW = 'month';
 - 不使用斜体或下划线表达强调。
 - 数字对齐场景使用 `fontVariant: ['tabular-nums']`。
 - 不随视口宽度动态缩放字号。窄屏通过换行、截断和 `adjustsFontSizeToFit` 局部兜底。
+
+---
+
+## 日期显示
+
+App 内日期 / 月份显示统一使用横杠分隔的 ISO 风格短格式：
+
+- 月份：`YYYY-MM`，例如 `2026-08`。
+- 完整日期：`YYYY-MM-DD`，例如 `2026-08-14`。
+
+列表月份 section 标题、日历时间线等日期分组标题必须使用该格式，不使用「2026年8月」等中文年月写法；存储格式即显示格式，不需要二次本地化。
+
+例外（口语化业务文案，不适用本规范）：含星期或相对表达的日期（如「2026年8月14日 周五」「8月15日 周三」「今天」「周三」）、统计周期导航文案（如「2026 年 8 月」「2026/08/10 – 2026/08/16」）、表单输入占位符提示。
 
 ---
 
@@ -242,7 +256,7 @@ DEFAULT_CALENDAR_DEFAULT_VIEW = 'month';
 
 ota_log 大量采用卡片式布局，页面层级统一按「section -> 卡片 -> 字段」理解。
 
-Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 accent 竖条，文字使用 `SectionLabel` / `FormSectionLabel` 规格。一个 section 内可以包含一个或多个卡片。
+Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 accent 竖条。页面级列表 / 日历分组（活动月份、电子切册记录月份、日历时间线、日历当天详情模块）统一使用 `EventSectionHeader`：标题 17/800 accent 色 + 计数胶囊（accentSoft 底、11/700）；表单与设置菜单分组使用 `SectionLabel` / `FormSectionLabel`（17/500 heading 色）。一个 section 内可以包含一个或多个卡片。
 
 卡片是内容容器。卡片标题和描述语都是可选的：统计卡、排行卡、独立信息块等需要解释口径或内容时，可以在卡片内部使用加粗标题和辅助描述；普通表单字段组不需要卡片标题，因为 section 已经说明上下文。
 
@@ -261,6 +275,8 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - 容器横向排列，左侧为 3x16 accent 竖条，圆角 999。
 - 标题文字 17/500，`lineHeight: 35`，颜色使用 `colors.heading`。
 - 不使用 uppercase 或额外字间距。
+
+页面级列表 / 月份分组标题不使用本节样式，统一改用 `EventSectionHeader`（17/800 accent + 计数胶囊，见上方「页面层级」说明）。
 
 `MenuItem` 规范：
 
