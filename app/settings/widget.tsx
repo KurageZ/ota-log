@@ -123,14 +123,14 @@ export default function WidgetSettingsScreen() {
             展示拍立得
           </Text>
           <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary, marginBottom: 16 }}>
-            选择一位或多位艺人后，桌面小组件只轮播这些艺人的拍立得。
+            选择一位或多位艺人后，桌面小组件只轮播这些艺人的有图拍立得。
           </Text>
 
           <TouchableOpacity
             activeOpacity={0.7}
             accessibilityRole="radio"
             accessibilityState={{ checked: selectedArtistIds.length === 0 }}
-            accessibilityLabel="展示全部艺人的拍立得"
+            accessibilityLabel="展示全部艺人的有图拍立得"
             onPress={() => {
               setSelectedArtistIds([]);
               setSearchQuery('');
@@ -150,7 +150,7 @@ export default function WidgetSettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>全部艺人</Text>
               <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }}>
-                按最近记录顺序轮播所有拍立得
+                按最近记录顺序轮播所有有图拍立得
               </Text>
             </View>
             <AppIcon

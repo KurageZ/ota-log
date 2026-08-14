@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect } from 'expo-router';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
@@ -218,8 +218,28 @@ export default function StorageSettingsScreen() {
             <ActivityIndicator color={colors.accent} />
           </View>
         ) : loadFailed ? (
-          <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-            <Text style={{ fontSize: 14, color: colors.textSecondary }}>无法读取存储空间</Text>
+          <View style={{ paddingVertical: 48, paddingHorizontal: 24, alignItems: 'center' }}>
+            <Text style={{ color: colors.heading, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>
+              无法读取存储空间
+            </Text>
+            <Text style={{ marginTop: 6, fontSize: 13, lineHeight: 18, color: colors.textSecondary, textAlign: 'center' }}>
+              暂时无法计算空间占用，请稍后再试。
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => { void reload(); }}
+              style={{
+                minHeight: 44,
+                marginTop: 18,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.accent,
+              }}
+            >
+              <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: '800' }}>重新加载</Text>
+            </TouchableOpacity>
           </View>
         ) : usage!.totalBytes === 0 ? (
           <>

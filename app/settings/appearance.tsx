@@ -21,9 +21,9 @@ const THEME_SWATCH_COLORS: Record<AppThemeId, string> = {
   nightNeon: appThemes.nightNeon.light.accent,
 };
 const THEME_DESCRIPTIONS: Record<AppThemeId, string> = {
-  monoChrome: '低色彩背景，配合多彩入口图标',
-  classicViolet: '品牌紫色主题',
-  nightNeon: '更强情绪色的粉色主题',
+  monoChrome: '默认主题，低色彩背景配合多彩入口图标',
+  classicViolet: '品牌主题',
+  nightNeon: '更强情绪色主题',
 };
 
 export default function AppearanceSettingsScreen() {

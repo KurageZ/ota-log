@@ -381,11 +381,10 @@ export default function HomeSettingsScreen() {
   }, [openPinnedArtistSelector, persistPinnedInfo, pinnedInfo]);
 
   const handleReset = useCallback(() => {
-    Alert.alert('恢复默认', '置顶信息会恢复为下一场活动，功能卡片恢复默认顺序，并只启用未来活动、最近完成和拍立得。确认继续吗？', [
+    Alert.alert('还原默认布局', '置顶信息会还原为下一场活动，功能卡片还原默认顺序，并只启用未来活动、最近完成和拍立得。确认继续吗？', [
       { text: '取消', style: 'cancel' },
       {
-        text: '恢复',
-        style: 'destructive',
+        text: '还原',
         onPress: () => {
           void persistPreferences(createDefaultHomePinnedInfo(), createDefaultHomeCards(userConfig?.oshi_artist_id));
         },
@@ -649,10 +648,10 @@ export default function HomeSettingsScreen() {
         paddingHorizontal: 10,
         backgroundColor: colors.accentSoft,
       }}
-      accessibilityLabel="恢复默认首页设置"
+      accessibilityLabel="还原默认首页设置"
     >
       <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '800', color: colors.accent }}>
-        重置
+        还原
       </Text>
     </TouchableOpacity>
   ), [colors.accent, colors.accentSoft, handleReset]);
@@ -662,10 +661,10 @@ export default function HomeSettingsScreen() {
       <Stack.Screen options={{ headerRight: Platform.OS === 'ios' ? undefined : renderResetAction }} />
       <NativeTextToolbar
         right={{
-          label: '重置',
-          accessibilityLabel: '恢复默认首页设置',
+          label: '还原',
+          accessibilityLabel: '还原默认首页设置',
           onPress: handleReset,
-          tintColor: colors.danger,
+          tintColor: colors.accent,
         }}
       />
       {isLoading ? (

@@ -181,6 +181,7 @@ export default function SettingsScreen() {
             <MenuItem
               icon="appearance"
               label="外观"
+              subtitle="显示模式与主题色"
               tint={appearanceTint}
               onPress={() => router.push('/settings/appearance')}
             />
@@ -217,10 +218,10 @@ export default function SettingsScreen() {
                 icon="widget"
                 label="拍立得回忆"
                 subtitle={widgetArtists.length === 0
-                  ? '展示全部艺人的拍立得'
+                  ? '展示全部艺人的有图拍立得'
                   : widgetArtists.length === 1
-                    ? `只展示 ${getArtistPrimaryName(widgetArtists[0])} 的拍立得`
-                    : `展示 ${getArtistPrimaryName(widgetArtists[0])} 等 ${widgetArtists.length} 位艺人的拍立得`}
+                    ? `只展示 ${getArtistPrimaryName(widgetArtists[0])} 的有图拍立得`
+                    : `展示 ${getArtistPrimaryName(widgetArtists[0])} 等 ${widgetArtists.length} 位艺人的有图拍立得`}
                 tint={settingsTints.widget}
                 isLast
                 onPress={() => router.push('/settings/widget')}

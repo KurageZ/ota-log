@@ -77,7 +77,7 @@ export default function StatsSettingsScreen() {
           await saveStatsPreferences(viewedPreferences);
         } catch (error) {
           showOperationFailedAlert(
-            '无法更新新内容提示',
+            '无法更新新内容提示。',
             '下次打开时，新内容标记可能再次出现。',
             error,
           );
@@ -85,7 +85,7 @@ export default function StatsSettingsScreen() {
       }
     } catch (error) {
       showOperationFailedAlert(
-        '无法载入统计设置',
+        '无法载入统计设置。',
         '请稍后再试。如果仍无法载入，请重新启动 App。',
         error,
       );
@@ -142,7 +142,7 @@ export default function StatsSettingsScreen() {
       }
       hapticError();
       showOperationFailedAlert(
-        '无法保存统计设置',
+        '无法保存统计设置。',
         '本次更改未保存，请再试一次。',
         error,
       );

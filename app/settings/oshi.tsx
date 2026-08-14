@@ -138,7 +138,7 @@ export default function OshiSettingsScreen() {
             typePreference="person"
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
-            placeholder="搜索艺人设置单推"
+            placeholder="搜索艺人设为单推"
             maxHeight={420}
             renderLimit={searchQuery.trim() ? 80 : 40}
             selectedLabel="当前单推"

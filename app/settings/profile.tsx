@@ -177,7 +177,7 @@ export default function ProfileSettingsScreen() {
           </View>
 
           <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: helperColor, marginBottom: 6 }}>名称</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: helperColor, marginBottom: 6 }}>名称 *</Text>
             <TextInput
               value={name}
               onChangeText={setName}

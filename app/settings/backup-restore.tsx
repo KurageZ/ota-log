@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import { MenuBadge, MenuCard, MenuItem } from '../../src/components/SettingsMenu';
+import { MenuBadge, MenuCard, MenuIconTile, MenuItem } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { exportFullBackup, importBackup, shareBackupFile } from '../../src/utils/backup';
@@ -17,11 +17,12 @@ type BackupExportState =
 
 function formatBackupCreatedAt(isoString: string): string {
   const date = new Date(isoString);
+  const year = String(date.getFullYear());
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hours}:${minutes}`;
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 export default function BackupRestoreSettingsScreen() {
@@ -119,6 +120,25 @@ export default function BackupRestoreSettingsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       >
+        <View style={{ marginBottom: 12 }}>
+          <MenuCard>
+            <View style={{ padding: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <MenuIconTile tint={settingsTints.backupRestore} name="info" style={{ marginRight: 10 }} />
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  使用说明
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                先“生成备份数据”，再“保存到本地”导出完整备份。
+              </Text>
+              <Text style={{ marginTop: 6, fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                更换设备或数据丢失时，用“恢复备份”导入；恢复会覆盖当前数据。
+              </Text>
+            </View>
+          </MenuCard>
+        </View>
+
         <MenuCard>
           <MenuItem
             icon="backupDownload"

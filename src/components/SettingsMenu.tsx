@@ -80,6 +80,38 @@ export function MenuCard({ children }: { children: ReactNode }) {
   );
 }
 
+/** 菜单行 / 卡片头部左侧的图标底块：34x34、主题 tint 半透明底。 */
+export function MenuIconTile({
+  tint,
+  name,
+  size = 18,
+  style,
+}: {
+  tint: string;
+  name: AppIconName;
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View
+      style={[
+        {
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          backgroundColor: `${tint}22`,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        },
+        style,
+      ]}
+    >
+      <AppIcon name={name} size={size} color={tint} />
+    </View>
+  );
+}
+
 export function MenuItem({
   icon,
   label,
@@ -118,19 +150,7 @@ export function MenuItem({
         activeOpacity={disabled ? 1 : 0.6}
         disabled={disabled}
       >
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 10,
-            backgroundColor: `${resolvedTint}22`,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 12,
-          }}
-        >
-          <AppIcon name={icon} size={18} color={resolvedTint} />
-        </View>
+        <MenuIconTile tint={resolvedTint} name={icon} />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: '500' }}>
