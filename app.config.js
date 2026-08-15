@@ -1,5 +1,3 @@
-const baseConfig = require('./app.json').expo;
-
 const variants = {
   development: {
     name: 'ota log Dev',
@@ -26,16 +24,18 @@ if (variantName && !Object.hasOwn(variants, variantName)) {
 
 const variant = variantName ? variants[variantName] : null;
 
-module.exports = {
-  ...baseConfig,
-  name: variant?.name ?? baseConfig.name,
-  scheme: variant?.scheme ?? baseConfig.scheme,
-  ios: {
-    ...baseConfig.ios,
-    bundleIdentifier: variant?.identifier ?? baseConfig.ios.bundleIdentifier,
-  },
-  android: {
-    ...baseConfig.android,
-    package: variant?.identifier ?? baseConfig.android.package,
-  },
+module.exports = ({ config }) => {
+  return {
+    ...config,
+    name: variant?.name ?? config.name,
+    scheme: variant?.scheme ?? config.scheme,
+    ios: {
+      ...config.ios,
+      bundleIdentifier: variant?.identifier ?? config.ios.bundleIdentifier,
+    },
+    android: {
+      ...config.android,
+      package: variant?.identifier ?? config.android.package,
+    },
+  };
 };

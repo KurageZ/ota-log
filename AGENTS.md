@@ -5,7 +5,7 @@
 ## Project Snapshot
 
 - 产品：本地优先的 Otaku 演出记录 App，面向日系 / 国内偶像、团体活动爱好者。
-- 平台：iOS + Android，Expo SDK 56 + Expo Router v6。
+- 平台：iOS + Android，Expo SDK 57 + Expo Router v6。
 - 数据：本地 SQLite，当前 migration 版本 v22；`trip` 表仍保留为历史遗留，前台功能已下线。
 - 主要模块：活动、艺人、切册、统计、个人资料、设置、小工具。
 
@@ -41,7 +41,7 @@
 - 所有 ID 使用 UUID v4：`expo-crypto.randomUUID()`。
 - 日期存 `YYYY-MM-DD`，时间存 `HH:MM`，时间戳存 ISO 8601。
 - 图片必须通过 `copyToDocuments()` 保存为永久 URI；不要保存相册临时 URI；删除记录时不删本地文件。
-- expo-file-system SDK 56 使用 class-based API：`new File(Paths.document, name)`、`file.copy()`、`file.write()`；`File.pickFileAsync()` 返回 `{ canceled, result }`。
+- expo-file-system SDK 57 使用 class-based API：`new File(Paths.document, name)`、`file.copy()`、`file.write()`；`File.pickFileAsync()` 返回 `{ canceled, result }`。
 - 图标必须通过 `src/components/AppIcon.tsx` 的业务名映射使用；页面和业务组件不要直接 import Lucide、Ionicons、`@expo/vector-icons` 或其他具体 icon 包。
 - 单推头像使用 `OshiAvatar`；右上角是红色实心 heart，不加圆形底或外框。
 - 数据库版本通过 `PRAGMA user_version` 管理；新增字段优先增量 `ALTER TABLE`，需要修改约束或列定义时才使用表重建模式。

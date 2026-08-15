@@ -6,7 +6,7 @@
 
 | 层级 | 选型 |
 |------|------|
-| 框架 | Expo SDK 56 + Expo Router v6 |
+| 框架 | Expo SDK 57 + Expo Router v6 |
 | 语言 | TypeScript strict |
 | 样式 | inline styles + `useColorScheme()` |
 | 数据库 | expo-sqlite |
@@ -19,8 +19,8 @@
 
 ## 关键依赖约束
 
-- `react-native-worklets` 使用 Expo SDK 56 匹配的 0.8.x。
-- expo-file-system SDK 56 使用 class-based API：`File`、`Paths`；`File.pickFileAsync()` 返回 `{ canceled, result }`。
+- `react-native-worklets` 使用 Expo SDK 57 匹配的 0.10.x。
+- expo-file-system SDK 57 使用 class-based API：`File`、`Paths`；`File.pickFileAsync()` 返回 `{ canceled, result }`。
 - 图标统一通过 `src/components/AppIcon.tsx` 业务名映射到 `@react-native-vector-icons/lucide`。
 - 数据库使用 `PRAGMA user_version` 管理 migration，当前主线为 v22。
 
