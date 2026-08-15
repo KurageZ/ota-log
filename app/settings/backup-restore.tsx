@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { MenuBadge, MenuCard, MenuIconTile, MenuItem } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
@@ -82,8 +82,20 @@ export default function BackupRestoreSettingsScreen() {
           try {
             setIsImportingBackup(true);
             const restored = await importBackup(db);
-            if (!restored) return;
-            Alert.alert('恢复完成', '数据已恢复。');
+            if (!restored.restored) return;
+            if (restored.legacyArtistType) {
+              Alert.alert(
+                '恢复完成',
+                '数据已恢复。这份备份来自不支持“艺人类型”的旧版本，恢复后艺人类型均为未设置。'
+                  + '你可以使用「艺人类型转换」批量设置个人或团体，并转换已有的普通所属关系。',
+                [
+                  { text: '稍后再说', style: 'cancel' },
+                  { text: '去转换', onPress: () => router.push('/settings/artist-type-conversion') },
+                ],
+              );
+            } else {
+              Alert.alert('恢复完成', '数据已恢复。');
+            }
           } catch (error) {
             showOperationFailedAlert(
               '恢复失败。',

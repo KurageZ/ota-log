@@ -13,6 +13,8 @@ import { normalizeArtistConfirmationMode } from './artistConfirmation';
 import { normalizeChekiSpec } from '../domain/chekiSpec';
 
 const BACKUP_VERSION = 9;
+/** 备份格式自该版本起支持“艺人类型”（artists.artist_type、普通所属与正式团体履历）。 */
+const ARTIST_TYPE_SUPPORTED_BACKUP_VERSION = 9;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
 const EXPORT_YIELD_INTERVAL = 4;
 const ZIP_PROGRESS_START = 82;
@@ -100,6 +102,8 @@ interface ExportFullBackupOptions {
 interface VersionedImportPayload {
   version: number;
   data: ImportDataShape;
+  /** 旧版本（不支持艺人类型）备份为 true，用于恢复后提示可使用“艺人类型转换”。 */
+  legacyArtistType?: boolean;
 }
 
 export function normalizeLegacyBackupActivitySessions(sessions: Row[]): Row[] {
@@ -108,6 +112,10 @@ export function normalizeLegacyBackupActivitySessions(sessions: Row[]): Row[] {
       ? { ...session, open_time: session.start_time, start_time: null }
       : session
   ));
+}
+
+export function backupVersionSupportsArtistType(version: number): boolean {
+  return version >= ARTIST_TYPE_SUPPORTED_BACKUP_VERSION;
 }
 
 export async function buildBackupData(db: Repositories): Promise<BackupData> {
@@ -959,10 +967,19 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       normalized.data.event_sessions,
     );
   }
-  return normalized;
+  return {
+    ...normalized,
+    legacyArtistType: !backupVersionSupportsArtistType(candidate.version),
+  };
 }
 
-async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
+export interface BackupImportResult {
+  restored: boolean;
+  /** 备份导出时不支持艺人类型（旧版本备份）；恢复后艺人类型均为未设置。 */
+  legacyArtistType: boolean;
+}
+
+async function importZipBackup(db: Repositories, file: File): Promise<BackupImportResult> {
   const cachedZip = await copyPickedBackupToCache(file);
   const extractDir = createUniqueDirectory(Paths.cache.uri, `ota_backup_import_${Date.now()}`);
 
@@ -975,7 +992,7 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
     const backupExists = pathExists(backupFile);
     if (!manifestExists || !backupExists) {
       Alert.alert('无法打开', '备份文件缺少必要的数据');
-      return false;
+      return { restored: false, legacyArtistType: false };
     }
 
     const manifest = JSON.parse(await manifestFile.text()) as FullBackupManifest;
@@ -987,13 +1004,13 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
       || typeof manifest.files.media_dir !== 'string'
     ) {
       Alert.alert('无法打开', '备份格式错误');
-      return false;
+      return { restored: false, legacyArtistType: false };
     }
 
     const payload = normalizeImportPayload(JSON.parse(await backupFile.text()));
     if (!payload) {
       Alert.alert('无法打开', '备份格式错误');
-      return false;
+      return { restored: false, legacyArtistType: false };
     }
     const mediaDir = manifest.files.media_dir.endsWith('/')
       ? manifest.files.media_dir
@@ -1038,7 +1055,7 @@ async function importZipBackup(db: Repositories, file: File): Promise<boolean> {
     const restoredData = buildRestoredBackupData(payload.data, uriMap);
 
     await restoreBackupData(db, restoredData);
-    return true;
+    return { restored: true, legacyArtistType: Boolean(payload.legacyArtistType) };
   } finally {
     deleteFileQuietly(cachedZip);
     deleteDirectoryQuietly(extractDir);
@@ -1159,11 +1176,11 @@ export async function shareBackupFile(uri: string): Promise<void> {
   });
 }
 
-export async function importBackup(db: Repositories): Promise<boolean> {
+export async function importBackup(db: Repositories): Promise<BackupImportResult> {
   const picked = await File.pickFileAsync({ mimeTypes: 'application/zip' });
   if (picked.canceled || !picked.result) {
     Alert.alert('没有选到文件');
-    return false;
+    return { restored: false, legacyArtistType: false };
   }
   const pickedFile = picked.result;
 
@@ -1171,6 +1188,6 @@ export async function importBackup(db: Repositories): Promise<boolean> {
     return await importZipBackup(db, pickedFile);
   } catch (error) {
     Alert.alert('恢复失败', getErrorMessage(error));
-    return false;
+    return { restored: false, legacyArtistType: false };
   }
 }

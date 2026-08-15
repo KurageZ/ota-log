@@ -6,6 +6,7 @@ import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
 import {
   buildBackupData,
   buildRestoredBackupData,
+  backupVersionSupportsArtistType,
   exportFullBackup,
   importBackup,
   normalizeLegacyBackupActivitySessions,
@@ -56,10 +57,25 @@ describe('backup file picker', () => {
     pickFileAsyncMock.mockResolvedValue({ canceled: true, result: null });
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
-    await expect(importBackup({} as Repositories)).resolves.toBe(false);
+    await expect(importBackup({} as Repositories)).resolves.toEqual({
+      restored: false,
+      legacyArtistType: false,
+    });
 
     expect(pickFileAsyncMock).toHaveBeenCalledWith({ mimeTypes: 'application/zip' });
     expect(alertSpy).toHaveBeenCalledWith('没有选到文件');
+  });
+});
+
+describe('backup version artist type detection', () => {
+  test('treats backups before v9 as legacy backups without artist type support', () => {
+    expect(backupVersionSupportsArtistType(1)).toBe(false);
+    expect(backupVersionSupportsArtistType(8)).toBe(false);
+  });
+
+  test('treats v9 and later backups as supporting artist types', () => {
+    expect(backupVersionSupportsArtistType(9)).toBe(true);
+    expect(backupVersionSupportsArtistType(10)).toBe(true);
   });
 });
 
