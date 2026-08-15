@@ -36,22 +36,15 @@ export default function ToolboxScreen() {
         ) : null}
 
         <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="规划" />
+          <SectionLabel label="数据" />
           <MenuCard>
             <MenuItem
-              icon="ticket"
-              label="Ultima 集章规划"
-              subtitle="规划夏日集章目标、活动与消费"
-              tint={toolTints.planner}
-              isLast
-              onPress={() => router.push('/tools/ultima-stamp-planner')}
+              icon="backupRestore"
+              label="导入 Chekiroku"
+              subtitle="增量添加记录，匹配艺人可同步收藏状态"
+              tint={toolTints.artistImport}
+              onPress={() => router.push('/tools/chekiroku-import')}
             />
-          </MenuCard>
-        </View>
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="艺人导入" />
-          <MenuCard>
             <MenuItem
               icon="weiboImport"
               label="微博关注导入"
@@ -66,20 +59,6 @@ export default function ToolboxScreen() {
               tint={weiboTint}
               isLast
               onPress={() => router.push('/weibo')}
-            />
-          </MenuCard>
-        </View>
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="数据导入" />
-          <MenuCard>
-            <MenuItem
-              icon="backupRestore"
-              label="导入 Chekiroku"
-              subtitle="增量添加记录，匹配艺人可同步收藏状态"
-              tint={toolTints.artistImport}
-              isLast
-              onPress={() => router.push('/tools/chekiroku-import')}
             />
           </MenuCard>
         </View>
