@@ -21,9 +21,9 @@ import {
   CHEKI_SPECS,
   DEFAULT_CHEKI_SPEC,
   getChekiSpecAspectRatio,
-  getChekiSpecLabel,
   type ChekiSpec,
 } from '../../../../src/domain/chekiSpec';
+import { NativeTextToolbar } from '../../../../src/components/native-text-toolbar';
 import type { ChekiImageSide } from '../../../../src/types/models';
 import type { ChekiItemWithImages } from '../../../../src/repositories/ChekiRecordRepository';
 import { useAppTheme } from '../../../../src/theme/appTheme';
@@ -62,7 +62,6 @@ export default function EditChekiItemScreen() {
   const [notes, setNotes] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
   const [spec, setSpec] = useState<ChekiSpec>(DEFAULT_CHEKI_SPEC);
-  const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
   const cleanupPendingImports = useCallback(async (uris?: string[]) => {
     const targets = uris ?? Array.from(pendingImportedUrisRef.current);
@@ -366,16 +365,25 @@ export default function EditChekiItemScreen() {
         options={{
           title: '编辑拍立得',
           headerBackVisible: false,
-          headerLeft: () => (
+          headerLeft: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={leave} hitSlop={8} accessibilityRole="button" accessibilityLabel="取消编辑">
               <Text style={{ fontSize: 16, color: colors.textSecondary }}>取消</Text>
             </TouchableOpacity>
           ),
-          headerRight: () => (
+          headerRight: Platform.OS === 'ios' ? undefined : () => (
             <TouchableOpacity onPress={() => void save()} disabled={saving} hitSlop={8} accessibilityRole="button" accessibilityLabel="保存拍立得">
               <Text style={{ fontSize: 16, fontWeight: '700', color: saving ? colors.textMuted : colors.accent }}>{saving ? '保存中' : '保存'}</Text>
             </TouchableOpacity>
           ),
+        }}
+      />
+      <NativeTextToolbar
+        left={{ label: '取消', onPress: leave, disabled: saving }}
+        right={{
+          label: saving ? '保存中' : '保存',
+          onPress: () => void save(),
+          disabled: saving,
+          variant: 'done',
         }}
       />
       <KeyboardAwareScrollView
@@ -391,58 +399,6 @@ export default function EditChekiItemScreen() {
           {renderImageCard('front', frontUri)}
           {renderImageCard('back', backUri)}
         </FormCard>
-
-        <FormSectionLabel label="展示" />
-        <FormCard>
-          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>收藏这张拍立得</Text>
-            </View>
-            <Switch
-              value={isFavorite}
-              onValueChange={setIsFavorite}
-              trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
-              thumbColor={isFavorite ? colors.accent : colors.card}
-            />
-          </View>
-
-        </FormCard>
-
-        <FormSectionLabel label="高级信息" />
-        <TouchableOpacity
-          onPress={() => setAdvancedExpanded((current) => !current)}
-          activeOpacity={0.72}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: advancedExpanded }}
-          style={{ minHeight: 52, paddingHorizontal: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>拍立得规格</Text>
-            <Text style={{ marginTop: 3, fontSize: 12, color: colors.textSecondary }}>{getChekiSpecLabel(spec)}</Text>
-          </View>
-          <AppIcon name="disclosure" variant={advancedExpanded ? 'down' : 'forward'} size={16} color={colors.chevron} />
-        </TouchableOpacity>
-        {advancedExpanded ? (
-          <FormCard style={{ marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {CHEKI_SPECS.map((option) => {
-                const selected = option.id === spec;
-                return (
-                  <TouchableOpacity
-                    key={option.id}
-                    onPress={() => setSpec(option.id)}
-                    activeOpacity={0.72}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    style={{ minHeight: 44, paddingHorizontal: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: selected ? colors.accent : colors.inputBorder }}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>{option.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </FormCard>
-        ) : null}
 
         <FormSectionLabel label="价格" />
         <FormCard>
@@ -471,6 +427,42 @@ export default function EditChekiItemScreen() {
             placeholderTextColor={colors.placeholder}
             style={{ minHeight: 112, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.inputBorder, backgroundColor: colors.input, fontSize: 14, lineHeight: 21, color: colors.text }}
           />
+        </FormCard>
+
+        <FormSectionLabel label="更多" />
+        <FormCard>
+          <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>收藏这张拍立得</Text>
+            </View>
+            <Switch
+              value={isFavorite}
+              onValueChange={setIsFavorite}
+              trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
+              thumbColor={isFavorite ? colors.accent : colors.card}
+              style={{ alignSelf: 'center' }}
+            />
+          </View>
+        </FormCard>
+        <FormCard>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>拍立得规格</Text>
+          <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {CHEKI_SPECS.map((option) => {
+              const selected = option.id === spec;
+              return (
+                <TouchableOpacity
+                  key={option.id}
+                  onPress={() => setSpec(option.id)}
+                  activeOpacity={0.72}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  style={{ minHeight: 44, paddingHorizontal: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt, borderWidth: 1, borderColor: selected ? colors.accent : colors.inputBorder }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? colors.onAccent : colors.text }}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </FormCard>
 
         <TouchableOpacity
