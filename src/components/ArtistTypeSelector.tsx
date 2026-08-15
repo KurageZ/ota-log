@@ -5,7 +5,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { AppIcon } from './AppIcon';
 
 const OPTIONS: Array<{ value: ArtistType | null; label: string }> = [
-  { value: null, label: '未设置' },
+  { value: null, label: '不设置' },
   { value: 'person', label: '个人' },
   { value: 'group', label: '团体' },
 ];
@@ -13,9 +13,11 @@ const OPTIONS: Array<{ value: ArtistType | null; label: string }> = [
 export function ArtistTypeSelector({
   value,
   onChange,
+  hint,
 }: {
   value: ArtistType | null;
   onChange: (value: ArtistType | null) => void;
+  hint?: string;
 }) {
   const { colors } = useAppTheme();
   return (
@@ -57,7 +59,7 @@ export function ArtistTypeSelector({
         })}
       </View>
       <Text style={{ marginTop: 10, color: colors.textMuted, fontSize: 12, lineHeight: 18 }}>
-        设置为个人或团体后，可记录多团体履历、成员时间，并按在团日期关联活动。没有这些需要时可以保持未设置。
+        {hint ?? '设置为个人或团体后，可记录多团体履历、成员时间，并按在团日期关联活动。没有这些需要时可以保持不设置。'}
       </Text>
     </View>
   );
