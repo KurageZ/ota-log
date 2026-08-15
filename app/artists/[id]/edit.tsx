@@ -25,7 +25,7 @@ import { extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop'
 import { withAlpha } from '../../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
 import { ArtistTypeSelector } from '../../../src/components/ArtistTypeSelector';
-import { toISODate } from '../../../src/utils/date';
+import { formatDateInput, isValidISODate, normalizeDateInput, toISODate } from '../../../src/utils/date';
 import { generateId } from '../../../src/utils/uuid';
 
 const MAX_ARTIST_BACKGROUND_BYTES = 5 * 1024 * 1024;
@@ -46,9 +46,9 @@ export default function EditArtistScreen() {
   const [parentId, setParentId] = useState<string | null>(null);
   const [artistType, setArtistType] = useState<ArtistType | null>(null);
   const [originalArtistType, setOriginalArtistType] = useState<ArtistType | null>(null);
-  const [typeHasExistingRelations, setTypeHasExistingRelations] = useState(false);
   const [memberships, setMemberships] = useState<EditableArtistMembership[]>([]);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [touchedDateFields, setTouchedDateFields] = useState<Set<string>>(() => new Set());
   const [typedSearch, setTypedSearch] = useState('');
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [backgroundPickedUri, setBackgroundPickedUri] = useState<string | null>(null);
@@ -82,13 +82,20 @@ export default function EditArtistScreen() {
     () => Object.fromEntries(allArtists.map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [allArtists],
   );
-  const currentMemberships = useMemo(() => {
-    const today = toISODate(new Date());
-    return memberships.filter((membership) => (
-      (membership.start_date == null || membership.start_date <= today)
-      && (membership.end_date == null || membership.end_date >= today)
-    ));
+  const selectedRelationshipArtists = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Artist[] = [];
+    for (const membership of memberships) {
+      if (!seen.has(membership.artist.id)) {
+        seen.add(membership.artist.id);
+        result.push(membership.artist);
+      }
+    }
+    return result;
   }, [memberships]);
+  const hasExistingRelations = artistType != null
+    ? memberships.some((membership) => !membership.isDraft)
+    : parentId != null || memberIds.length > 0;
   const memberCandidateArtists = useMemo(() => {
     if (!memberMode) return allArtists;
 
@@ -131,18 +138,17 @@ export default function EditArtistScreen() {
       const members = all.filter((candidate) => candidate.parent_id === id);
       setMemberIds(members.map((member) => member.id));
       setMemberMode(members.length > 0);
-      setTypeHasExistingRelations(Boolean(artist.parent_id) || members.length > 0);
       // Exclude self from parent options
       setAllArtists(all.filter((a) => a.id !== id));
       setOshiArtistId(config.oshi_artist_id);
       if (artist.artist_type === 'person') {
         const loadedMemberships = await db.artists.findMembershipsForPerson(id);
         setMemberships(loadedMemberships);
-        setTypeHasExistingRelations(loadedMemberships.length > 0);
+        setAdvancedExpanded(loadedMemberships.length > 0);
       } else if (artist.artist_type === 'group') {
         const loadedMemberships = await db.artists.findMembershipsForGroup(id);
         setMemberships(loadedMemberships);
-        setTypeHasExistingRelations(loadedMemberships.length > 0);
+        setAdvancedExpanded(loadedMemberships.length > 0);
       }
       setLoading(false);
     };
@@ -155,6 +161,13 @@ export default function EditArtistScreen() {
     pickedUri ? { uri: pickedUri }
       : avatarUrl.trim() ? { uri: avatarUrl.trim() }
         : resolveAvatarSource(presetAvatar);
+  const typeHint = artistType === 'person'
+    ? '可记录所属团体等信息，并自动关联到所属团体的活动。'
+    : artistType === 'group'
+      ? '可记录所属成员等信息，并将团体活动关联到所属成员。'
+      : (memberMode || selectedParent != null)
+        ? '该艺人已有旧版普通所属，可在此维护，或前往「设置 → 数据与备份 → 艺人类型转换」整组转换。'
+        : '设置类型后，可记录所属关系。';
   const nameError = !name.trim() ? '请填写艺人名称' : null;
   const showNameError = (nameTouched || didTrySave) && nameError != null;
   const officialUrlError = didTryParseUrl && !url.trim() ? '请先填写微博用户链接' : null;
@@ -243,6 +256,15 @@ export default function EditArtistScreen() {
     setDidTrySave(true);
     const trimmed = name.trim();
     if (!trimmed) { Alert.alert('请填写艺人名称'); return; }
+    const invalidMembershipDate = memberships.find((membership) => (
+      (membership.start_date != null && !isValidISODate(membership.start_date))
+      || (membership.end_date != null && !isValidISODate(membership.end_date))
+    ));
+    if (invalidMembershipDate) {
+      setAdvancedExpanded(true);
+      Alert.alert('日期格式应为 YYYY-MM-DD');
+      return;
+    }
     setSaving(true);
     try {
       const finalAvatar = pickedUri ?? (avatarUrl.trim() || presetAvatar || null);
@@ -308,19 +330,47 @@ export default function EditArtistScreen() {
 
   const toggleTypedRelationship = (artist: Artist) => {
     const today = toISODate(new Date());
-    const existingIndex = memberships.findIndex((membership) => (
+    const activeIndex = memberships.findIndex((membership) => (
       membership.artist.id === artist.id
       && (membership.start_date == null || membership.start_date <= today)
       && (membership.end_date == null || membership.end_date >= today)
     ));
-    if (existingIndex >= 0) {
+    if (activeIndex >= 0) {
       Alert.alert('结束成员关系', `将最后在团日期设为 ${today}，并保留历史履历。`, [
         { text: '取消', style: 'cancel' },
         {
           text: '结束关系',
           onPress: () => setMemberships((current) => current.map((membership, index) => (
-            index === existingIndex ? { ...membership, end_date: today } : membership
+            index === activeIndex ? { ...membership, end_date: today } : membership
           ))),
+        },
+      ]);
+      return;
+    }
+    if (memberships.some((membership) => membership.artist.id === artist.id)) {
+      const addDraft = () => {
+        const now = new Date().toISOString();
+        setMemberships((current) => [...current, {
+          id: generateId(),
+          isDraft: true,
+          person_artist_id: artistType === 'person' ? id : artist.id,
+          group_artist_id: artistType === 'group' ? id : artist.id,
+          start_date: null,
+          end_date: null,
+          created_at: now,
+          updated_at: now,
+          artist,
+        }]);
+      };
+      Alert.alert('管理这条关系', '该艺人只有已结束的历史关系。', [
+        { text: '取消', style: 'cancel' },
+        { text: '重新加入', onPress: addDraft },
+        {
+          text: '删除该艺人的关系',
+          style: 'destructive',
+          onPress: () => setMemberships((current) => (
+            current.filter((membership) => membership.artist.id !== artist.id)
+          )),
         },
       ]);
       return;
@@ -337,6 +387,64 @@ export default function EditArtistScreen() {
       updated_at: now,
       artist,
     }]);
+  };
+
+  const handleArtistTypeChange = (value: ArtistType | null) => {
+    if (value === artistType) return;
+    if (value !== originalArtistType && hasExistingRelations) {
+      Alert.alert(
+        '暂时无法更改类型',
+        originalArtistType == null
+          ? '这条记录已有普通所属关系。请前往“设置 → 数据与备份 → 艺人类型转换”，与关联记录一起转换。'
+          : '这条记录已有正式所属履历。请先移除全部履历后再更改类型。',
+      );
+      return;
+    }
+    setArtistType(value);
+    if (value != null) {
+      setParentId(null);
+      setMemberMode(false);
+      setMemberIds([]);
+    }
+    setMemberships([]);
+    setTouchedDateFields(new Set());
+    setAdvancedExpanded(false);
+  };
+
+  const updateMembershipDate = (membershipId: string, field: 'start_date' | 'end_date', value: string) => {
+    setMemberships((current) => current.map((membership) => (
+      membership.id === membershipId ? { ...membership, [field]: value.trim() || null } : membership
+    )));
+  };
+
+  const handleRemoveMembership = (membership: EditableArtistMembership) => {
+    const today = toISODate(new Date());
+    const isActive = (membership.start_date == null || membership.start_date <= today)
+      && (membership.end_date == null || membership.end_date >= today);
+    const deleteMembership = () => setMemberships((current) => (
+      current.filter((item) => item.id !== membership.id)
+    ));
+    Alert.alert(
+      '管理这条关系',
+      isActive
+        ? '结束再团关系会把最后在团日期设为今天并保留历史履历；直接删除会彻底移除这条关系。'
+        : '这条关系已结束。直接删除会彻底移除它，不会删除关联的活动记录。',
+      isActive
+        ? [
+            {
+              text: '结束再团关系',
+              onPress: () => setMemberships((current) => current.map((item) => (
+                item.id === membership.id ? { ...item, end_date: today } : item
+              ))),
+            },
+            { text: '直接删除关系', style: 'destructive', onPress: deleteMembership },
+            { text: '取消', style: 'cancel' },
+          ]
+        : [
+            { text: '直接删除关系', style: 'destructive', onPress: deleteMembership },
+            { text: '取消', style: 'cancel' },
+          ],
+    );
   };
 
 
@@ -403,88 +511,9 @@ export default function EditArtistScreen() {
           // extraHeight={140}          // 给输入框下方留出足够的上推安全空间
           extraScrollHeight={20}
         >
-          <FormSectionLabel label="形象" />
-          <FormCard style={{ alignItems: 'center' }}>
-            <View style={{ alignSelf: 'stretch' }}>
-              <FormFieldLabel>头像</FormFieldLabel>
-            </View>
-            <TouchableOpacity onPress={handlePickImage} style={{ marginBottom: 12 }}>
-              <View style={{
-                width: 80, height: 80, borderRadius: 40,
-                backgroundColor: isDark ? colors.input : colors.cardAlt,
-                alignItems: 'center', justifyContent: 'center',
-                borderWidth: 2, borderColor: colors.inputBorder,
-                overflow: 'hidden'
-              }}>
-                {previewSource ? (
-                  <Image source={previewSource} style={{ width: 80, height: 80, borderRadius: 40 }} />
-                ) : (
-                  <AppIcon name="camera" size={28} color={colors.placeholder} />
-                )}
-              </View>
-              <Text style={{ fontSize: 12, color: colors.accent, marginTop: 6, textAlign: 'center' }}>
-                {previewSource ? '更换图片' : '从相册选择'}
-              </Text>
-            </TouchableOpacity>
-            {pickedUri && (
-              <TouchableOpacity onPress={() => setPickedUri(null)} style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder }}>清除图片</Text>
-              </TouchableOpacity>
-            )}
-            <View style={{ width: '100%' }}>
-              <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder, marginBottom: 6 }}>或使用图片链接</Text>
-              <TextInput
-                style={{ ...inputStyle, height: 40 }}
-                placeholder="https://example.com/avatar.jpg"
-                placeholderTextColor={colors.placeholder}
-                value={avatarUrl}
-                onChangeText={(t) => { setAvatarUrl(t); if (t) setPickedUri(null); }}
-                keyboardType="url"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={{ width: '100%', marginTop: 16, alignItems: 'center' }}>
-              <View style={{ alignSelf: 'stretch' }}>
-                <FormFieldLabel>背景图</FormFieldLabel>
-              </View>
-              <TouchableOpacity onPress={handlePickBackground} style={{ width: '100%', marginBottom: 12 }}>
-                <View style={{
-                  width: backgroundPreviewWidth,
-                  aspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
-                  alignSelf: 'center',
-                  borderRadius: 14,
-                  backgroundColor: isDark ? colors.input : colors.cardAlt,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.5,
-                  borderColor: colors.inputBorder,
-                  overflow: 'hidden',
-                }}>
-                  {backgroundPickedUri ? (
-                    <Image source={{ uri: backgroundPickedUri }} style={{ width: '100%', height: '100%' }} />
-                  ) : (
-                    <View style={{ alignItems: 'center', gap: 8 }}>
-                      <AppIcon name="images" size={28} color={colors.placeholder} />
-                      <Text style={{ fontSize: 13, color: colors.textSecondary }}>从相册选择艺人背景图</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={{ fontSize: 12, color: colors.accent, marginTop: 8, textAlign: 'center' }}>
-                  {backgroundPickedUri ? '更换背景图' : '设置背景图'}
-                </Text>
-              </TouchableOpacity>
-              {backgroundPickedUri ? (
-                <TouchableOpacity onPress={() => { setBackgroundPickedUri(null); setBackgroundColor(null); }} style={{ marginBottom: 8 }}>
-                  <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder }}>清除背景图</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </FormCard>
-
           <FormSectionLabel label="基础信息" />
           <FormCard>
-            <FormFieldLabel required>艺人名称</FormFieldLabel>
+            <FormFieldLabel required>名称</FormFieldLabel>
             <TextInput
               style={{
                 ...inputStyle,
@@ -513,6 +542,47 @@ export default function EditArtistScreen() {
                 onChangeText={setShortName}
                 returnKeyType="next"
               />
+            </View>
+
+            <View style={{ width: '100%', alignItems: 'center', marginTop: 16, marginBottom: 16 }}>
+              <View style={{ alignSelf: 'stretch' }}>
+                <FormFieldLabel>头像</FormFieldLabel>
+              </View>
+              <TouchableOpacity onPress={handlePickImage} style={{ marginBottom: 12 }}>
+                <View style={{
+                  width: 80, height: 80, borderRadius: 40,
+                  backgroundColor: isDark ? colors.input : colors.cardAlt,
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: colors.inputBorder,
+                  overflow: 'hidden'
+                }}>
+                  {previewSource ? (
+                    <Image source={previewSource} style={{ width: 80, height: 80, borderRadius: 40 }} />
+                  ) : (
+                    <AppIcon name="camera" size={28} color={colors.placeholder} />
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: colors.accent, marginTop: 6, textAlign: 'center' }}>
+                  {previewSource ? '更换图片' : '从相册选择'}
+                </Text>
+              </TouchableOpacity>
+              {pickedUri && (
+                <TouchableOpacity onPress={() => setPickedUri(null)} style={{ marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder }}>清除图片</Text>
+                </TouchableOpacity>
+              )}
+              <View style={{ width: '100%' }}>
+                <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder, marginBottom: 6 }}>或使用图片链接</Text>
+                <TextInput
+                  style={{ ...inputStyle, height: 40 }}
+                  placeholder="https://example.com/avatar.jpg"
+                  placeholderTextColor={colors.placeholder}
+                  value={avatarUrl}
+                  onChangeText={(t) => { setAvatarUrl(t); if (t) setPickedUri(null); }}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
 
             <View style={{ marginTop: 14 }}>
@@ -561,10 +631,16 @@ export default function EditArtistScreen() {
             </View>
           </FormCard>
 
-          <FormSectionLabel label="所属关系" />
-          <FormCard style={{ marginBottom: 24 }}>
-            {artistType == null ? (
-              <>
+          <FormSectionLabel label="类型与关系" />
+          <FormCard style={artistType != null ? { paddingBottom: 0 } : undefined}>
+            <FormFieldLabel>艺人类型</FormFieldLabel>
+            <ArtistTypeSelector
+              value={artistType}
+              onChange={handleArtistTypeChange}
+              hint={typeHint}
+            />
+            {artistType == null && (memberMode || selectedParent != null) ? (
+              <View style={{ marginTop: 16 }}>
                 <FormFieldLabel>{memberMode ? '成员' : '所属'}</FormFieldLabel>
                 <ArtistSearchPicker
                   artists={(memberMode ? memberCandidateArtists : allArtists).filter((artist) => artist.artist_type == null)}
@@ -585,100 +661,181 @@ export default function EditArtistScreen() {
                   })}
                   onRemoveArtist={memberMode ? toggleMember : (() => setParentId(null))}
                 />
-              </>
-            ) : (
+              </View>
+            ) : artistType != null ? (
               <>
-                <FormFieldLabel>{artistType === 'person' ? '当前所属团体' : '当前成员'}</FormFieldLabel>
-                <ArtistSearchPicker
-                  artists={allArtists.filter((artist) => artist.artist_type === (artistType === 'person' ? 'group' : 'person'))}
-                  selectedArtists={currentMemberships.map((membership) => membership.artist)}
-                  selectedIds={currentMemberships.map((membership) => membership.artist.id)}
-                  oshiArtistId={oshiArtistId}
-                  isDark={isDark}
-                  searchValue={typedSearch}
-                  onSearchChange={setTypedSearch}
-                  placeholder={artistType === 'person' ? '搜索团体...' : '搜索个人成员...'}
-                  maxHeight={200}
-                  parentNameMap={artistNameMap}
-                  onSelectArtist={toggleTypedRelationship}
-                  onRemoveArtist={toggleTypedRelationship}
-                />
+                <View style={{ marginTop: 16 }}>
+                  <FormFieldLabel>{artistType === 'person' ? '所属团体' : '成员'}</FormFieldLabel>
+                  <ArtistSearchPicker
+                    artists={allArtists.filter((artist) => artist.artist_type === (artistType === 'person' ? 'group' : 'person'))}
+                    selectedArtists={selectedRelationshipArtists}
+                    selectedIds={selectedRelationshipArtists.map((artist) => artist.id)}
+                    oshiArtistId={oshiArtistId}
+                    isDark={isDark}
+                    searchValue={typedSearch}
+                    onSearchChange={setTypedSearch}
+                    placeholder={artistType === 'person' ? '搜索团体...' : '搜索成员...'}
+                    maxHeight={200}
+                    parentNameMap={artistNameMap}
+                    onSelectArtist={toggleTypedRelationship}
+                    onRemoveArtist={toggleTypedRelationship}
+                  />
+                </View>
+
+                {advancedExpanded ? (
+                  <View style={{ marginTop: 16 }}>
+                    <FormFieldLabel>{artistType === 'person' ? '所属履历' : '成员履历'}</FormFieldLabel>
+                    {memberships.length === 0 ? (
+                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
+                        请先在上方选择{artistType === 'person' ? '所属团体' : '成员'}，再编辑在团日期。
+                      </Text>
+                    ) : (
+                      memberships.map((membership, index) => {
+                        const startKey = `${membership.id}:start`;
+                        const endKey = `${membership.id}:end`;
+                        const showStartError = (touchedDateFields.has(startKey) || didTrySave)
+                          && membership.start_date != null
+                          && !isValidISODate(membership.start_date);
+                        const showEndError = (touchedDateFields.has(endKey) || didTrySave)
+                          && membership.end_date != null
+                          && !isValidISODate(membership.end_date);
+                        return (
+                          <View key={membership.id} style={{ marginTop: index === 0 ? 0 : 14 }}>
+                            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 8 }}>
+                              {getArtistPrimaryName(membership.artist)}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                              <TextInput
+                                style={{
+                                  ...inputStyle, flex: 1,
+                                  borderColor: showStartError ? colors.danger : inputStyle.borderColor,
+                                }}
+                                placeholder="入团日期"
+                                placeholderTextColor={colors.placeholder}
+                                value={membership.start_date ?? ''}
+                                onChangeText={(value) => updateMembershipDate(
+                                  membership.id,
+                                  'start_date',
+                                  formatDateInput(value, membership.start_date ?? undefined),
+                                )}
+                                onBlur={() => {
+                                  setTouchedDateFields((current) => new Set(current).add(startKey));
+                                  updateMembershipDate(
+                                    membership.id,
+                                    'start_date',
+                                    normalizeDateInput(membership.start_date ?? ''),
+                                  );
+                                }}
+                                keyboardType="numeric"
+                                maxLength={10}
+                              />
+                              <TextInput
+                                style={{
+                                  ...inputStyle, flex: 1,
+                                  borderColor: showEndError ? colors.danger : inputStyle.borderColor,
+                                }}
+                                placeholder="最后在团日期"
+                                placeholderTextColor={colors.placeholder}
+                                value={membership.end_date ?? ''}
+                                onChangeText={(value) => updateMembershipDate(
+                                  membership.id,
+                                  'end_date',
+                                  formatDateInput(value, membership.end_date ?? undefined),
+                                )}
+                                onBlur={() => {
+                                  setTouchedDateFields((current) => new Set(current).add(endKey));
+                                  updateMembershipDate(
+                                    membership.id,
+                                    'end_date',
+                                    normalizeDateInput(membership.end_date ?? ''),
+                                  );
+                                }}
+                                keyboardType="numeric"
+                                maxLength={10}
+                              />
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={`删除${getArtistPrimaryName(membership.artist)}的关系`}
+                                onPress={() => handleRemoveMembership(membership)}
+                                style={{ width: 44, height: 46, alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <AppIcon name="trash" size={18} color={colors.danger} />
+                              </TouchableOpacity>
+                            </View>
+                            {showStartError || showEndError ? (
+                              <Text style={{ marginTop: 6, fontSize: 12, color: colors.danger }}>
+                                日期格式应为 YYYY-MM-DD
+                              </Text>
+                            ) : null}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={advancedExpanded ? '收起高级' : '展开高级'}
+                  accessibilityState={{ expanded: advancedExpanded }}
+                  activeOpacity={0.7}
+                  onPress={() => setAdvancedExpanded((value) => !value)}
+                  style={{
+                    marginTop: 18,
+                    minHeight: 44,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.divider,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
+                    {advancedExpanded ? '收起高级' : '高级'}
+                  </Text>
+                  <AppIcon name="chevron" variant={advancedExpanded ? 'up' : 'down'} size={15} color={colors.accent} />
+                </TouchableOpacity>
               </>
-            )}
+            ) : null}
           </FormCard>
 
-          <TouchableOpacity
-            onPress={() => setAdvancedExpanded((value) => !value)}
-            accessibilityState={{ expanded: advancedExpanded }}
-            style={{ paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          >
-            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '700' }}>
-              {advancedExpanded ? '收起高级内容' : '展开高级内容'}
-            </Text>
-            <AppIcon name="chevron" variant={advancedExpanded ? 'up' : 'down'} size={16} color={colors.accent} />
-          </TouchableOpacity>
-
-          {advancedExpanded ? (
-            <>
-              <FormSectionLabel label="高级内容" />
-              <FormCard style={{ marginBottom: 16 }}>
-                <FormFieldLabel>艺人类型</FormFieldLabel>
-                <ArtistTypeSelector
-                  value={artistType}
-                  onChange={(value) => {
-                    if (value !== originalArtistType && typeHasExistingRelations) {
-                      Alert.alert(
-                        '暂时无法更改类型',
-                        originalArtistType == null
-                          ? '这条记录已有普通所属关系。请前往“设置 → 数据与备份 → 艺人类型转换”，与关联记录一起转换。'
-                          : '这条记录已有正式所属履历。请先移除全部履历后再更改类型。',
-                      );
-                      return;
-                    }
-                    setArtistType(value);
-                    if (value != null) {
-                      setParentId(null);
-                      setMemberMode(false);
-                      setMemberIds([]);
-                    }
-                    setMemberships([]);
-                  }}
-                />
-              </FormCard>
-              {artistType != null && memberships.length > 0 ? (
-                <FormCard style={{ marginBottom: 24 }}>
-                  <FormFieldLabel>{artistType === 'person' ? '所属履历' : '成员履历'}</FormFieldLabel>
-                  {memberships.map((membership, index) => (
-                    <View key={membership.id} style={{ marginTop: index === 0 ? 0 : 14 }}>
-                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 8 }}>
-                        {getArtistPrimaryName(membership.artist)}
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TextInput
-                          style={{ ...inputStyle, flex: 1 }}
-                          placeholder="入团日期"
-                          placeholderTextColor={colors.placeholder}
-                          value={membership.start_date ?? ''}
-                          onChangeText={(value) => setMemberships((current) => current.map((item, itemIndex) => (
-                            itemIndex === index ? { ...item, start_date: value.trim() || null } : item
-                          )))}
-                        />
-                        <TextInput
-                          style={{ ...inputStyle, flex: 1 }}
-                          placeholder="最后在团日期"
-                          placeholderTextColor={colors.placeholder}
-                          value={membership.end_date ?? ''}
-                          onChangeText={(value) => setMemberships((current) => current.map((item, itemIndex) => (
-                            itemIndex === index ? { ...item, end_date: value.trim() || null } : item
-                          )))}
-                        />
-                      </View>
+          <FormSectionLabel label="背景图" />
+          <FormCard>
+            <View style={{ width: '100%', alignItems: 'center' }}>
+              <TouchableOpacity onPress={handlePickBackground} style={{ width: '100%', marginBottom: 12 }}>
+                <View style={{
+                  width: backgroundPreviewWidth,
+                  aspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
+                  alignSelf: 'center',
+                  borderRadius: 14,
+                  backgroundColor: isDark ? colors.input : colors.cardAlt,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: colors.inputBorder,
+                  overflow: 'hidden',
+                }}>
+                  {backgroundPickedUri ? (
+                    <Image source={{ uri: backgroundPickedUri }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 8 }}>
+                      <AppIcon name="images" size={28} color={colors.placeholder} />
+                      <Text style={{ fontSize: 13, color: colors.textSecondary }}>从相册选择背景图</Text>
                     </View>
-                  ))}
-                </FormCard>
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: colors.accent, marginTop: 8, textAlign: 'center' }}>
+                  {backgroundPickedUri ? '更换背景图' : '设置背景图'}
+                </Text>
+              </TouchableOpacity>
+              {backgroundPickedUri ? (
+                <TouchableOpacity onPress={() => { setBackgroundPickedUri(null); setBackgroundColor(null); }} style={{ marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? colors.textMuted : colors.placeholder }}>清除背景图</Text>
+                </TouchableOpacity>
               ) : null}
-            </>
-          ) : null}
+            </View>
+          </FormCard>
 
           <TouchableOpacity
             onPress={handleDelete}
