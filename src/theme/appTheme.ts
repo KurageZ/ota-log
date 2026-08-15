@@ -705,10 +705,12 @@ export function useAppTheme() {
     appearance,
     calendarWeekStart,
     calendarDisplay,
+    chekiDisplayMode,
     isHydrated,
     setAppearance,
     setCalendarWeekStart,
     setCalendarDisplay,
+    setChekiDisplayMode,
     setThemeId,
   } = useThemePreferences();
   const mode = resolveMode(appearance, systemColorScheme);
@@ -720,6 +722,7 @@ export function useAppTheme() {
     appearance,
     calendarWeekStart,
     calendarDisplay,
+    chekiDisplayMode,
     mode,
     isDark: mode === 'dark',
     colors,
@@ -727,6 +730,7 @@ export function useAppTheme() {
     setAppearance,
     setCalendarWeekStart,
     setCalendarDisplay,
+    setChekiDisplayMode,
     setThemeId,
   };
 }

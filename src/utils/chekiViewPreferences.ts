@@ -19,7 +19,6 @@ export interface ChekiViewPreferences {
   albumSortOrder: ChekiSortOrder;
   recordSortOrder: ChekiSortOrder;
   density: ChekiGridDensity;
-  useSpecAspectRatio: boolean;
   showRecordThumbnails: boolean;
   albumModeHintDismissed: boolean;
 }
@@ -31,7 +30,6 @@ export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
   albumSortOrder: 'desc',
   recordSortOrder: 'desc',
   density: 'large',
-  useSpecAspectRatio: false,
   showRecordThumbnails: true,
   albumModeHintDismissed: false,
 };
@@ -83,9 +81,6 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
     density: isDensity(raw.density)
       ? raw.density
       : DEFAULT_CHEKI_VIEW_PREFERENCES.density,
-    useSpecAspectRatio: typeof raw.useSpecAspectRatio === 'boolean'
-      ? raw.useSpecAspectRatio
-      : DEFAULT_CHEKI_VIEW_PREFERENCES.useSpecAspectRatio,
     showRecordThumbnails: typeof raw.showRecordThumbnails === 'boolean'
       ? raw.showRecordThumbnails
       : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails,

@@ -28,10 +28,6 @@ import { NativeTextToolbar } from '../../../../src/components/native-text-toolba
 import { OshiAvatar } from '../../../../src/components/Oshi';
 import { getEventCardOshiBadge } from '../../../../src/utils/oshiMatch';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
-import {
-  DEFAULT_CHEKI_SPEC,
-  getChekiSpecAspectRatio,
-} from '../../../../src/domain/chekiSpec';
 
 const ARTIST_AVATAR_SIZE = 48;
 const ARTIST_TITLE_GAP = 14;
@@ -55,7 +51,7 @@ function formatPrice(value: number | null): string {
 export default function ChekiRecordDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useDB();
-  const { colors } = useAppTheme();
+  const { colors, chekiDisplayMode } = useAppTheme();
   const { width } = useWindowDimensions();
   const [record, setRecord] = useState<ChekiRecordWithItems | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -220,6 +216,9 @@ export default function ChekiRecordDetailScreen() {
   }
 
   const itemWidth = Math.floor((width - 32 - 16) / 3);
+  const itemHeight = chekiDisplayMode === 'original'
+    ? itemWidth
+    : Math.round((itemWidth * 86) / 54);
   const photoItems = record.items.filter((item) => item.images.length > 0);
   const hasMissingImages = photoItems.length < record.quantity;
   const totalPrice = record.items.reduce((sum, item) => sum + item.unit_price, 0);
@@ -367,7 +366,7 @@ export default function ChekiRecordDetailScreen() {
                       resizeMode="contain"
                       style={{
                         width: itemWidth,
-                        height: itemWidth / getChekiSpecAspectRatio(item.spec),
+                        height: itemHeight,
                         borderRadius: 10,
                         backgroundColor: colors.cardAlt,
                       }}
@@ -401,7 +400,7 @@ export default function ChekiRecordDetailScreen() {
                   accessibilityLabel="添加图片"
                   style={{
                     width: itemWidth,
-                    height: itemWidth / getChekiSpecAspectRatio(DEFAULT_CHEKI_SPEC),
+                    height: itemHeight,
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: 10,

@@ -200,6 +200,13 @@ export default function SettingsScreen() {
               onPress={() => router.push('/settings/calendar')}
             />
             <MenuItem
+              icon="image"
+              label="拍立得展示方式"
+              subtitle="艺人、活动、记录详情与切册的图片展示方式"
+              tint={preferenceTint}
+              onPress={() => router.push('/settings/cheki-display')}
+            />
+            <MenuItem
               icon="filter"
               label="首页自定义"
               subtitle="调整首页卡片顺序和显示内容"

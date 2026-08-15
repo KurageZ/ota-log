@@ -4,10 +4,12 @@ import {
   AppAppearance,
   AppCalendarWeekStart,
   AppThemeId,
+  ChekiDisplayMode,
   CalendarDisplayOptions,
   DEFAULT_APPEARANCE,
   DEFAULT_CALENDAR_DISPLAY,
   DEFAULT_CALENDAR_WEEK_START,
+  DEFAULT_CHEKI_DISPLAY_MODE,
   DEFAULT_THEME_ID,
 } from './config';
 
@@ -18,6 +20,7 @@ export interface ThemePreferences {
   appearance: AppAppearance;
   calendarWeekStart: AppCalendarWeekStart;
   calendarDisplay: CalendarDisplayOptions;
+  chekiDisplayMode: ChekiDisplayMode;
 }
 
 interface ThemePreferencesContextValue extends ThemePreferences {
@@ -25,6 +28,7 @@ interface ThemePreferencesContextValue extends ThemePreferences {
   setAppearance: (appearance: AppAppearance) => Promise<void>;
   setCalendarWeekStart: (weekStart: AppCalendarWeekStart) => Promise<void>;
   setCalendarDisplay: (display: CalendarDisplayOptions) => Promise<void>;
+  setChekiDisplayMode: (mode: ChekiDisplayMode) => Promise<void>;
   setThemeId: (themeId: AppThemeId) => Promise<void>;
 }
 
@@ -33,6 +37,7 @@ const defaultPreferences: ThemePreferences = {
   appearance: DEFAULT_APPEARANCE,
   calendarWeekStart: DEFAULT_CALENDAR_WEEK_START,
   calendarDisplay: DEFAULT_CALENDAR_DISPLAY,
+  chekiDisplayMode: DEFAULT_CHEKI_DISPLAY_MODE,
 };
 
 const ThemePreferencesContext = createContext<ThemePreferencesContextValue | null>(null);
@@ -47,6 +52,10 @@ function isAppearance(value: unknown): value is AppAppearance {
 
 function isCalendarWeekStart(value: unknown): value is AppCalendarWeekStart {
   return value === 'sunday' || value === 'monday';
+}
+
+function isChekiDisplayMode(value: unknown): value is ChekiDisplayMode {
+  return value === 'portrait' || value === 'original';
 }
 
 function parseStoredPreferences(rawValue: string | null): ThemePreferences {
@@ -84,12 +93,16 @@ function parseStoredPreferences(rawValue: string | null): ThemePreferences {
         ? rawCalendarDisplay.showDateItems
         : DEFAULT_CALENDAR_DISPLAY.showDateItems,
     };
+    const chekiDisplayMode = 'chekiDisplayMode' in parsed && isChekiDisplayMode(parsed.chekiDisplayMode)
+      ? parsed.chekiDisplayMode
+      : DEFAULT_CHEKI_DISPLAY_MODE;
 
     return {
       themeId,
       appearance,
       calendarWeekStart,
       calendarDisplay,
+      chekiDisplayMode,
     };
   } catch {
     return defaultPreferences;
@@ -159,6 +172,13 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     [persistPreferences],
   );
 
+  const setChekiDisplayMode = useCallback(
+    async (chekiDisplayMode: ChekiDisplayMode) => (
+      persistPreferences({ ...latestPreferencesRef.current, chekiDisplayMode })
+    ),
+    [persistPreferences],
+  );
+
   const setThemeId = useCallback(
     async (themeId: AppThemeId) => persistPreferences({ ...latestPreferencesRef.current, themeId }),
     [persistPreferences],
@@ -170,6 +190,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setAppearance,
     setCalendarWeekStart,
     setCalendarDisplay,
+    setChekiDisplayMode,
     setThemeId,
   }), [
     isHydrated,
@@ -177,6 +198,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setAppearance,
     setCalendarWeekStart,
     setCalendarDisplay,
+    setChekiDisplayMode,
     setThemeId,
   ]);
 

@@ -181,8 +181,8 @@ export function StickerPicker({
     availableWidth: galleryContentWidth,
     // calculateChekiGridLayout 目前不使用 availableHeight，占位传窗口高度即可。
     availableHeight: windowHeight,
-    // 与电子切册相册模式默认一致：统一比例。
-    useSpecAspectRatio: false,
+    // 与电子切册相册模式默认一致：竖版网格。
+    displayMode: 'portrait',
   });
   const columns = gridLayout.columns;
   const chekiW = gridLayout.itemWidth;
@@ -341,7 +341,7 @@ export function StickerPicker({
                   width={chekiW}
                   height={chekiH}
                   colors={colors}
-                  aspectRatio={null}
+                  variant="portrait"
                 />
                 {selected ? (
                   <View

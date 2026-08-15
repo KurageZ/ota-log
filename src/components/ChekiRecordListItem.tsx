@@ -85,7 +85,7 @@ export function ChekiRecordListItem({
                   >
                     <Image
                       source={{ uri: image.photo_uri }}
-                      resizeMode="cover"
+                      resizeMode="contain"
                       style={{ width: '100%', height: '100%' }}
                     />
                     {originalIndex === 0 && additionalPreviewCount > 0 ? (

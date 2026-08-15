@@ -402,10 +402,12 @@ function CardHeader({
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useDB();
-  const { colors, isDark } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode } = useAppTheme();
   const { width: screenWidth } = useWindowDimensions();
   const chekiW = Math.floor((screenWidth - 80) / 3);
-  const chekiH = Math.round(chekiW * 86 / 54);
+  const chekiH = chekiDisplayMode === 'original'
+    ? chekiW
+    : Math.round(chekiW * 86 / 54);
 
   const [event, setEvent] = useState<Event | null>(null);
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -924,6 +926,7 @@ export default function EventDetailScreen() {
                   <Image
                     source={{ uri: ck.photo_uri }}
                     resizeMethod="resize"
+                    resizeMode="contain"
                     style={{ width: chekiW, height: chekiH, borderRadius: 10,
                       backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
                   />

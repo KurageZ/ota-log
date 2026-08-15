@@ -103,7 +103,7 @@ export default function ArtistDetailScreen() {
   const db = useDB();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { colors, isDark } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode } = useAppTheme();
 
   const [loading, setLoading] = useState(true);
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -336,7 +336,9 @@ export default function ArtistDetailScreen() {
   }, [chekiScrollY, eventsScrollY, scrollY]);
 
   const chekiCellW = Math.floor((screenWidth - 32 - 16) / 3);
-  const chekiCellH = Math.round((chekiCellW * 86) / 54);
+  const chekiCellH = chekiDisplayMode === 'original'
+    ? chekiCellW
+    : Math.round((chekiCellW * 86) / 54);
   const eventSections = useMemo(() => buildEventMonthSections(events), [events]);
   const viewerItems = useMemo(
     () => buildChekiViewerItems(chekiList, new Map(artist ? [[artist.id, artist]] : []), eventMap),
@@ -681,6 +683,7 @@ export default function ArtistDetailScreen() {
               <Image
                 source={{ uri: cheki.photo_uri }}
                 resizeMethod="resize"
+                resizeMode="contain"
                 style={{
                   width: chekiCellW,
                   height: chekiCellH,

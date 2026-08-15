@@ -30,7 +30,6 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
       density: 'small',
-      useSpecAspectRatio: false,
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     })).toEqual({
@@ -40,7 +39,6 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
       density: 'small',
-      useSpecAspectRatio: false,
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     });
@@ -61,15 +59,13 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'asc',
       density: 'large',
-      useSpecAspectRatio: false,
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     });
   });
 
-  it('defaults the album to large images with a uniform ratio', () => {
+  it('defaults the album to large images with the portrait grid', () => {
     expect(DEFAULT_CHEKI_VIEW_PREFERENCES.density).toBe('large');
-    expect(DEFAULT_CHEKI_VIEW_PREFERENCES.useSpecAspectRatio).toBe(false);
     expect(DEFAULT_CHEKI_VIEW_PREFERENCES.defaultBrowseMode).toBe('album');
   });
 
@@ -100,7 +96,6 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc' as const,
       recordSortOrder: 'desc' as const,
       density: 'small' as const,
-      useSpecAspectRatio: false,
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     };

@@ -31,6 +31,15 @@ export function getChekiSpecAspectRatio(spec: ChekiSpec): number {
     ?? SPEC_BY_ID.get(DEFAULT_CHEKI_SPEC)!.aspectRatio;
 }
 
+/**
+ * 根据图片宽高推断新增拍立得的规格方向。
+ * 尺寸族固定为三寸；只推断竖版/横版，不推断方形。
+ * 宽大于高视为横版，否则（含方形）视为竖版。
+ */
+export function inferChekiSpecFromImageSize(width: number, height: number): ChekiSpec {
+  return width > height ? 'three_inch_landscape' : 'three_inch_portrait';
+}
+
 export function formatChekiSpecDistribution(specs: readonly ChekiSpec[]): string {
   const counts = new Map<ChekiSpec, number>();
   for (const spec of specs) counts.set(spec, (counts.get(spec) ?? 0) + 1);

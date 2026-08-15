@@ -1,6 +1,7 @@
 export type AppThemeId = 'monoChrome' | 'classicViolet' | 'nightNeon';
 export type AppAppearance = 'system' | 'light' | 'dark';
 export type AppCalendarWeekStart = 'sunday' | 'monday';
+export type ChekiDisplayMode = 'portrait' | 'original';
 
 export interface CalendarDisplayOptions {
   showChekiPhotos: boolean;
@@ -11,6 +12,7 @@ export interface CalendarDisplayOptions {
 export const DEFAULT_THEME_ID: AppThemeId = 'monoChrome';
 export const DEFAULT_APPEARANCE: AppAppearance = 'system';
 export const DEFAULT_CALENDAR_WEEK_START: AppCalendarWeekStart = 'sunday';
+export const DEFAULT_CHEKI_DISPLAY_MODE: ChekiDisplayMode = 'portrait';
 export const DEFAULT_CALENDAR_DISPLAY: CalendarDisplayOptions = {
   showChekiPhotos: true,
   showEvents: true,
@@ -32,4 +34,9 @@ export const APP_THEME_LABELS: Record<AppThemeId, string> = {
 export const APP_CALENDAR_WEEK_START_LABELS: Record<AppCalendarWeekStart, string> = {
   sunday: '周日',
   monday: '周一',
+};
+
+export const CHEKI_DISPLAY_MODE_LABELS: Record<ChekiDisplayMode, string> = {
+  portrait: '拍立得',
+  original: '正方形网格',
 };

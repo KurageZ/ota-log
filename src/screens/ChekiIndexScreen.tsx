@@ -58,7 +58,7 @@ import {
 } from '../utils/chekiViewPreferences';
 import { useFloatingTabBarSpacing } from '../navigation/floatingTabBar';
 import { useFloatingTabBarScroll } from '../navigation/FloatingTabBarVisibility';
-import { CHEKI_SPECS, getChekiSpecAspectRatio, normalizeChekiSpec, type ChekiSpec } from '../domain/chekiSpec';
+import { CHEKI_SPECS, type ChekiSpec } from '../domain/chekiSpec';
 import {
   EMPTY_CHEKI_ITEM_FILTERS,
   EMPTY_CHEKI_RECORD_FILTERS,
@@ -100,7 +100,7 @@ function ChekiThumbnailButton({
   height,
   colors,
   onOpen,
-  useSpecAspectRatio,
+  displayMode,
 }: {
   cheki: Cheki;
   viewerChekis: Cheki[];
@@ -108,7 +108,7 @@ function ChekiThumbnailButton({
   height: number;
   colors: ThemeColors;
   onOpen: (cheki: Cheki, chekis: Cheki[], origin: FullscreenImageTransitionOrigin | null) => void;
-  useSpecAspectRatio: boolean;
+  displayMode: 'portrait' | 'original';
 }) {
   const thumbnailRef = useRef<View>(null);
   const thumbnailImageRef = useRef<Image>(null);
@@ -148,9 +148,7 @@ function ChekiThumbnailButton({
           height={height}
           colors={colors}
           imageRef={thumbnailImageRef}
-          aspectRatio={useSpecAspectRatio
-            ? getChekiSpecAspectRatio(normalizeChekiSpec(cheki.spec))
-            : null}
+          variant={displayMode}
         />
       </TouchableOpacity>
     </View>
@@ -417,7 +415,7 @@ function useReducedMotionEnabled(): boolean {
 export default function ChekiLibraryScreen() {
   const params = useLocalSearchParams<ChekiFilterRouteParams>();
   const db = useDB();
-  const { colors, isDark } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const isAndroid = Platform.OS === 'android';
   const androidHeader = useAndroidCollapsibleTabHeader();
@@ -430,6 +428,7 @@ export default function ChekiLibraryScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [viewPreferences, setViewPreferences] = useState<ChekiViewPreferences>(DEFAULT_CHEKI_VIEW_PREFERENCES);
   const [viewPreferencesLoaded, setViewPreferencesLoaded] = useState(false);
+  const [albumDisplayOverride, setAlbumDisplayOverride] = useState<'portrait' | 'original' | null>(null);
   const consumedDeepLinkRef = useRef<string | null>(null);
   const [viewSettingsVisible, setViewSettingsVisible] = useState(false);
   const [galleryViewportHeight, setGalleryViewportHeight] = useState(0);
@@ -439,11 +438,12 @@ export default function ChekiLibraryScreen() {
     240,
     (galleryViewportHeight || screenHeight) - galleryHeaderHeight - 40,
   );
+  const albumDisplayMode = albumDisplayOverride ?? chekiDisplayMode;
   const gridLayout = useChekiAlbumGridLayout({
     density: viewPreferences.density,
     availableWidth: galleryContentWidth,
     availableHeight: galleryAvailableHeight,
-    useSpecAspectRatio: viewPreferences.useSpecAspectRatio,
+    displayMode: albumDisplayMode,
   });
   const columns = gridLayout.columns;
   const chekiW = gridLayout.itemWidth;
@@ -925,9 +925,10 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, albumModeHintDismissed: true });
   }, [persistViewPreferences, viewPreferences]);
 
-  const handleChangeSpecAspectRatio = useCallback((useSpecAspectRatio: boolean) => {
-    persistViewPreferences({ ...viewPreferences, useSpecAspectRatio });
-  }, [persistViewPreferences, viewPreferences]);
+  const handleChangeAlbumDisplayMode = useCallback((mode: 'portrait' | 'original') => {
+    // 电子切册页内的切换只影响本次会话，不写入持久化；持久化默认值由设置页「拍立得展示方式」决定。
+    setAlbumDisplayOverride(mode);
+  }, []);
 
   const filterParams = useMemo(() => {
     const params: { artist_id?: string; event_id?: string; date?: string } = {};
@@ -1140,7 +1141,7 @@ export default function ChekiLibraryScreen() {
             height={chekiH}
             colors={colors}
             onOpen={openViewer}
-            useSpecAspectRatio={viewPreferences.useSpecAspectRatio}
+            displayMode={albumDisplayMode}
           />
         ))}
       </View>
@@ -1155,9 +1156,9 @@ export default function ChekiLibraryScreen() {
     isDark,
     openViewer,
     oshiArtistId,
+    albumDisplayMode,
     viewPreferences.albumGrouping,
     viewPreferences.showRecordThumbnails,
-    viewPreferences.useSpecAspectRatio,
   ]);
 
   const galleryList = (
@@ -1413,16 +1414,16 @@ export default function ChekiLibraryScreen() {
                 </View>
                 <View>
                   <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                    展示比例
+                    展示方式
                   </Text>
                   <SegmentedOptions
                     colors={colors}
                     options={[
-                      { value: 'uniform', label: '统一比例' },
-                      { value: 'spec', label: '按规格' },
+                      { value: 'portrait', label: '拍立得' },
+                      { value: 'original', label: '正方形网格' },
                     ]}
-                    value={viewPreferences.useSpecAspectRatio ? 'spec' : 'uniform'}
-                    onChange={(value) => handleChangeSpecAspectRatio(value === 'spec')}
+                    value={albumDisplayMode}
+                    onChange={(value) => handleChangeAlbumDisplayMode(value as 'portrait' | 'original')}
                   />
                 </View>
               </View>

@@ -153,6 +153,7 @@ export function ChekiStackPreviewCard({
                   <Image
                     source={{ uri: cheki.photo_uri }}
                     resizeMethod="resize"
+                    resizeMode="contain"
                     style={{ width: '100%', height: '100%', borderRadius: 10, backgroundColor: colors.cardAlt }}
                   />
                   {isLastVisible && hiddenCount > 0 ? (
@@ -198,6 +199,7 @@ export function ChekiStackPreviewCard({
                 <Image
                   source={{ uri: cheki.photo_uri }}
                   resizeMethod="resize"
+                  resizeMode="contain"
                   style={{ width: '100%', height: '100%', borderRadius: 10, backgroundColor: colors.cardAlt }}
                 />
               </View>

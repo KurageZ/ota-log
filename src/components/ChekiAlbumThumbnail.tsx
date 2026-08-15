@@ -17,25 +17,19 @@ export function ChekiGridThumbnail({
   height,
   colors,
   imageRef,
-  aspectRatio,
+  variant,
 }: {
   uri: string;
   width: number;
   height: number;
   colors: ThemeColors;
   imageRef?: Ref<Image>;
-  aspectRatio: number | null;
+  variant: 'portrait' | 'original';
 }) {
-  const usesSpecLayout = aspectRatio !== null;
-  const cardInset = usesSpecLayout ? Math.max(5, Math.round(width * 0.07)) : 0;
-  const fitInside = (maxWidth: number, maxHeight: number) => {
-    if (aspectRatio === null) return { width: maxWidth, height: maxHeight };
-    const widthFromHeight = maxHeight * aspectRatio;
-    return widthFromHeight <= maxWidth
-      ? { width: widthFromHeight, height: maxHeight }
-      : { width: maxWidth, height: maxWidth / aspectRatio };
-  };
-  const fitted = fitInside(width - cardInset * 2, height - cardInset * 2);
+  const usesSquareFrame = variant === 'original';
+  const cardInset = usesSquareFrame ? Math.max(5, Math.round(width * 0.07)) : 0;
+  const innerWidth = width - cardInset * 2;
+  const innerHeight = height - cardInset * 2;
 
   return (
     <View
@@ -45,20 +39,21 @@ export function ChekiGridThumbnail({
         padding: cardInset,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: usesSpecLayout ? 12 : 0,
-        backgroundColor: usesSpecLayout ? colors.cardAlt : 'transparent',
+        borderRadius: usesSquareFrame ? 12 : 0,
+        backgroundColor: usesSquareFrame ? colors.cardAlt : 'transparent',
       }}
     >
       <View
         style={{
-          ...fitted,
+          width: innerWidth,
+          height: innerHeight,
           borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
           backgroundColor: colors.card,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: usesSpecLayout ? 3 : 0 },
-          shadowOpacity: usesSpecLayout ? 0.18 : 0,
-          shadowRadius: usesSpecLayout ? 5 : 0,
-          elevation: usesSpecLayout ? 3 : 0,
+          shadowColor: usesSquareFrame ? colors.shadow : 'transparent',
+          shadowOffset: { width: 0, height: usesSquareFrame ? 3 : 0 },
+          shadowOpacity: usesSquareFrame ? 0.18 : 0,
+          shadowRadius: usesSquareFrame ? 5 : 0,
+          elevation: usesSquareFrame ? 3 : 0,
         }}
       >
         <Image
@@ -77,12 +72,12 @@ export function useChekiAlbumGridLayout({
   density,
   availableWidth,
   availableHeight,
-  useSpecAspectRatio,
+  displayMode,
 }: {
   density: ChekiGridDensity;
   availableWidth: number;
   availableHeight: number;
-  useSpecAspectRatio: boolean;
+  displayMode: 'portrait' | 'original';
 }): { columns: ChekiGridColumns; itemWidth: number; itemHeight: number; targetRows: number } {
   return useMemo(
     () => calculateChekiGridLayout({
@@ -90,8 +85,8 @@ export function useChekiAlbumGridLayout({
       availableWidth,
       availableHeight,
       gap: CHEKI_GRID_GAP,
-      aspectRatio: useSpecAspectRatio ? 1 : CHEKI_ASPECT_RATIO,
+      aspectRatio: displayMode === 'original' ? 1 : CHEKI_ASPECT_RATIO,
     }),
-    [availableHeight, availableWidth, density, useSpecAspectRatio],
+    [availableHeight, availableWidth, density, displayMode],
   );
 }
