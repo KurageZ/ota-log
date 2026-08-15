@@ -7,6 +7,7 @@ import {
   AndroidLargeTabTitle,
   useAndroidCollapsibleTabHeader,
 } from '../../../src/components/AndroidCollapsibleTabHeader';
+import { useOnboardingGuide } from '../../../src/components/OnboardingGuide';
 import { useDB } from '../../../src/context/DBContext';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
@@ -83,6 +84,7 @@ function ProfileStat({
 
 export default function ProfileScreen() {
   const { colors, isDark } = useAppTheme();
+  const { showHelp } = useOnboardingGuide();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const db = useDB();
   const isAndroid = Platform.OS === 'android';
@@ -306,8 +308,14 @@ export default function ProfileScreen() {
             label="重要日期"
             badge={stats.dateItems}
             tint={menuTints.cheki}
-            isLast
             onPress={() => router.push('/date-items')}
+          />
+          <MenuItem
+            icon="tools"
+            label="工具箱"
+            tint={menuTints.tools}
+            isLast
+            onPress={() => router.push('/tools')}
           />
         </MenuCard>
       </View>
@@ -323,11 +331,11 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings')}
           />
           <MenuItem
-            icon="tools"
-            label="工具箱"
-            subtitle="实用小工具"
-            tint={menuTints.tools}
-            onPress={() => router.push('/tools')}
+            icon="help"
+            label="帮助"
+            subtitle="查看 app 使用说明"
+            tint={colors.accent}
+            onPress={showHelp}
           />
           <MenuItem
             icon="info"

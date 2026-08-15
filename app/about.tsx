@@ -1,8 +1,6 @@
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppIcon } from '../src/components/AppIcon';
-import { MenuCard, MenuItem, SectionLabel } from '../src/components/SettingsMenu';
-import { useOnboardingGuide } from '../src/components/OnboardingGuide';
+import { MenuCard, SectionLabel } from '../src/components/SettingsMenu';
 import { useAppTheme } from '../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../src/utils/safeArea';
 
@@ -194,7 +192,6 @@ function ReleaseNoteCard({
 
 export default function AboutScreen() {
   const { colors, isDark } = useAppTheme();
-  const { showHelp } = useOnboardingGuide();
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -229,20 +226,6 @@ export default function AboutScreen() {
           <Text style={{ fontSize: 13, lineHeight: 19, color: colors.heroSubtext }}>
             本地优先的演出记录 App，帮你整理活动、单推、拍立得和回顾数据。
           </Text>
-        </View>
-
-        <View style={{ marginBottom: 20 }}>
-          <SectionLabel label="帮助" />
-          <MenuCard>
-            <MenuItem
-              icon="help"
-              label="重新查看帮助"
-              subtitle="再次播放新用户引导"
-              tint={colors.accent}
-              isLast
-              onPress={showHelp}
-            />
-          </MenuCard>
         </View>
 
         <View style={{ marginBottom: 20 }}>
