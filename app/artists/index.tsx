@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect } from 'expo-router';
+import SegmentedControl from '@expo/ui/community/segmented-control';
 import { useDB } from '../../src/context/DBContext';
 import { Artist } from '../../src/types/models';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
@@ -15,7 +16,7 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { SearchFilterBar } from '../../src/components/SearchFilterBar';
 import { FilterSheet, FilterSection } from '../../src/components/FilterSheet';
 import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
-import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
+import { AppIcon } from '../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
@@ -289,60 +290,16 @@ export default function ArtistsScreen() {
             activeCount={activeSearchFilters.length}
             isDark={isDark}
           />
-          <View
-            style={{
-              flexDirection: 'row',
-              padding: 3,
-              marginBottom: 12,
-              borderRadius: 12,
-              backgroundColor: colors.cardAlt,
-              borderWidth: 1,
-              borderColor: colors.inputBorder,
-            }}
-          >
-            {([
-              { value: 'all' as const, label: '全部艺人', icon: 'artists' as AppIconName },
-              { value: 'favorites' as const, label: '收藏艺人', icon: 'favorite' as AppIconName },
-            ]).map((option) => {
-              const active = filter === option.value;
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  onPress={() => handleFilterChange(option.value)}
-                  activeOpacity={0.72}
-                  style={{
-                    flex: 1,
-                    height: 34,
-                    borderRadius: 9,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    backgroundColor: active ? colors.card : 'transparent',
-                    shadowColor: active ? colors.shadow : 'transparent',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: active ? 0.08 : 0,
-                    shadowRadius: 3,
-                    elevation: active ? 1 : 0,
-                  }}
-                >
-                  <AppIcon
-                    name={option.icon}
-                    size={15}
-                    color={active ? colors.accent : colors.textMuted}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: active ? '700' : '600',
-                      color: active ? colors.accent : colors.textSecondary,
-                    }}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={{ marginBottom: 12 }}>
+            <SegmentedControl
+              values={['全部艺人', '收藏艺人']}
+              selectedIndex={filter === 'favorites' ? 1 : 0}
+              appearance={isDark ? 'dark' : 'light'}
+              onChange={({ nativeEvent }) => {
+                handleFilterChange(nativeEvent.selectedSegmentIndex === 1 ? 'favorites' : 'all');
+              }}
+              style={{ height: 60 }}
+            />
           </View>
           {loadFailed ? (
             <View
