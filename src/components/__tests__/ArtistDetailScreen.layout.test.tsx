@@ -229,7 +229,8 @@ describe('ArtistDetailScreen background layout', () => {
         && typeof node.props.selectedIndex === 'number',
     );
     expect(nativeSegmentedControls).toHaveLength(2);
-    expect(nativeSegmentedControls.every((node) => node.props.selectedIndex === 0)).toBe(true);
+    // 每个列表的控件固定显示自己列表的选中项：events 列表显示「活动」，cheki 列表显示「拍立得」。
+    expect(nativeSegmentedControls.map((node) => node.props.selectedIndex).sort()).toEqual([0, 1]);
     expect(nativeSegmentedControls.every(
       (node) => node.props.values.join('|') === '活动 · 0|拍立得 · 0',
     )).toBe(true);
@@ -250,6 +251,7 @@ describe('ArtistDetailScreen background layout', () => {
         && Array.isArray(node.props.values)
         && typeof node.props.selectedIndex === 'number',
     );
-    expect(switchedSegmentedControls.every((node) => node.props.selectedIndex === 1)).toBe(true);
+    // 切换后选中项仍按列表固定，不随 activeTab 变化，避免原生组件播放选中动画导致闪烁。
+    expect(switchedSegmentedControls.map((node) => node.props.selectedIndex).sort()).toEqual([0, 1]);
   });
 });

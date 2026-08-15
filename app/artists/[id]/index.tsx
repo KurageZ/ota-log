@@ -116,6 +116,7 @@ export default function ArtistDetailScreen() {
   const [manualEntries, setManualEntries] = useState<ChekiManualEntry[]>([]);
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('events');
+  const [tabRemountKey, setTabRemountKey] = useState<Record<TabKey, number>>({ events: 0, cheki: 0 });
   const [showMoreAttributes, setShowMoreAttributes] = useState(false);
 
   const scrollY = useSharedValue(0);
@@ -317,6 +318,10 @@ export default function ArtistDetailScreen() {
   const handleSelectTab = useCallback((tab: TabKey) => {
     const nextScrollY = tab === 'events' ? eventsScrollY.value : chekiScrollY.value;
     scrollY.value = nextScrollY;
+    setTabRemountKey((prev) => {
+      const leaving = tab === 'events' ? 'cheki' : 'events';
+      return { ...prev, [leaving]: prev[leaving] + 1 };
+    });
     setActiveTab(tab);
   }, [chekiScrollY, eventsScrollY, scrollY]);
 
@@ -846,7 +851,8 @@ export default function ArtistDetailScreen() {
                   {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <ArtistSectionTabs
-                      activeTab={activeTab}
+                      key={`cheki-hero-${tabRemountKey.cheki}`}
+                      selectedTab="cheki"
                       eventCount={events.length}
                       chekiCount={totalChekiCount}
                       onSelect={handleSelectTab}
@@ -1054,7 +1060,8 @@ export default function ArtistDetailScreen() {
 
                 <View style={{ paddingHorizontal: 16 }}>
                   <ArtistSectionTabs
-                    activeTab={activeTab}
+                    key={`cheki-lower-${tabRemountKey.cheki}`}
+                    selectedTab="cheki"
                     eventCount={events.length}
                     chekiCount={totalChekiCount}
                     onSelect={handleSelectTab}
@@ -1182,7 +1189,8 @@ export default function ArtistDetailScreen() {
                   {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <ArtistSectionTabs
-                      activeTab={activeTab}
+                      key={`events-hero-${tabRemountKey.events}`}
+                      selectedTab="events"
                       eventCount={events.length}
                       chekiCount={totalChekiCount}
                       onSelect={handleSelectTab}
@@ -1417,7 +1425,8 @@ export default function ArtistDetailScreen() {
 
                 <View style={{ paddingHorizontal: 16 }}>
                   <ArtistSectionTabs
-                    activeTab={activeTab}
+                    key={`events-lower-${tabRemountKey.events}`}
+                    selectedTab="events"
                     eventCount={events.length}
                     chekiCount={totalChekiCount}
                     onSelect={handleSelectTab}
@@ -1609,7 +1618,7 @@ function HeaderTextButton({
 }
 
 function ArtistSectionTabs({
-  activeTab,
+  selectedTab,
   eventCount,
   chekiCount,
   onSelect,
@@ -1622,7 +1631,7 @@ function ArtistSectionTabs({
   activeTextColor,
   inactiveTextColor,
 }: {
-  activeTab: TabKey;
+  selectedTab: TabKey;
   eventCount: number;
   chekiCount: number;
   onSelect: (tab: TabKey) => void;
@@ -1642,13 +1651,13 @@ function ArtistSectionTabs({
       <SegmentedControl
         testID="artist-section-segmented-control"
         values={values}
-        selectedIndex={activeTab === 'events' ? 0 : 1}
+        selectedIndex={selectedTab === 'events' ? 0 : 1}
         appearance={overlayIsDark ? 'dark' : 'light'}
         onChange={({ nativeEvent }) => {
-          const selectedTab = TAB_KEYS[nativeEvent.selectedSegmentIndex];
-          if (selectedTab) onSelect(selectedTab);
+          const nextTab = TAB_KEYS[nativeEvent.selectedSegmentIndex];
+          if (nextTab) onSelect(nextTab);
         }}
-        style={{ height: 32 }}
+        style={{ height: 60 }}
       />
     );
   }
@@ -1663,7 +1672,7 @@ function ArtistSectionTabs({
     >
       <TabButton
         label={values[0]}
-        active={activeTab === 'events'}
+        active={selectedTab === 'events'}
         onPress={() => onSelect('events')}
         activeBg={activeBg}
         activeTextColor={activeTextColor}
@@ -1671,7 +1680,7 @@ function ArtistSectionTabs({
       />
       <TabButton
         label={values[1]}
-        active={activeTab === 'cheki'}
+        active={selectedTab === 'cheki'}
         onPress={() => onSelect('cheki')}
         activeBg={activeBg}
         activeTextColor={activeTextColor}
@@ -1704,7 +1713,7 @@ function TabButton({
       onPress={onPress}
       style={{
         flex: 1,
-        minHeight: 44,
+        minHeight: 60,
         justifyContent: 'center',
         paddingVertical: 9,
         borderRadius: 9,
