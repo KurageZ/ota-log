@@ -442,9 +442,14 @@ export default function ArtistDetailScreen() {
   const backdropEmptyTextColor = pDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
   const chekiListIsDark = hasBackground ? pDark : isDark;
   const chekiManualTone = hasBackground && pDark ? 'glass' : 'default';
-  const historyLabel = artist.artist_type === 'group' ? '成员履历' : '所属履历';
   const hasHiddenAttributes = Boolean(artist.artist_type || artist.url);
   const today = toISODate(new Date());
+  const isCurrentMembership = (membership: ArtistGroupMembershipWithArtist) => (
+    (membership.start_date == null || membership.start_date <= today)
+    && (membership.end_date == null || membership.end_date >= today)
+  );
+  const currentMemberships = memberships.filter(isCurrentMembership);
+  const pastMemberships = memberships.filter((membership) => !isCurrentMembership(membership));
 
   const renderMetaToggle = (overlay: boolean) => {
     if (!hasHiddenAttributes) return null;
@@ -473,73 +478,84 @@ export default function ArtistDetailScreen() {
   const renderArtistAttributes = () => {
     if (!hasHiddenAttributes) return null;
 
-    return (
-      <View testID="artist-attributes-card" style={{ gap: 12 }}>
-        {artist.artist_type ? (
-          <MenuCard testID="artist-history-card">
-            <View
-              style={{
-                minHeight: 44,
-                paddingHorizontal: 16,
-                paddingTop: 13,
-                paddingBottom: 8,
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>
-                {historyLabel}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                {memberships.length > 0 ? `${memberships.length} 条` : '暂无记录'}
+    const renderMembershipCard = (
+      testID: string,
+      title: string,
+      items: ArtistGroupMembershipWithArtist[],
+      showCurrentBadge: boolean,
+      unit: string,
+    ) => (
+      <MenuCard testID={testID}>
+        <View
+          style={{
+            minHeight: 44,
+            paddingHorizontal: 16,
+            paddingTop: 13,
+            paddingBottom: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>
+            {title}
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+            {items.length > 0 ? `${items.length} ${unit}` : '暂无记录'}
+          </Text>
+        </View>
+        {items.length === 0 ? (
+          <Text style={{ paddingHorizontal: 16, paddingBottom: 14, fontSize: 13, color: colors.textSecondary }}>
+            还没有{title}
+          </Text>
+        ) : items.map((membership) => (
+          <TouchableOpacity
+            key={membership.id}
+            activeOpacity={0.72}
+            accessibilityRole="button"
+            accessibilityLabel={`查看${membership.artist.name}`}
+            onPress={() => {
+              setAttributesSheetVisible(false);
+              router.push(`/artists/${membership.artist.id}`);
+            }}
+            style={{
+              minHeight: 60,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+            }}
+          >
+            <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
+            <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 14, fontWeight: '700' }}>
+                  {membership.artist.name}
+                </Text>
+                {showCurrentBadge && isCurrentMembership(membership) ? (
+                  <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
+                    当前
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={{ marginTop: 3, color: colors.textSecondary, fontSize: 12 }}>
+                {membership.start_date ?? '更早'} — {membership.end_date ?? '至今'}
               </Text>
             </View>
-            {memberships.length === 0 ? (
-              <Text style={{ paddingHorizontal: 16, paddingBottom: 14, fontSize: 13, color: colors.textSecondary }}>
-                还没有{historyLabel}
-              </Text>
-            ) : memberships.map((membership) => {
-              const membershipIsCurrent = (membership.start_date == null || membership.start_date <= today)
-                && (membership.end_date == null || membership.end_date >= today);
-              return (
-                <TouchableOpacity
-                  key={membership.id}
-                  activeOpacity={0.72}
-                  accessibilityRole="button"
-                  accessibilityLabel={`查看${membership.artist.name}`}
-                  onPress={() => {
-                    setAttributesSheetVisible(false);
-                    router.push(`/artists/${membership.artist.id}`);
-                  }}
-                  style={{
-                    minHeight: 60,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                  }}
-                >
-                  <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
-                  <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                      <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 14, fontWeight: '700' }}>
-                        {membership.artist.name}
-                      </Text>
-                      {membershipIsCurrent ? (
-                        <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
-                          当前
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text style={{ marginTop: 3, color: colors.textSecondary, fontSize: 12 }}>
-                      {membership.start_date ?? '更早'} — {membership.end_date ?? '至今'}
-                    </Text>
-                  </View>
-                  <AppIcon name="disclosure" variant="forward" size={15} color={colors.chevron} />
-                </TouchableOpacity>
-              );
-            })}
-          </MenuCard>
+            <AppIcon name="disclosure" variant="forward" size={15} color={colors.chevron} />
+          </TouchableOpacity>
+        ))}
+      </MenuCard>
+    );
+
+    return (
+      <View testID="artist-attributes-card" style={{ gap: 12 }}>
+        {artist.artist_type === 'group' ? (
+          <>
+            {renderMembershipCard('artist-current-members-card', '当前成员', currentMemberships, false, '位')}
+            {renderMembershipCard('artist-past-members-card', '历史成员', pastMemberships, false, '位')}
+          </>
+        ) : artist.artist_type === 'person' ? (
+          renderMembershipCard('artist-history-card', '所属团体', memberships, true, '个')
         ) : null}
         {artist.url ? (
           <MenuCard testID="artist-link-card">

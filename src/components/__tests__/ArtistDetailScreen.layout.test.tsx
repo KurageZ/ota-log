@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { ImageBackground, View } from 'react-native';
+import { ImageBackground, Text, View } from 'react-native';
 
 import ArtistDetailScreen from '../../../app/artists/[id]/index';
 
@@ -157,6 +157,13 @@ function hasAncestorOfType(node: ReactTestInstance, type: unknown) {
   return false;
 }
 
+function textContents(node: ReactTestInstance): string[] {
+  return node.findAllByType(Text).map((textNode) => {
+    const children = Array.isArray(textNode.props.children) ? textNode.props.children : [textNode.props.children];
+    return children.map((child) => (typeof child === 'string' ? child : '')).join('');
+  });
+}
+
 describe('ArtistDetailScreen background layout', () => {
   let renderer: ReactTestRenderer;
 
@@ -235,6 +242,11 @@ describe('ArtistDetailScreen background layout', () => {
     );
     expect(historyCards).toHaveLength(1);
     expect(linkCards).toHaveLength(1);
+    expect(textContents(historyCards[0])).toEqual(expect.arrayContaining([
+      '所属团体',
+      '暂无记录',
+      '还没有所属团体',
+    ]));
 
     const heroContents = renderer.root.findAllByType(View).filter(
       (node) => node.props.testID === 'artist-hero-content',
@@ -288,5 +300,105 @@ describe('ArtistDetailScreen background layout', () => {
     );
     // 切换后选中项仍按列表固定，不随 activeTab 变化，避免原生组件播放选中动画导致闪烁。
     expect(switchedSegmentedControls.map((node) => node.props.selectedIndex).sort()).toEqual([0, 1]);
+  });
+
+  test('splits group memberships into current and past member cards', async () => {
+    mockDb.artists.findById.mockResolvedValue({
+      id: 'artist-group',
+      name: '测试团体',
+      short_name: null,
+      artist_type: 'group',
+      parent_id: null,
+      avatar_uri: null,
+      background_uri: null,
+      background_color: null,
+      url: null,
+      is_favorite: 0,
+      created_at: '2026-08-05T00:00:00.000Z',
+    });
+    mockDb.artists.findMembers.mockResolvedValue([]);
+    mockDb.artists.findCurrentMembers.mockResolvedValue([]);
+    mockDb.artists.findMembershipsForGroup.mockResolvedValue([
+      {
+        id: 'membership-current',
+        person_artist_id: 'artist-member-current',
+        group_artist_id: 'artist-group',
+        start_date: null,
+        end_date: null,
+        created_at: '2026-08-01T00:00:00.000Z',
+        updated_at: '2026-08-01T00:00:00.000Z',
+        artist: {
+          id: 'artist-member-current',
+          name: '现役成员',
+          short_name: null,
+          artist_type: 'person',
+          parent_id: 'artist-group',
+          avatar_uri: null,
+          background_uri: null,
+          background_color: null,
+          url: null,
+          is_favorite: 0,
+          created_at: '2026-08-01T00:00:00.000Z',
+        },
+      },
+      {
+        id: 'membership-past',
+        person_artist_id: 'artist-member-past',
+        group_artist_id: 'artist-group',
+        start_date: '2020-01-01',
+        end_date: '2025-01-01',
+        created_at: '2026-08-01T00:00:00.000Z',
+        updated_at: '2026-08-01T00:00:00.000Z',
+        artist: {
+          id: 'artist-member-past',
+          name: '毕业成员',
+          short_name: null,
+          artist_type: 'person',
+          parent_id: null,
+          avatar_uri: null,
+          background_uri: null,
+          background_color: null,
+          url: null,
+          is_favorite: 0,
+          created_at: '2026-08-01T00:00:00.000Z',
+        },
+      },
+    ]);
+
+    await act(async () => {
+      renderer = create(<ArtistDetailScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const moreButtons = renderer.root.findAllByProps({ accessibilityLabel: '更多' });
+    await act(async () => {
+      moreButtons[0].props.onPress();
+    });
+
+    const sheets = renderer.root.findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-attributes-sheet',
+    );
+    expect(sheets).toHaveLength(1);
+
+    const sheetCards = sheets[0].findAllByType(View);
+    const currentCard = sheetCards.find((node) => node.props.testID === 'artist-current-members-card');
+    const pastCard = sheetCards.find((node) => node.props.testID === 'artist-past-members-card');
+    expect(currentCard).toBeDefined();
+    expect(pastCard).toBeDefined();
+    expect(sheetCards.filter((node) => node.props.testID === 'artist-history-card')).toHaveLength(0);
+
+    expect(textContents(currentCard!)).toEqual(expect.arrayContaining([
+      '当前成员',
+      '1 位',
+      '现役成员',
+      '更早 — 至今',
+    ]));
+    expect(textContents(pastCard!)).toEqual(expect.arrayContaining([
+      '历史成员',
+      '1 位',
+      '毕业成员',
+      '2020-01-01 — 2025-01-01',
+    ]));
   });
 });
