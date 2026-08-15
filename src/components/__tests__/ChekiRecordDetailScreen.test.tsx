@@ -12,6 +12,9 @@ const mockDb = {
   events: {
     findById: jest.fn(),
   },
+  userConfig: {
+    getConfig: jest.fn(),
+  },
 };
 
 const baseRecord = {
@@ -89,12 +92,14 @@ jest.mock('../Oshi', () => {
   const ReactModule = require('react');
   const { Image } = require('react-native');
   return {
-    OshiAvatar: ({ source }: { source: { uri: string } | null }) => (
+    OshiAvatar: ({ source, isOshi }: { source: { uri: string } | null; isOshi?: boolean }) => (
       ReactModule.createElement(Image, {
         testID: 'record-artist-avatar',
         source,
+        isOshi,
       })
     ),
+    OshiBadge: () => null,
   };
 });
 
@@ -115,6 +120,7 @@ describe('ChekiRecordDetailScreen', () => {
       is_favorite: 0,
       created_at: '2026-08-05T00:00:00.000Z',
     });
+    mockDb.userConfig.getConfig.mockResolvedValue({ oshi_artist_id: null });
     mockEventCardProps.length = 0;
   });
 
@@ -132,6 +138,19 @@ describe('ChekiRecordDetailScreen', () => {
 
     const avatar = renderer.root.findByProps({ testID: 'record-artist-avatar' });
     expect(avatar.props.source).toEqual({ uri: 'file:///artist-avatar.jpg' });
+  });
+
+  test('marks the artist avatar as oshi when the artist is the oshi artist', async () => {
+    mockDb.userConfig.getConfig.mockResolvedValue({ oshi_artist_id: 'artist-1' });
+
+    await act(async () => {
+      renderer = create(<ChekiRecordDetailScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const avatar = renderer.root.findByProps({ testID: 'record-artist-avatar' });
+    expect(avatar.props.isOshi).toBe(true);
   });
 
   test('renders the date with weekday in the overview header', async () => {

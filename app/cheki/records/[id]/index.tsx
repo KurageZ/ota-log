@@ -25,7 +25,7 @@ import { EventCard } from '../../../../src/components/EventCard';
 import { ChekiViewerModal } from '../../../../src/components/ChekiViewerModal';
 import { FormSectionLabel } from '../../../../src/components/FormPrimitives';
 import { NativeTextToolbar } from '../../../../src/components/native-text-toolbar';
-import { OshiAvatar } from '../../../../src/components/Oshi';
+import { OshiAvatar, OshiBadge } from '../../../../src/components/Oshi';
 import { getEventCardOshiBadge } from '../../../../src/utils/oshiMatch';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 
@@ -56,6 +56,7 @@ export default function ChekiRecordDetailScreen() {
   const [record, setRecord] = useState<ChekiRecordWithItems | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
+  const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
@@ -68,13 +69,15 @@ export default function ChekiRecordDetailScreen() {
       setLoading(false);
       return;
     }
-    const [nextArtist, nextEvent] = await Promise.all([
+    const [nextArtist, nextEvent, config] = await Promise.all([
       nextRecord.artist_id ? db.artists.findById(nextRecord.artist_id) : Promise.resolve(null),
       nextRecord.event_id ? db.events.findById(nextRecord.event_id) : Promise.resolve(null),
+      db.userConfig.getConfig(),
     ]);
     setRecord(nextRecord);
     setArtist(nextArtist);
     setEvent(nextEvent);
+    setOshiArtistId(config.oshi_artist_id);
     setLoading(false);
   }, [db, id]);
 
@@ -223,6 +226,7 @@ export default function ChekiRecordDetailScreen() {
   const hasMissingImages = photoItems.length < record.quantity;
   const totalPrice = record.items.reduce((sum, item) => sum + item.unit_price, 0);
   const artistName = artist ? getArtistPrimaryName(artist) : '未关联艺人';
+  const isOshi = artist?.id != null && artist?.id === oshiArtistId;
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -272,25 +276,27 @@ export default function ChekiRecordDetailScreen() {
             <OshiAvatar
               source={artist ? resolveAvatarSource(artist.avatar_uri) : null}
               size={ARTIST_AVATAR_SIZE}
-              isOshi={false}
+              isOshi={isOshi}
             />
-            <Text
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                marginLeft: ARTIST_TITLE_GAP,
-                fontSize: 18,
-                lineHeight: 24,
-                fontWeight: '800',
-                color: colors.heading,
-              }}
-            >
-              {artistName}
-            </Text>
+            <View style={{ flex: 1, marginLeft: ARTIST_TITLE_GAP, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  flexShrink: 1,
+                  fontSize: 18,
+                  lineHeight: 24,
+                  fontWeight: '800',
+                  color: colors.heading,
+                }}
+              >
+                {artistName}
+              </Text>
+              {isOshi ? <OshiBadge /> : null}
+            </View>
             {artist ? <AppIcon name="disclosure" variant="forward" size={16} color={colors.chevron} /> : null}
           </TouchableOpacity>
 
-          <View style={{ marginTop: 12, marginLeft: ARTIST_AVATAR_SIZE + ARTIST_TITLE_GAP, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ marginTop: 20, marginLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <AppIcon name="calendar" size={16} color={colors.accent} />
             <Text
               style={{
@@ -306,7 +312,7 @@ export default function ChekiRecordDetailScreen() {
             </Text>
           </View>
 
-          <View style={{ marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.divider, flexDirection: 'row' }}>
+          <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider, flexDirection: 'row' }}>
             <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 4 }}>
               <Text style={{ fontSize: 11, lineHeight: 15, color: colors.textSecondary }}>总数量</Text>
               <Text style={{ marginTop: 4, fontSize: 17, lineHeight: 22, fontWeight: '800', color: colors.text }}>{record.quantity} 张</Text>
