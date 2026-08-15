@@ -25,10 +25,10 @@ import {
 import { buildPosterParagraphStyle } from './poster-paragraph-style';
 
 const POSTER_WIDTH = 1200;
-const POSTER_HEIGHT = 2000;
+const POSTER_HEIGHT = 2160;
 const PHOTO_HEIGHT = 1600;
 const POSTER_PADDING = 56;
-const FOOTER_Y = 1940;
+const FOOTER_Y = 2070;
 const ARTIST_AVATAR_SIZE = 88;
 const USER_AVATAR_SIZE = 50;
 const MAX_ARTIST_AVATARS = 10;
@@ -176,7 +176,7 @@ function createParagraph(
 }
 
 function createTitleParagraph(title: string, width: number, maxHeight: number): SkParagraph {
-  for (let fontSize = 60; fontSize >= 40; fontSize -= 4) {
+  for (let fontSize = 68; fontSize >= 44; fontSize -= 4) {
     const candidate = createParagraph(title, width, {
       fontSize,
       weight: FontWeight.Black,
@@ -190,7 +190,7 @@ function createTitleParagraph(title: string, width: number, maxHeight: number): 
   }
 
   return createParagraph(title, width, {
-    fontSize: 40,
+    fontSize: 44,
     weight: FontWeight.Black,
     color: COLORS.text,
     maxLines: 2,
@@ -314,6 +314,8 @@ function drawSessionRows(
   const paragraphs: SkParagraph[] = [];
   const paints: SkPaint[] = [];
   const availableWidth = POSTER_WIDTH - (POSTER_PADDING * 2);
+  const dateRowHeight = 78;
+  const locationRowHeight = 74;
   let y = startY;
 
   const session = sessions[0];
@@ -330,14 +332,15 @@ function drawSessionRows(
     heightMultiplier: 1,
   });
   paragraphs.push(dateTime);
+  const dateTimeOffsetY = Math.max(0, (dateRowHeight - dateTime.getHeight()) / 2);
   paints.push(...drawInfoIcon(
     surface,
     'time',
     POSTER_PADDING,
-    y + Math.max(0, (dateTime.getHeight() - 32) / 2),
+    y + Math.max(0, (dateRowHeight - 32) / 2),
   ));
-  dateTime.paint(canvas, textX, y);
-  y += 60;
+  dateTime.paint(canvas, textX, y + dateTimeOffsetY);
+  y += dateRowHeight;
 
   const location = createParagraph(locationText, textWidth, {
     fontSize: 31,
@@ -347,14 +350,15 @@ function drawSessionRows(
     heightMultiplier: 1,
   });
   paragraphs.push(location);
+  const locationOffsetY = Math.max(0, (locationRowHeight - location.getHeight()) / 2);
   paints.push(...drawInfoIcon(
     surface,
     'location',
     POSTER_PADDING,
-    y + Math.max(0, (location.getHeight() - 32) / 2),
+    y + Math.max(0, (locationRowHeight - 32) / 2),
   ));
-  location.paint(canvas, textX, y);
-  y += 56;
+  location.paint(canvas, textX, y + locationOffsetY);
+  y += locationRowHeight;
 
   return { paragraphs, paints, endY: y };
 }
@@ -608,13 +612,13 @@ export async function createEventSharePoster({
 
     stage = 'draw-title';
     const contentWidth = POSTER_WIDTH - (POSTER_PADDING * 2);
-    const titleY = PHOTO_HEIGHT + 18;
-    const titleParagraph = createTitleParagraph(title.trim(), contentWidth, 86);
+    const titleY = PHOTO_HEIGHT + 56;
+    const titleParagraph = createTitleParagraph(title.trim(), contentWidth, 108);
     paragraphs.push(titleParagraph);
     titleParagraph.paint(canvas, POSTER_PADDING, titleY);
 
     stage = 'draw-sessions';
-    const sessionsY = titleY + titleParagraph.getHeight() + 6;
+    const sessionsY = titleY + titleParagraph.getHeight() + 32;
     const sessionResources = drawSessionRows(
       surface,
       visible,
@@ -631,8 +635,8 @@ export async function createEventSharePoster({
     );
     stage = 'draw-artist-avatars';
     const artistY = Math.min(
-      sessionResources.endY + 8,
-      FOOTER_Y - ARTIST_AVATAR_SIZE - 10,
+      sessionResources.endY + 28,
+      FOOTER_Y - ARTIST_AVATAR_SIZE - 20,
     );
     const artistResources = drawArtistAvatars(surface, artists, artistAvatars, artistY);
     paragraphs.push(...artistResources.paragraphs);

@@ -10,9 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import {
@@ -26,8 +24,10 @@ import {
   type StickerAsset,
 } from '../features/sticker-camera/sticker-overlay';
 import { STICKER_CAMERA_ASPECT_RATIO } from '../features/sticker-camera/sticker-preset';
+import { ImageResultPreview } from '../components/ImageResultPreview';
 import { useAppTheme } from '../theme/appTheme';
 import { showFailureAlert } from '../utils/failureAlert';
+import { saveImageToAlbum, shareImageFile } from '../utils/imageShare';
 
 type ScreenPhase = 'picker' | 'camera' | 'result';
 type BusyAction = 'capturing' | 'composing' | 'saving' | 'sharing' | null;
@@ -302,31 +302,21 @@ function ResultStage({
   onRetake: () => void;
   onToggleWatermark: () => void;
 }) {
-  const isBusy = busyAction === 'composing' || busyAction === 'saving' || busyAction === 'sharing';
-
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: '#050506' }}>
-      <View style={{ flex: 1, paddingHorizontal: 16, gap: 14 }}>
-        <View style={{ height: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <IconButton icon="close" label="关闭结果" onPress={() => router.back()} disabled={isBusy} />
-          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800' }}>已生成</Text>
-          <View style={{ width: 44, height: 44 }} />
-        </View>
-
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Image
-            source={{ uri: result.uri }}
-            resizeMode="contain"
-            style={{ width: '100%', height: '100%', borderRadius: 12 }}
-          />
-        </View>
-
+    <ImageResultPreview
+      uri={result.uri}
+      busyAction={busyAction}
+      saved={saved}
+      onClose={() => router.back()}
+      onSave={onSave}
+      onShare={onShare}
+      toggleRow={
         <TouchableOpacity
           accessibilityRole="switch"
           accessibilityLabel="添加 App 水印"
           accessibilityState={{ checked: watermarkEnabled }}
           activeOpacity={0.7}
-          disabled={isBusy}
+          disabled={busyAction !== null}
           onPress={onToggleWatermark}
           style={{
             minHeight: 44,
@@ -363,69 +353,20 @@ function ResultStage({
             </View>
           )}
         </TouchableOpacity>
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.75}
-            disabled={isBusy || saved}
-            onPress={onSave}
-            style={{
-              flex: 1,
-              minHeight: 50,
-              borderRadius: 15,
-              borderCurve: 'continuous',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: 8,
-              backgroundColor: saved ? 'rgba(255,255,255,0.18)' : '#ffffff',
-              opacity: isBusy ? 0.55 : 1,
-            }}
-          >
-            {busyAction === 'saving' ? (
-              <ActivityIndicator size="small" color="#111114" />
-            ) : (
-              <AppIcon name={saved ? 'statusCompleted' : 'save'} size={18} color={saved ? '#ffffff' : '#111114'} />
-            )}
-            <Text style={{ color: saved ? '#ffffff' : '#111114', fontSize: 15, fontWeight: '800' }}>
-              {saved ? '已保存' : '保存到相册'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="分享合成照片"
-            activeOpacity={0.75}
-            disabled={isBusy}
-            onPress={onShare}
-            style={{
-              width: 52,
-              height: 50,
-              borderRadius: 15,
-              borderCurve: 'continuous',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(255,255,255,0.16)',
-              opacity: isBusy ? 0.55 : 1,
-            }}
-          >
-            {busyAction === 'sharing' ? <ActivityIndicator size="small" color="#ffffff" /> : <AppIcon name="share" size={20} color="#ffffff" />}
-          </TouchableOpacity>
-        </View>
-
+      }
+      footerLink={
         <TouchableOpacity
           accessibilityRole="button"
           activeOpacity={0.72}
-          disabled={isBusy}
+          disabled={busyAction !== null}
           onPress={onRetake}
           style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}
         >
           <AppIcon name="refresh" size={17} color="#ffffff" />
           <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>重新拍摄</Text>
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      }
+    />
   );
 }
 
@@ -531,24 +472,7 @@ export default function ChekiStickerCameraScreen() {
     if (!result || busyAction || saved) return;
     setBusyAction('saving');
     try {
-      const permission = await MediaLibrary.requestPermissionsAsync(true);
-      if (!permission.granted) {
-        showFailureAlert({
-          title: '无法保存到相册',
-          reason: 'ota log 没有添加照片的权限。',
-          nextStep: '请在系统设置中允许添加照片后再试。',
-        });
-        return;
-      }
-      await MediaLibrary.Asset.create(result.uri);
-      setSaved(true);
-    } catch (error) {
-      showFailureAlert({
-        title: '保存失败',
-        reason: '无法将照片保存到系统相册。',
-        nextStep: '请稍后重新保存。',
-        details: error,
-      });
+      if (await saveImageToAlbum(result.uri)) setSaved(true);
     } finally {
       setBusyAction(null);
     }
@@ -558,19 +482,7 @@ export default function ChekiStickerCameraScreen() {
     if (!result || busyAction) return;
     setBusyAction('sharing');
     try {
-      if (!(await Sharing.isAvailableAsync())) throw new Error('当前设备不支持系统分享');
-      await Sharing.shareAsync(result.uri, {
-        dialogTitle: '分享贴纸照片',
-        mimeType: 'image/jpeg',
-        UTI: 'public.jpeg',
-      });
-    } catch (error) {
-      showFailureAlert({
-        title: '分享失败',
-        reason: '无法分享这张照片。',
-        nextStep: '请稍后重新尝试。',
-        details: error,
-      });
+      await shareImageFile(result.uri, '分享贴纸照片');
     } finally {
       setBusyAction(null);
     }

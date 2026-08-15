@@ -3,10 +3,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
   Image, Modal, Linking, useWindowDimensions, Platform, ActivityIndicator, TextStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Calendar from 'expo-calendar/legacy';
-import * as Sharing from 'expo-sharing';
 import { File } from 'expo-file-system';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useDB } from '../../src/context/DBContext';
@@ -54,6 +53,8 @@ import {
   resolveEventShareSessions,
 } from '../../src/utils/eventShare';
 import { createEventSharePoster } from '../../src/features/event-share/create-event-share-poster';
+import { ImageResultPreview } from '../../src/components/ImageResultPreview';
+import { saveImageToAlbum, shareImageFile } from '../../src/utils/imageShare';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
@@ -430,8 +431,12 @@ export default function EventDetailScreen() {
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [calendarSessionPickerVisible, setCalendarSessionPickerVisible] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
+  const [sharePosterUri, setSharePosterUri] = useState<string | null>(null);
+  const [sharePreviewBusy, setSharePreviewBusy] = useState<'saving' | 'sharing' | null>(null);
+  const [sharePosterSaved, setSharePosterSaved] = useState(false);
   const statusPillRef = useRef<View | null>(null);
   const copyToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sharePosterUriRef = useRef<string | null>(null);
   const suppressNextLinkPressRef = useRef(false);
   const allArtistsMap = useMemo(() => new Map(allArtists.map(a => [a.id, a])), [allArtists]);
   const overviewCountdownDays = useMemo(() => {
@@ -522,6 +527,14 @@ export default function EventDetailScreen() {
     return () => {
       if (copyToastTimerRef.current) {
         clearTimeout(copyToastTimerRef.current);
+      }
+      if (sharePosterUriRef.current) {
+        try {
+          new File(sharePosterUriRef.current).delete();
+        } catch {
+          // 离开页面时清理临时海报，缓存清理失败不影响页面退出。
+        }
+        sharePosterUriRef.current = null;
       }
     };
   }, []);
@@ -683,7 +696,6 @@ export default function EventDetailScreen() {
       return;
     }
 
-    let posterUri: string | null = null;
     setShareBusy(true);
     try {
       console.info('[DEBUG-event-share] share flow started', {
@@ -691,10 +703,6 @@ export default function EventDetailScreen() {
         sessionCount: sessions.length,
         photoCount: infoPhotos.length,
       });
-      if (!(await Sharing.isAvailableAsync())) {
-        throw new Error('当前设备不支持系统分享');
-      }
-      console.info('[DEBUG-event-share] system sharing is available');
       const poster = await createEventSharePoster({
         title: event.title,
         sessions: resolveEventShareSessions(event, sessions),
@@ -709,39 +717,62 @@ export default function EventDetailScreen() {
           avatarEmoji: userConfig?.avatar_emoji || '🎤',
         },
       });
-      posterUri = poster.uri;
-      console.info('[DEBUG-event-share] poster ready, opening system share', {
+      sharePosterUriRef.current = poster.uri;
+      setSharePosterUri(poster.uri);
+      setSharePosterSaved(false);
+      setShareMenuVisible(false);
+      console.info('[DEBUG-event-share] poster ready, showing preview', {
         width: poster.width,
         height: poster.height,
       });
-      setShareMenuVisible(false);
-      await Sharing.shareAsync(poster.uri, {
-        dialogTitle: `分享${event.title}`,
-        mimeType: 'image/jpeg',
-        UTI: 'public.jpeg',
-      });
-      console.info('[DEBUG-event-share] system share closed');
     } catch (error) {
       console.error('[DEBUG-event-share] share flow failed', error);
       showFailureAlert({
         title: '分享失败',
-        reason: '无法生成或分享活动图片。',
+        reason: '无法生成活动图片。',
         nextStep: '请稍后重新尝试。',
         details: error,
       });
     } finally {
-      if (posterUri) {
-        try {
-          new File(posterUri).delete();
-          console.info('[DEBUG-event-share] temporary poster deleted');
-        } catch {
-          console.warn('[DEBUG-event-share] temporary poster cleanup failed');
-          // Cache cleanup is best effort and must not hide the sharing result.
-        }
-      }
       setShareBusy(false);
     }
   }, [event, infoPhotos, prioritizedArtists, sessions, shareBusy, userConfig]);
+
+  const closeSharePosterPreview = useCallback(() => {
+    if (sharePreviewBusy) return;
+    if (sharePosterUriRef.current) {
+      try {
+        new File(sharePosterUriRef.current).delete();
+        console.info('[DEBUG-event-share] temporary poster deleted');
+      } catch {
+        console.warn('[DEBUG-event-share] temporary poster cleanup failed');
+        // 缓存清理尽力而为，不应阻塞关闭预览。
+      }
+      sharePosterUriRef.current = null;
+    }
+    setSharePosterUri(null);
+    setSharePosterSaved(false);
+  }, [sharePreviewBusy]);
+
+  const saveSharePoster = useCallback(async () => {
+    if (!sharePosterUri || sharePreviewBusy || sharePosterSaved) return;
+    setSharePreviewBusy('saving');
+    try {
+      if (await saveImageToAlbum(sharePosterUri)) setSharePosterSaved(true);
+    } finally {
+      setSharePreviewBusy(null);
+    }
+  }, [sharePosterUri, sharePosterSaved, sharePreviewBusy]);
+
+  const shareSharePoster = useCallback(async () => {
+    if (!sharePosterUri || sharePreviewBusy) return;
+    setSharePreviewBusy('sharing');
+    try {
+      await shareImageFile(sharePosterUri, event ? `分享${event.title}` : '分享活动图片');
+    } finally {
+      setSharePreviewBusy(null);
+    }
+  }, [event, sharePosterUri, sharePreviewBusy]);
 
   const handleOpenEventUrl = useCallback(() => {
     if (!event?.url) return;
@@ -1492,6 +1523,29 @@ export default function EventDetailScreen() {
         }}
       />
 
+      {sharePosterUri ? (
+        <Modal
+          visible
+          animationType="fade"
+          onRequestClose={() => {
+            if (!sharePreviewBusy) closeSharePosterPreview();
+          }}
+        >
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+            <ImageResultPreview
+              uri={sharePosterUri}
+              title="已生成"
+              busyAction={sharePreviewBusy}
+              saved={sharePosterSaved}
+              onClose={closeSharePosterPreview}
+              onSave={() => void saveSharePoster()}
+              onShare={() => void shareSharePoster()}
+              imageBorderRadius={0}
+            />
+          </SafeAreaProvider>
+        </Modal>
+      ) : null}
+
       <BottomSheetDialog
         visible={shareMenuVisible}
         title="分享活动"
@@ -1524,9 +1578,6 @@ export default function EventDetailScreen() {
             <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
               {simpleShareAction?.menuLabel}
             </Text>
-            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-              {event.url?.trim() ? '复制活动名称和演出链接' : '复制活动名称、时间和地点'}
-            </Text>
           </View>
         </TouchableOpacity>
 
@@ -1554,9 +1605,6 @@ export default function EventDetailScreen() {
             <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
               {shareBusy ? '正在生成分享图片' : '生成分享图片'}
             </Text>
-            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-              生成 5:3 竖版活动图片并打开系统分享
-            </Text>
           </View>
         </TouchableOpacity>
 
@@ -1582,9 +1630,6 @@ export default function EventDetailScreen() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.text }}>
               添加到日历
-            </Text>
-            <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-              {sessions.length > 1 ? '选择要添加到系统日历的场次' : '将活动添加到系统日历'}
             </Text>
           </View>
         </TouchableOpacity>
