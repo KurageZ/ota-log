@@ -21,6 +21,10 @@ import { formatChineseDateWithWeekday } from '../../../../src/utils/date';
 import { getArtistPrimaryName } from '../../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../../src/utils/avatarSource';
 import { AppIcon } from '../../../../src/components/AppIcon';
+import {
+  CHEKI_SQUARE_GRID_GAP,
+  ChekiGridThumbnail,
+} from '../../../../src/components/ChekiAlbumThumbnail';
 import { EventCard } from '../../../../src/components/EventCard';
 import { ChekiViewerModal } from '../../../../src/components/ChekiViewerModal';
 import { FormSectionLabel } from '../../../../src/components/FormPrimitives';
@@ -353,7 +357,13 @@ export default function ChekiRecordDetailScreen() {
         <View style={{ marginTop: 20 }}>
           <FormSectionLabel label="拍立得" />
           {photoItems.length > 0 || hasMissingImages ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
+              }}
+            >
               {photoItems.map((item) => {
                 const uri = getItemPreviewUri(item);
                 const previewSide = getItemPreviewSide(item);
@@ -366,17 +376,27 @@ export default function ChekiRecordDetailScreen() {
                     accessibilityRole="imagebutton"
                     accessibilityLabel={`查看第 ${item.sort_order + 1} 张拍立得`}
                   >
-                    <Image
-                      source={{ uri }}
-                      resizeMethod="resize"
-                      resizeMode="contain"
-                      style={{
-                        width: itemWidth,
-                        height: itemHeight,
-                        borderRadius: 10,
-                        backgroundColor: colors.cardAlt,
-                      }}
-                    />
+                    {chekiDisplayMode === 'original' ? (
+                      <ChekiGridThumbnail
+                        uri={uri}
+                        width={itemWidth}
+                        height={itemHeight}
+                        colors={colors}
+                        variant="original"
+                      />
+                    ) : (
+                      <Image
+                        source={{ uri }}
+                        resizeMethod="resize"
+                        resizeMode="contain"
+                        style={{
+                          width: itemWidth,
+                          height: itemHeight,
+                          borderRadius: 10,
+                          backgroundColor: colors.cardAlt,
+                        }}
+                      />
+                    )}
                     {item.notes?.trim() ? (
                       <View style={{ position: 'absolute', left: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.scrim }}>
                         <AppIcon name="document" size={12} color={colors.onAccent} />

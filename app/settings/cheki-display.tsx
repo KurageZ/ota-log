@@ -15,7 +15,7 @@ const CHEKI_DISPLAY_MODE_OPTIONS: ChekiDisplayMode[] = ['portrait', 'original'];
 
 const CHEKI_DISPLAY_MODE_DESCRIPTIONS: Record<ChekiDisplayMode, string> = {
   portrait: '图片统一按三寸竖版比例显示。',
-  original: '图片按自身比例显示在正方形外框中。',
+  original: '图片按自身比例居中显示在正方形网格中，不撑满整格。',
 };
 
 export default function ChekiDisplaySettingsScreen() {

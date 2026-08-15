@@ -38,6 +38,10 @@ import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
 import { AppIcon, type AppIconName, type AppIconVariant } from '../../../src/components/AppIcon';
 import { BottomSheetDialog } from '../../../src/components/BottomSheetDialog';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
+import {
+  CHEKI_SQUARE_GRID_GAP,
+  ChekiGridThumbnail,
+} from '../../../src/components/ChekiAlbumThumbnail';
 import { ChekiViewerModal } from '../../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../../src/types/chekiViewer';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
@@ -673,26 +677,44 @@ export default function ArtistDetailScreen() {
 
     return (
       <View style={{ paddingHorizontal: 16 }}>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: item.isLastPhotoRow ? 24 : 8 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
+            marginBottom: item.isLastPhotoRow
+              ? 24
+              : chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
+          }}
+        >
           {item.chekis.map((cheki) => (
             <TouchableOpacity
               key={cheki.id}
               onPress={() => setViewerSelectedId(cheki.id)}
               activeOpacity={0.85}
             >
-              <Image
-                source={{ uri: cheki.photo_uri }}
-                resizeMethod="resize"
-                resizeMode="contain"
-                style={{
-                  width: chekiCellW,
-                  height: chekiCellH,
-                  borderRadius: 10,
-                  backgroundColor: galleryPlaceholderBg,
-                  borderWidth: 1,
-                  borderColor: galleryPlaceholderBorder,
-                }}
-              />
+              {chekiDisplayMode === 'original' ? (
+                <ChekiGridThumbnail
+                  uri={cheki.photo_uri}
+                  width={chekiCellW}
+                  height={chekiCellH}
+                  colors={colors}
+                  variant="original"
+                />
+              ) : (
+                <Image
+                  source={{ uri: cheki.photo_uri }}
+                  resizeMethod="resize"
+                  resizeMode="contain"
+                  style={{
+                    width: chekiCellW,
+                    height: chekiCellH,
+                    borderRadius: 10,
+                    backgroundColor: galleryPlaceholderBg,
+                    borderWidth: 1,
+                    borderColor: galleryPlaceholderBorder,
+                  }}
+                />
+              )}
             </TouchableOpacity>
           ))}
         </View>

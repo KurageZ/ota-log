@@ -39,6 +39,10 @@ import { hapticCopySuccess } from '../../src/utils/haptics';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
+import {
+  CHEKI_SQUARE_GRID_GAP,
+  ChekiGridThumbnail,
+} from '../../src/components/ChekiAlbumThumbnail';
 import { withAlpha } from '../../src/utils/color';
 import { AppIcon } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
@@ -920,16 +924,32 @@ export default function EventDetailScreen() {
 
         {chekiList.length > 0 ? (
           <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
+              }}
+            >
               {previewChekiList.map((ck) => (
                 <TouchableOpacity key={ck.id} onPress={() => setViewerSelectedId(ck.id)} activeOpacity={0.8}>
-                  <Image
-                    source={{ uri: ck.photo_uri }}
-                    resizeMethod="resize"
-                    resizeMode="contain"
-                    style={{ width: chekiW, height: chekiH, borderRadius: 10,
-                      backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
-                  />
+                  {chekiDisplayMode === 'original' ? (
+                    <ChekiGridThumbnail
+                      uri={ck.photo_uri}
+                      width={chekiW}
+                      height={chekiH}
+                      colors={colors}
+                      variant="original"
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri: ck.photo_uri }}
+                      resizeMethod="resize"
+                      resizeMode="contain"
+                      style={{ width: chekiW, height: chekiH, borderRadius: 10,
+                        backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
+                    />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>

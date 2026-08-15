@@ -23,6 +23,7 @@ import {
 import {
   CHEKI_BARE_THUMBNAIL_RADIUS,
   CHEKI_GRID_GAP,
+  CHEKI_SQUARE_GRID_GAP,
   ChekiGridThumbnail,
   useChekiAlbumGridLayout,
 } from '../components/ChekiAlbumThumbnail';
@@ -1131,7 +1132,15 @@ export default function ChekiLibraryScreen() {
     }
 
     return (
-      <View style={{ flexDirection: 'row', gap: CHEKI_GRID_GAP, marginBottom: item.isLastPhotoRow ? 24 : CHEKI_GRID_GAP }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: albumDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : CHEKI_GRID_GAP,
+          marginBottom: item.isLastPhotoRow
+            ? 24
+            : albumDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : CHEKI_GRID_GAP,
+        }}
+      >
         {item.chekis.map((cheki) => (
           <ChekiThumbnailButton
             key={cheki.id}
