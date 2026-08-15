@@ -298,4 +298,48 @@ describe('ArtistRepository artist media metadata support', () => {
     expect(inferred.membershipCount).toBe(0);
     expect(inferred.skippedArtistCount).toBe(4);
   });
+
+  test('findCurrentGroupmates returns current members of the same current groups, deduped and excluding the person', async () => {
+    for (const [id, name, type] of [
+      ['self', 'Self', 'person'],
+      ['group-a', 'Group A', 'group'],
+      ['group-b', 'Group B', 'group'],
+      ['mate-a', 'Mate A', 'person'],
+      ['mate-shared', 'Mate Shared', 'person'],
+      ['mate-past', 'Mate Past', 'person'],
+      ['mate-other', 'Mate Other', 'person'],
+    ] as const) {
+      rawDb.prepare(
+        `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, name, null, type, null, null, null, null, 0, '2026-01-01T00:00:00.000Z');
+    }
+    const insertMembership = (
+      id: string,
+      personId: string,
+      groupId: string,
+      start: string | null,
+      end: string | null,
+    ) => {
+      rawDb.prepare(
+        `INSERT INTO artist_group_memberships
+          (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, personId, groupId, start, end, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+    };
+
+    insertMembership('ms-self-a', 'self', 'group-a', null, null);
+    insertMembership('ms-self-past-b', 'self', 'group-b', '2020-01-01', '2025-01-01');
+    insertMembership('ms-mate-a', 'mate-a', 'group-a', null, null);
+    insertMembership('ms-mate-shared-a', 'mate-shared', 'group-a', null, null);
+    insertMembership('ms-mate-shared-b', 'mate-shared', 'group-b', null, null);
+    insertMembership('ms-mate-past', 'mate-past', 'group-a', '2020-01-01', '2025-01-01');
+    insertMembership('ms-mate-other-b', 'mate-other', 'group-b', null, null);
+
+    const groupmates = await artistRepository.findCurrentGroupmates('self', '2026-06-01');
+
+    // 只返回当前团体 group-a 的现役成员，跨团成员去重、排除本人；
+    // 已毕业成员（mate-past）、仅属于本人已退出团体的成员（mate-other）不返回。
+    expect(groupmates.map((artist) => artist.id)).toEqual(['mate-a', 'mate-shared']);
+  });
 });

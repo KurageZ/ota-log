@@ -327,6 +327,25 @@ export class ArtistRepository {
     );
   }
 
+  /** 当前同团成员：与指定个人当前所属同一团体的其他成员，跨团去重并排除本人。 */
+  async findCurrentGroupmates(personId: string, date: string): Promise<Artist[]> {
+    return this.db.getAllAsync<Artist>(
+      `SELECT DISTINCT person.*, NULL AS parent_id
+       FROM artist_group_memberships membership
+       JOIN artist_group_memberships groupmate
+         ON groupmate.group_artist_id = membership.group_artist_id
+       JOIN artists person ON person.id = groupmate.person_artist_id
+       WHERE membership.person_artist_id = ?
+         AND (membership.start_date IS NULL OR membership.start_date <= ?)
+         AND (membership.end_date IS NULL OR membership.end_date >= ?)
+         AND (groupmate.start_date IS NULL OR groupmate.start_date <= ?)
+         AND (groupmate.end_date IS NULL OR groupmate.end_date >= ?)
+         AND person.id != ?
+       ORDER BY person.name ASC`,
+      [personId, date, date, date, date, personId],
+    );
+  }
+
   async findCurrentGroupSummaries(date: string): Promise<Array<{
     person_artist_id: string;
     group_artist_id: string;

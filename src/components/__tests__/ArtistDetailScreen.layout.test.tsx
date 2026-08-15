@@ -34,6 +34,7 @@ const mockDb = {
     findMembershipsForGroup: jest.fn(),
     findCurrentGroups: jest.fn(),
     findCurrentMembers: jest.fn(),
+    findCurrentGroupmates: jest.fn(),
     update: jest.fn(),
     toggleFavorite: jest.fn(),
   },
@@ -160,7 +161,9 @@ function hasAncestorOfType(node: ReactTestInstance, type: unknown) {
 function textContents(node: ReactTestInstance): string[] {
   return node.findAllByType(Text).map((textNode) => {
     const children = Array.isArray(textNode.props.children) ? textNode.props.children : [textNode.props.children];
-    return children.map((child) => (typeof child === 'string' ? child : '')).join('');
+    return children.map((child) => (
+      typeof child === 'string' || typeof child === 'number' ? String(child) : ''
+    )).join('');
   });
 }
 
@@ -187,6 +190,7 @@ describe('ArtistDetailScreen background layout', () => {
     mockDb.artists.findMembershipsForGroup.mockResolvedValue([]);
     mockDb.artists.findCurrentGroups.mockResolvedValue([]);
     mockDb.artists.findCurrentMembers.mockResolvedValue([]);
+    mockDb.artists.findCurrentGroupmates.mockResolvedValue([]);
     mockDb.events.findByArtistId.mockResolvedValue([]);
     mockDb.events.findAll.mockResolvedValue([]);
     mockDb.cheki.findByArtistId.mockResolvedValue([]);
@@ -242,6 +246,9 @@ describe('ArtistDetailScreen background layout', () => {
     );
     expect(historyCards).toHaveLength(1);
     expect(linkCards).toHaveLength(1);
+    expect(sheets[0].findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-related-card',
+    )).toHaveLength(0);
     expect(textContents(historyCards[0])).toEqual(expect.arrayContaining([
       '所属团体',
       '暂无记录',
@@ -400,5 +407,68 @@ describe('ArtistDetailScreen background layout', () => {
       '毕业成员',
       '2020-01-01 — 2025-01-01',
     ]));
+  });
+
+  test('shows related groupmates as a horizontal avatar rail for person artists', async () => {
+    mockDb.userConfig.getConfig.mockResolvedValue({ oshi_artist_id: 'artist-mate-2' });
+    mockDb.artists.findCurrentGroupmates.mockResolvedValue([
+      {
+        id: 'artist-mate-1',
+        name: '队友一',
+        short_name: null,
+        artist_type: 'person',
+        parent_id: 'artist-group',
+        avatar_uri: null,
+        background_uri: null,
+        background_color: null,
+        url: null,
+        is_favorite: 0,
+        created_at: '2026-08-01T00:00:00.000Z',
+      },
+      {
+        id: 'artist-mate-2',
+        name: '队友二',
+        short_name: '二号',
+        artist_type: 'person',
+        parent_id: 'artist-group',
+        avatar_uri: null,
+        background_uri: null,
+        background_color: null,
+        url: null,
+        is_favorite: 0,
+        created_at: '2026-08-01T00:00:00.000Z',
+      },
+    ]);
+
+    await act(async () => {
+      renderer = create(<ArtistDetailScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const moreButtons = renderer.root.findAllByProps({ accessibilityLabel: '更多' });
+    await act(async () => {
+      moreButtons[0].props.onPress();
+    });
+
+    const sheets = renderer.root.findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-attributes-sheet',
+    );
+    expect(sheets).toHaveLength(1);
+
+    const relatedCard = sheets[0].findAllByType(View).find(
+      (node) => node.props.testID === 'artist-related-card',
+    );
+    expect(relatedCard).toBeDefined();
+    const relatedTexts = textContents(relatedCard!);
+    expect(relatedTexts).toEqual(expect.arrayContaining([
+      '相关艺人',
+      '2 位',
+      '队友二',
+      '队友一',
+    ]));
+    // 单推成员优先排列
+    expect(relatedTexts.indexOf('队友二')).toBeLessThan(relatedTexts.indexOf('队友一'));
+    expect(renderer.root.findAllByProps({ horizontal: true }).length).toBeGreaterThan(0);
   });
 });

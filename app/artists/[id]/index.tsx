@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -109,6 +110,7 @@ export default function ArtistDetailScreen() {
   const [parentArtist, setParentArtist] = useState<Artist | null>(null);
   const [currentGroupCount, setCurrentGroupCount] = useState(0);
   const [members, setMembers] = useState<Artist[]>([]);
+  const [relatedArtists, setRelatedArtists] = useState<Artist[]>([]);
   const [memberships, setMemberships] = useState<ArtistGroupMembershipWithArtist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -158,6 +160,7 @@ export default function ArtistDetailScreen() {
       setParentArtist(null);
       setCurrentGroupCount(0);
       setMembers([]);
+      setRelatedArtists([]);
       setMemberships([]);
       setEvents([]);
       setChekiList([]);
@@ -217,12 +220,17 @@ export default function ArtistDetailScreen() {
       const groups = await db.artists.findCurrentGroups(id, today);
       setParentArtist(groups[0] ?? null);
       setCurrentGroupCount(groups.length);
-    } else if (currentArtist?.parent_id) {
-      setParentArtist(await db.artists.findById(currentArtist.parent_id));
-      setCurrentGroupCount(1);
+      const groupmates = await db.artists.findCurrentGroupmates(id, today);
+      setRelatedArtists(sortArtistsWithOshi(groupmates, config.oshi_artist_id));
     } else {
-      setParentArtist(null);
-      setCurrentGroupCount(0);
+      setRelatedArtists([]);
+      if (currentArtist?.parent_id) {
+        setParentArtist(await db.artists.findById(currentArtist.parent_id));
+        setCurrentGroupCount(1);
+      } else {
+        setParentArtist(null);
+        setCurrentGroupCount(0);
+      }
     }
 
     setEvents(artistEvents);
@@ -555,7 +563,61 @@ export default function ArtistDetailScreen() {
             {renderMembershipCard('artist-past-members-card', '历史成员', pastMemberships, false, '位')}
           </>
         ) : artist.artist_type === 'person' ? (
-          renderMembershipCard('artist-history-card', '所属团体', memberships, true, '个')
+          <>
+            {relatedArtists.length > 0 ? (
+              <MenuCard testID="artist-related-card">
+                <View
+                  style={{
+                    minHeight: 44,
+                    paddingHorizontal: 16,
+                    paddingTop: 13,
+                    paddingBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    相关艺人
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                    {relatedArtists.length} 位
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 14 }}
+                >
+                  {relatedArtists.map((related) => (
+                    <TouchableOpacity
+                      key={related.id}
+                      activeOpacity={0.72}
+                      accessibilityRole="button"
+                      accessibilityLabel={`查看${related.name}`}
+                      onPress={() => {
+                        setAttributesSheetVisible(false);
+                        router.push(`/artists/${related.id}`);
+                      }}
+                      style={{ width: 64, marginRight: 14, alignItems: 'center' }}
+                    >
+                      <OshiAvatar
+                        source={resolveAvatarSource(related.avatar_uri)}
+                        size={56}
+                        isOshi={related.id === oshiArtistId}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={{ marginTop: 6, fontSize: 11, color: colors.textSecondary, textAlign: 'center' }}
+                      >
+                        {related.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </MenuCard>
+            ) : null}
+            {renderMembershipCard('artist-history-card', '所属团体', memberships, true, '个')}
+          </>
         ) : null}
         {artist.url ? (
           <MenuCard testID="artist-link-card">
