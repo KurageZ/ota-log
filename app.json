@@ -2,7 +2,7 @@
   "expo": {
     "name": "ota log",
     "slug": "ota-log",
-    "version": "1.5.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "otalog",
@@ -111,8 +111,26 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4f80f1fa-8e50-44df-a7a5-df36b95b4056"
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.otalog.app.ExpoWidgetsTarget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.otalog.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "e488e346-d304-40d2-8ae5-073b2af93541"
       }
-    }
+    },
+    "owner": "kuragez"
   }
 }

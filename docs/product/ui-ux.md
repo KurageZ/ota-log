@@ -736,7 +736,8 @@ Mini countdown：
 ### About
 
 - 使用 `SectionLabel + MenuCard + MenuItem` 的结构语言。
-- 版本更新文案应该来自 changelog，但要经过人工压缩，适合 app 内阅读。
+- 页首展示当前版本标识（如 `v2.0 Beta 1`），内部命名与 iOS 规范版本号分离。
+- 不提供应用内版本更新记录，版本说明由外部 changelog 与 TestFlight release notes 提供。
 - 帮助文案要短，不做长篇说明。
 
 ---

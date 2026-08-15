@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useFocusEffect } from 'expo-router';
-import Constants from 'expo-constants';
 import {
   AndroidCompactTabHeader,
   AndroidLargeTabTitle,
@@ -16,6 +15,7 @@ import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarV
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
 import { useAppTheme, type ThemeColors } from '../../../src/theme/appTheme';
 import { Artist, UserConfig } from '../../../src/types/models';
+import { APP_VERSION_LABEL } from '../../../src/utils/appInfo';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 
@@ -131,7 +131,6 @@ export default function ProfileScreen() {
       : null;
     return getArtistDisplayText({ artist: oshiArtist, parentName });
   }, [allArtists, oshiArtist]);
-  const appVersion = Constants.expoConfig?.version ?? '1.5.0';
   const profileName = userConfig?.name ?? 'Otaku';
   const avatarSize = 92;
   const menuTints = colors.profileMenu;
@@ -340,7 +339,7 @@ export default function ProfileScreen() {
           <MenuItem
             icon="info"
             label="关于"
-            subtitle={`当前版本 v${appVersion}`}
+            subtitle={`当前版本 v${APP_VERSION_LABEL}`}
             tint={menuTints.about}
             isLast
             onPress={() => router.push('/about')}

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.0-beta.1] - 2026-08-15
+
+### Added
+- 活动升级为多场次结构：支持一个活动多个场次、结构化时间表、实际支出与独立日历入口
+- 艺人支持个人 / 团体类型，团体成员与所属关系、正式入团 / 最后在团履历，活动按日期自动归因
+- 活动、艺人、拍立得列表支持组合搜索与高级筛选，活动搜索覆盖场次、时间表和归因艺人
+- 拍立得升级为 Record / Item / Image 模型，支持规格筛选、展示方式偏好（拍立得 / 正方形网格）与图片规格自动推断
+- 电子切册新增相册 / 记录浏览模式、分组排序与深链语义匹配
+- iOS 新增拍立得贴纸相机，支持多选扇形布局、阴影合成、高清导出与分享
+- 统计页新增活动 / 拍立得热力图，并支持自定义 section 的显示、隐藏与排序
+- 首页新增「下一场活动」小组件（iOS），支持重要日期与多种自定义信息卡片
+- 设置页新增存储空间概览、切册 / 统计默认视图偏好
+- 支持 iEvent 导入、Chekiroku 导入、微博关注艺人批量导入与旧备份艺人类型转换提示
+- 升级至 Expo SDK 57
+
+### Changed
+- 关于页改为在页首展示当前版本标识（2.0 Beta 1），不再提供应用内版本更新记录
+- 电子切册展示方式由设置统一控制，缩略图按图片自身比例完整显示
+
+### Removed
+- 移除应用内「版本更新」记录，版本说明改由外部 changelog 与 TestFlight release notes 提供
+
+### Fixed
+- 修复暗色模式部分文字对比度不足、活动深链筛选丢失、艺人详情切换闪烁等已知问题
+
 ## [1.5.0] - 2026-07-09
 
 ### Added
