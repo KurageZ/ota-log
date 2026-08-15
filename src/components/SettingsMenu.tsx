@@ -59,11 +59,12 @@ export function SectionLabel({ label, style }: { label: string; style?: StylePro
   );
 }
 
-export function MenuCard({ children }: { children: ReactNode }) {
+export function MenuCard({ children, testID }: { children: ReactNode; testID?: string }) {
   const { colors } = useAppTheme();
 
   return (
     <View
+      testID={testID}
       style={{
         backgroundColor: colors.card,
         borderRadius: 18,

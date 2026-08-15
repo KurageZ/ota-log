@@ -128,6 +128,25 @@ jest.mock('../ChekiViewerModal', () => ({ ChekiViewerModal: () => null }));
 jest.mock('../EventCard', () => ({ EventCard: () => null }));
 jest.mock('../EventSectionHeader', () => ({ EventSectionHeader: () => null }));
 jest.mock('../Oshi', () => ({ OshiAvatar: () => null, OshiBadge: () => null }));
+jest.mock('../BottomSheetDialog', () => {
+  const ReactModule = require('react');
+  const { View } = require('react-native');
+  return {
+    BottomSheetDialog: ({
+      visible,
+      title,
+      children,
+    }: {
+      visible: boolean;
+      title: string;
+      children: React.ReactNode;
+    }) => (
+      visible
+        ? ReactModule.createElement(View, { testID: 'artist-attributes-sheet', accessibilityLabel: title }, children)
+        : null
+    ),
+  };
+});
 
 function hasAncestorOfType(node: ReactTestInstance, type: unknown) {
   let parent = node.parent;
@@ -172,7 +191,7 @@ describe('ArtistDetailScreen background layout', () => {
     jest.clearAllMocks();
   });
 
-  test('keeps the backdrop fixed and places expanded attributes before non-sticky tabs', async () => {
+  test('keeps the backdrop fixed and presents more attributes in a bottom sheet', async () => {
     await act(async () => {
       renderer = create(<ArtistDetailScreen />);
       await Promise.resolve();
@@ -183,8 +202,9 @@ describe('ArtistDetailScreen background layout', () => {
       .findAllByType(ImageBackground)
       .map((node) => node.props.style.height);
 
-    const moreButtons = renderer.root.findAllByProps({ accessibilityLabel: '更多资料' });
+    const moreButtons = renderer.root.findAllByProps({ accessibilityLabel: '更多' });
     expect(moreButtons.length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: 'artist-attributes-sheet' })).toHaveLength(0);
 
     await act(async () => {
       moreButtons[0].props.onPress();
@@ -195,11 +215,26 @@ describe('ArtistDetailScreen background layout', () => {
       .map((node) => node.props.style.height);
     expect(expandedBackdropHeights).toEqual(collapsedBackdropHeights);
 
-    const attributeCards = renderer.root.findAllByType(View).filter(
+    const sheets = renderer.root.findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-attributes-sheet',
+    );
+    expect(sheets).toHaveLength(1);
+    expect(sheets.every((node) => !hasAncestorOfType(node, ImageBackground))).toBe(true);
+
+    const attributeCards = sheets[0].findAllByType(View).filter(
       (node) => node.props.testID === 'artist-attributes-card',
     );
-    expect(attributeCards).toHaveLength(2);
+    expect(attributeCards).toHaveLength(1);
     expect(attributeCards.every((node) => !hasAncestorOfType(node, ImageBackground))).toBe(true);
+
+    const historyCards = sheets[0].findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-history-card',
+    );
+    const linkCards = sheets[0].findAllByType(View).filter(
+      (node) => node.props.testID === 'artist-link-card',
+    );
+    expect(historyCards).toHaveLength(1);
+    expect(linkCards).toHaveLength(1);
 
     const heroContents = renderer.root.findAllByType(View).filter(
       (node) => node.props.testID === 'artist-hero-content',

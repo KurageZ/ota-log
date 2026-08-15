@@ -35,10 +35,12 @@ import Animated, {
 import { EventCard } from '../../../src/components/EventCard';
 import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
 import { AppIcon, type AppIconName, type AppIconVariant } from '../../../src/components/AppIcon';
+import { BottomSheetDialog } from '../../../src/components/BottomSheetDialog';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
 import { ChekiViewerModal } from '../../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../../src/types/chekiViewer';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
+import { MenuCard } from '../../../src/components/SettingsMenu';
 import { useDB } from '../../../src/context/DBContext';
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { Artist, ArtistGroupMembershipWithArtist, Cheki, ChekiManualEntry, Event } from '../../../src/types/models';
@@ -117,7 +119,7 @@ export default function ArtistDetailScreen() {
   const [viewerSelectedId, setViewerSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('events');
   const [tabRemountKey, setTabRemountKey] = useState<Record<TabKey, number>>({ events: 0, cheki: 0 });
-  const [showMoreAttributes, setShowMoreAttributes] = useState(false);
+  const [attributesSheetVisible, setAttributesSheetVisible] = useState(false);
 
   const scrollY = useSharedValue(0);
   const eventsScrollY = useSharedValue(0);
@@ -207,7 +209,7 @@ export default function ArtistDetailScreen() {
         ? await db.artists.findMembershipsForGroup(id)
         : [];
     setMemberships(artistMemberships);
-    setShowMoreAttributes(false);
+    setAttributesSheetVisible(false);
     setOshiArtistId(config.oshi_artist_id);
     setEventMap(new Map(allEvents.map((event) => [event.id, event])));
 
@@ -446,131 +448,130 @@ export default function ArtistDetailScreen() {
 
   const renderMetaToggle = (overlay: boolean) => {
     if (!hasHiddenAttributes) return null;
-    const label = showMoreAttributes ? '收起资料' : '更多资料';
-    const variant: AppIconVariant = showMoreAttributes ? 'up' : 'down';
 
     return overlay ? (
       <HeroMetaAction
         icon="disclosure"
-        variant={variant}
-        label={label}
+        variant="down"
+        label="更多"
         iconColor={heroActionIcon}
         textColor={heroActionText}
-        onPress={() => setShowMoreAttributes((current) => !current)}
+        onPress={() => setAttributesSheetVisible(true)}
       />
     ) : (
       <MetaPill
         icon="disclosure"
-        iconVariant={variant}
-        label={label}
+        iconVariant="down"
+        label="更多"
         tone="group"
         overlayMode={false}
-        onPress={() => setShowMoreAttributes((current) => !current)}
+        onPress={() => setAttributesSheetVisible(true)}
       />
     );
   };
 
   const renderArtistAttributes = () => {
-    if (!showMoreAttributes || !hasHiddenAttributes) return null;
+    if (!hasHiddenAttributes) return null;
 
     return (
-      <View testID="artist-attributes-card" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <View
-          style={{
-            backgroundColor: cardBg,
-            borderRadius: 16,
-            borderWidth: lowerCardBorderWidth,
-            borderColor: hasBackground ? backdropDivider : colors.divider,
-            overflow: 'hidden',
-          }}
-        >
-          {artist.artist_type ? (
-            <View>
-              <View
-                style={{
-                  minHeight: 44,
-                  paddingHorizontal: 14,
-                  paddingTop: 13,
-                  paddingBottom: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: backdropText }}>
-                  {historyLabel}
-                </Text>
-                <Text style={{ fontSize: 12, color: backdropTextSecondary }}>
-                  {memberships.length > 0 ? `${memberships.length} 条` : '暂无记录'}
-                </Text>
-              </View>
-              {memberships.length === 0 ? (
-                <Text style={{ paddingHorizontal: 14, paddingBottom: 14, fontSize: 13, color: backdropTextSecondary }}>
-                  还没有{historyLabel}
-                </Text>
-              ) : memberships.map((membership) => {
-                const membershipIsCurrent = (membership.start_date == null || membership.start_date <= today)
-                  && (membership.end_date == null || membership.end_date >= today);
-                return (
-                  <TouchableOpacity
-                    key={membership.id}
-                    activeOpacity={0.72}
-                    accessibilityRole="button"
-                    accessibilityLabel={`查看${membership.artist.name}`}
-                    onPress={() => router.push(`/artists/${membership.artist.id}`)}
-                    style={{
-                      minHeight: 60,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderTopWidth: 1,
-                      borderTopColor: hasBackground ? backdropDivider : colors.divider,
-                    }}
-                  >
-                    <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
-                    <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                        <Text numberOfLines={1} style={{ flexShrink: 1, color: backdropText, fontSize: 14, fontWeight: '700' }}>
-                          {membership.artist.name}
-                        </Text>
-                        {membershipIsCurrent ? (
-                          <Text style={{ color: hasBackground ? backdropTextSecondary : colors.accent, fontSize: 11, fontWeight: '700' }}>
-                            当前
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text style={{ marginTop: 3, color: backdropTextSecondary, fontSize: 12 }}>
-                        {membership.start_date ?? '更早'} — {membership.end_date ?? '至今'}
-                      </Text>
-                    </View>
-                    <AppIcon name="disclosure" variant="forward" size={15} color={backdropChevron} />
-                  </TouchableOpacity>
-                );
-              })}
+      <View testID="artist-attributes-card" style={{ gap: 12 }}>
+        {artist.artist_type ? (
+          <MenuCard testID="artist-history-card">
+            <View
+              style={{
+                minHeight: 44,
+                paddingHorizontal: 16,
+                paddingTop: 13,
+                paddingBottom: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>
+                {historyLabel}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                {memberships.length > 0 ? `${memberships.length} 条` : '暂无记录'}
+              </Text>
             </View>
-          ) : null}
-          {artist.artist_type && artist.url ? (
-            <View style={{ height: 1, backgroundColor: hasBackground ? backdropDivider : colors.divider }} />
-          ) : null}
-          {artist.url ? (
+            {memberships.length === 0 ? (
+              <Text style={{ paddingHorizontal: 16, paddingBottom: 14, fontSize: 13, color: colors.textSecondary }}>
+                还没有{historyLabel}
+              </Text>
+            ) : memberships.map((membership) => {
+              const membershipIsCurrent = (membership.start_date == null || membership.start_date <= today)
+                && (membership.end_date == null || membership.end_date >= today);
+              return (
+                <TouchableOpacity
+                  key={membership.id}
+                  activeOpacity={0.72}
+                  accessibilityRole="button"
+                  accessibilityLabel={`查看${membership.artist.name}`}
+                  onPress={() => {
+                    setAttributesSheetVisible(false);
+                    router.push(`/artists/${membership.artist.id}`);
+                  }}
+                  style={{
+                    minHeight: 60,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                  }}
+                >
+                  <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
+                  <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 14, fontWeight: '700' }}>
+                        {membership.artist.name}
+                      </Text>
+                      {membershipIsCurrent ? (
+                        <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
+                          当前
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={{ marginTop: 3, color: colors.textSecondary, fontSize: 12 }}>
+                      {membership.start_date ?? '更早'} — {membership.end_date ?? '至今'}
+                    </Text>
+                  </View>
+                  <AppIcon name="disclosure" variant="forward" size={15} color={colors.chevron} />
+                </TouchableOpacity>
+              );
+            })}
+          </MenuCard>
+        ) : null}
+        {artist.url ? (
+          <MenuCard testID="artist-link-card">
+            <View
+              style={{
+                minHeight: 44,
+                paddingHorizontal: 16,
+                paddingTop: 13,
+                paddingBottom: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>官方链接</Text>
+            </View>
             <TouchableOpacity
               activeOpacity={0.72}
               accessibilityRole="link"
               accessibilityLabel="打开艺人链接"
               onPress={() => Linking.openURL(artist.url!)}
-              style={{ minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 }}
+              style={{ minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}
             >
-              <AppIcon name="link" size={18} color={hasBackground ? backdropTextSecondary : colors.accent} />
+              <AppIcon name="link" size={18} color={colors.accent} />
               <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
-                <Text style={{ color: backdropText, fontSize: 14, fontWeight: '700' }}>官方链接</Text>
-                <Text numberOfLines={1} ellipsizeMode="tail" style={{ marginTop: 3, color: backdropTextSecondary, fontSize: 12 }}>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>
                   {artist.url}
                 </Text>
               </View>
-              <AppIcon name="externalLink" size={15} color={backdropChevron} />
+              <AppIcon name="externalLink" size={15} color={colors.chevron} />
             </TouchableOpacity>
-          ) : null}
-        </View>
+          </MenuCard>
+        ) : null}
       </View>
     );
   };
@@ -848,7 +849,6 @@ export default function ArtistDetailScreen() {
                   testID="artist-details-region"
                   style={{ marginTop: -ARTIST_HERO_CONTENT_OFFSET, paddingTop: 8 }}
                 >
-                  {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <ArtistSectionTabs
                       key={`cheki-hero-${tabRemountKey.cheki}`}
@@ -991,7 +991,6 @@ export default function ArtistDetailScreen() {
                 </View>
               </View>
 
-              {renderArtistAttributes()}
               <View
                 style={{
                   backgroundColor: 'transparent',
@@ -1186,7 +1185,6 @@ export default function ArtistDetailScreen() {
                   testID="artist-details-region"
                   style={{ marginTop: -ARTIST_HERO_CONTENT_OFFSET, paddingTop: 8 }}
                 >
-                  {renderArtistAttributes()}
                   <View testID="artist-section-tabs" style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                     <ArtistSectionTabs
                       key={`events-hero-${tabRemountKey.events}`}
@@ -1356,7 +1354,6 @@ export default function ArtistDetailScreen() {
                 </View>
               </View>
 
-              {renderArtistAttributes()}
               <View
                 style={{
                   backgroundColor: 'transparent',
@@ -1474,6 +1471,16 @@ export default function ArtistDetailScreen() {
         onDelete={(item) => handleDeleteCheki(item.itemId ?? item.id)}
         onToggleFavorite={(item) => void handleToggleChekiFavorite(item)}
       />
+
+      <BottomSheetDialog
+        visible={attributesSheetVisible}
+        title="更多"
+        onClose={() => setAttributesSheetVisible(false)}
+        scrollable
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
+      >
+        {renderArtistAttributes()}
+      </BottomSheetDialog>
     </View>
   );
 }
