@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { AppIcon } from './AppIcon';
+import { AppIcon, AppIconName } from './AppIcon';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { FormCard, FormFieldLabel } from './FormPrimitives';
 import { OshiAvatar } from './Oshi';
@@ -18,6 +18,7 @@ import { SectionLabel } from './SettingsMenu';
 import { useDB } from '../context/DBContext';
 import { HydratedDateItem } from '../repositories/DateItemRepository';
 import { useAppTheme } from '../theme/appTheme';
+import type { ThemeColors } from '../theme/appTheme';
 import { Artist, DateItemAnniversaryRule, DateItemSourceKind, Event } from '../types/models';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { resolveAvatarSource } from '../utils/avatarSource';
@@ -39,6 +40,68 @@ const PRESET_TITLE: Record<Exclude<QuickPreset, 'custom' | 'activity'>, string> 
   firstCheki: '纪念日：首次拍立得',
   firstLive: '纪念日：首次观看演出',
 };
+
+const QUICK_PRESETS: { key: Exclude<QuickPreset, 'custom'>; icon: AppIconName; title: string; subtitle: string }[] = [
+  { key: 'activity', icon: 'calendar', title: '倒数日：关联未来活动', subtitle: '从未来活动创建倒数日' },
+  { key: 'firstCheki', icon: 'cheki', title: '纪念日：首次拍立得', subtitle: '搜索艺人，自动创建首次拍立得纪念日' },
+  { key: 'firstLive', icon: 'ticket', title: '纪念日：首次观看演出', subtitle: '搜索艺人，自动创建首次演出纪念日' },
+];
+
+const CUSTOM_PRESET: { key: 'custom'; icon: AppIconName; title: string; subtitle: string } = {
+  key: 'custom',
+  icon: 'edit',
+  title: '自定义',
+  subtitle: '手动填写标题、日期和关联艺人',
+};
+
+type PresetOption = { key: QuickPreset; icon: AppIconName; title: string; subtitle: string };
+
+function PresetOptionCard({
+  preset,
+  selected,
+  onPress,
+  colors,
+}: {
+  preset: PresetOption;
+  selected: boolean;
+  onPress: () => void;
+  colors: ThemeColors;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.72}
+      style={{
+        minHeight: 76,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        backgroundColor: selected ? colors.accentSofter : colors.card,
+        borderWidth: 1,
+        borderColor: selected ? colors.accent : colors.divider,
+      }}
+    >
+      <View style={{
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: withAlpha(colors.accent, selected ? 0.18 : 0.1),
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <AppIcon name={preset.icon} size={20} color={colors.accent} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '800', color: colors.text }}>{preset.title}</Text>
+        <Text numberOfLines={2} style={{ marginTop: 3, fontSize: 12.5, lineHeight: 17, color: colors.textSecondary }}>{preset.subtitle}</Text>
+      </View>
+      {selected ? <AppIcon name="statusCompleted" size={20} color={colors.accent} /> : null}
+    </TouchableOpacity>
+  );
+}
 
 function formatDateInput(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 8);
@@ -403,52 +466,31 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
     >
       {!initial ? (
         <View style={{ marginBottom: 22 }}>
-          <SectionLabel label="快速创建" />
+          <Text style={{ marginBottom: 10, fontSize: 13, color: colors.textSecondary }}>
+            使用模板创建
+          </Text>
           <View style={{ gap: 8 }}>
-            {[
-              { key: 'activity' as const, icon: 'calendar' as const, title: '关联未来活动', subtitle: '从未来活动创建倒数日' },
-              { key: 'firstCheki' as const, icon: 'cheki' as const, title: '纪念日：首次拍立得', subtitle: '搜索艺人，自动创建首次拍立得纪念日' },
-              { key: 'firstLive' as const, icon: 'ticket' as const, title: '纪念日：首次观看演出', subtitle: '搜索艺人，自动创建首次演出纪念日' },
-              { key: 'custom' as const, icon: 'edit' as const, title: '自定义', subtitle: '手动填写标题、日期和关联艺人' },
-            ].map((preset) => {
-              const selected = quickPreset === preset.key;
-              return (
-                <TouchableOpacity
-                  key={preset.key}
-                  onPress={() => selectPreset(preset.key)}
-                  activeOpacity={0.72}
-                  style={{
-                    minHeight: 58,
-                    borderRadius: 16,
-                    paddingHorizontal: 14,
-                    paddingVertical: 11,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                    backgroundColor: selected ? colors.accentSofter : colors.card,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.accent : colors.divider,
-                  }}
-                >
-                  <View style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: withAlpha(colors.accent, selected ? 0.18 : 0.1),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <AppIcon name={preset.icon} size={18} color={colors.accent} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>{preset.title}</Text>
-                    <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, color: colors.textSecondary }}>{preset.subtitle}</Text>
-                  </View>
-                  {selected ? <AppIcon name="statusCompleted" size={18} color={colors.accent} /> : null}
-                </TouchableOpacity>
-              );
-            })}
+            {QUICK_PRESETS.map((preset) => (
+              <PresetOptionCard
+                key={preset.key}
+                preset={preset}
+                selected={quickPreset === preset.key}
+                onPress={() => selectPreset(preset.key)}
+                colors={colors}
+              />
+            ))}
           </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 16 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
+            <Text style={{ fontSize: 12, color: colors.textMuted }}>或</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
+          </View>
+          <PresetOptionCard
+            preset={CUSTOM_PRESET}
+            selected={quickPreset === 'custom'}
+            onPress={() => selectPreset('custom')}
+            colors={colors}
+          />
         </View>
       ) : null}
 
@@ -670,8 +712,14 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
             marginBottom: 22,
           }}>
             <View style={{ minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>显示在日历</Text>
-              <Switch value={showOnCalendar} onValueChange={setShowOnCalendar} trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }} thumbColor={showOnCalendar ? colors.accent : colors.card} />
+              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>展示在日历</Text>
+              <Switch
+                value={showOnCalendar}
+                onValueChange={setShowOnCalendar}
+                trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
+                thumbColor={showOnCalendar ? colors.accent : colors.card}
+                style={{ alignSelf: 'center' }}
+              />
             </View>
           </View>
         </>

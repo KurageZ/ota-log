@@ -346,7 +346,7 @@ export default function DateItemDetailScreen() {
             paddingTop: showsArtistSection ? 12 : 0,
           }}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700' }}>显示在日历</Text>
+              <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700' }}>展示在日历</Text>
             </View>
             <Switch
               value={item.item.show_on_calendar === 1}
@@ -354,6 +354,7 @@ export default function DateItemDetailScreen() {
               disabled={pendingSetting !== null}
               trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
               thumbColor={item.item.show_on_calendar === 1 ? colors.accent : colors.card}
+              style={{ alignSelf: 'center' }}
             />
           </View>
           {item.item.notes ? (
