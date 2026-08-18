@@ -7,6 +7,9 @@ const WEIBO_DOMAINS = [
   'https://weibo.cn',
 ];
 
+const SETTLE_DELAY_MS = 400;
+const MAX_SETTLE_ATTEMPTS = 4;
+
 export function parseCookieString(cookie: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const pair of cookie.split(';')) {
@@ -23,6 +26,7 @@ export function parseCookieString(cookie: string): Record<string, string> {
 
 export function stringifyCookies(map: Record<string, string>): string {
   return Object.entries(map)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([k, v]) => `${k}=${v}`)
     .join('; ');
 }
@@ -42,16 +46,29 @@ export async function setFetchCookies(cookie: string): Promise<void> {
 }
 
 export async function pullWebViewCookies(url: string): Promise<string> {
-  try {
-    const map = await CookieManager.get(url, true);
-    const result: Record<string, string> = {};
-    for (const k of Object.keys(map)) {
-      result[k] = map[k].value;
+  const result: Record<string, string> = {};
+
+  // iOS can store the same WebView's cookies in either place, depending on the
+  // WebView configuration:
+  // - persistent WebView (`cacheEnabled` true) uses the default WKWebsiteDataStore,
+  //   which `get(url, true)` reads.
+  // - `cacheEnabled={false}` makes react-native-webview switch to a non-persistent
+  //   store; CookieManager cannot see it directly, but react-native-webview mirrors
+  //   those cookies into NSHTTPCookieStorage, which `get(url, false)` reads.
+  // Read both and merge so either configuration is covered.
+  for (const useWebKit of [false, true]) {
+    try {
+      const map = await CookieManager.get(url, useWebKit);
+      for (const k of Object.keys(map)) {
+        const value = map[k]?.value;
+        if (value !== undefined) result[k] = value;
+      }
+    } catch {
+      // best-effort; new arch may reject
     }
-    return stringifyCookies(result);
-  } catch {
-    return '';
   }
+
+  return stringifyCookies(result);
 }
 
 export async function clearWeiboCookies(): Promise<void> {
@@ -79,9 +96,24 @@ async function pullWeiboCookies(): Promise<string> {
 }
 
 export async function mirrorWebViewToFetch(): Promise<string> {
-  const cookie = await pullWeiboCookies();
-  if (cookie) await setFetchCookies(cookie);
-  return cookie;
+  // WKHTTPCookieStore propagates cookies set by the web content process
+  // asynchronously. The user may tap "完成" right after the login redirect, so
+  // wait until two consecutive reads agree before treating the state as final.
+  let previous = '';
+  for (let attempt = 1; attempt <= MAX_SETTLE_ATTEMPTS; attempt++) {
+    const cookie = await pullWeiboCookies();
+    if (cookie && cookie === previous) {
+      await setFetchCookies(cookie);
+      return cookie;
+    }
+    previous = cookie;
+    if (attempt < MAX_SETTLE_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_DELAY_MS));
+    }
+  }
+
+  if (previous) await setFetchCookies(previous);
+  return previous;
 }
 
 function extractHostname(url: string): string {

@@ -21,3 +21,8 @@ export async function saveWeiboCookie(cookie: string): Promise<void> {
   if (!f.exists) f.create();
   f.write(cookie);
 }
+
+export async function clearWeiboCookieFile(): Promise<void> {
+  const f = cookieFile();
+  if (f.exists) f.delete();
+}

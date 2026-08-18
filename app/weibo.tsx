@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { AppIcon } from '../src/components/AppIcon';
-import { loadWeiboCookie, saveWeiboCookie } from '../src/utils/weibo/cookieStore';
+import {
+  clearWeiboCookieFile,
+  loadWeiboCookie,
+  saveWeiboCookie,
+} from '../src/utils/weibo/cookieStore';
 import { clearWeiboCookies, mirrorWebViewToFetch } from '../src/utils/weibo/cookieBridge';
 import { useAppTheme } from '../src/theme/appTheme';
 
@@ -13,6 +17,7 @@ export default function WeiboScreen() {
   const [cookie, setCookie] = useState('');
   const [webViewUrl, setWebViewUrl] = useState('');
   const [webViewNav, setWebViewNav] = useState('');
+  const [saving, setSaving] = useState(false);
   const hasCookie = cookie.trim().length > 0;
 
   useEffect(() => {
@@ -35,10 +40,12 @@ export default function WeiboScreen() {
   }, []);
 
   const handleLoginDone = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       const freshCookie = await mirrorWebViewToFetch();
       if (!freshCookie) {
-        Alert.alert('未检测到登录状态', '请先在微博页面完成登录，再点右上角完成。');
+        Alert.alert('未检测到登录状态', '请完成登录后再试。');
         return;
       }
 
@@ -46,15 +53,37 @@ export default function WeiboScreen() {
       await saveWeiboCookie(freshCookie);
       setWebViewUrl('');
       setWebViewNav('');
-      Alert.alert('登录信息已保存', '后续解析微博内容时会自动使用当前登录状态；如果失效，回到这里重新登录即可。');
+      Alert.alert('登录状态已保存', '解析微博内容时会自动使用。失效时重新登录即可。');
     } catch {
-      Alert.alert('保存失败', '未能读取微博登录信息，请重试。');
+      Alert.alert('保存失败', '未能读取登录信息，请重试。');
+    } finally {
+      setSaving(false);
     }
-  }, []);
+  }, [saving]);
 
   const handleLoginCancel = useCallback(() => {
     setWebViewUrl('');
     setWebViewNav('');
+  }, []);
+
+  const handleClearCookie = useCallback(() => {
+    Alert.alert('清除登录状态？', '清除后需重新登录才能解析微博内容。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '清除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearWeiboCookies();
+            await clearWeiboCookieFile();
+            setCookie('');
+            Alert.alert('已清除登录状态');
+          } catch {
+            Alert.alert('清除失败', '请重试。');
+          }
+        },
+      },
+    ]);
   }, []);
 
   return (
@@ -77,7 +106,7 @@ export default function WeiboScreen() {
             微博登录
           </Text>
           <Text style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
-            这里仅保存你的微博登录信息，Cookie 只会保存在本机，用于后续需要微博登录态的功能。
+            登录微博后，可解析公告、艺人资料和关注列表。Cookie 仅保存在本机。
           </Text>
 
           <View
@@ -121,12 +150,12 @@ export default function WeiboScreen() {
                     color: hasCookie ? colors.success : colors.text,
                   }}
                 >
-                  {hasCookie ? '已保存微博登录状态' : '尚未保存微博登录状态'}
+                  {hasCookie ? '已保存登录状态' : '未保存登录状态'}
                 </Text>
                 <Text style={{ marginTop: 4, fontSize: 12, lineHeight: 18, color: colors.textSecondary }}>
                   {hasCookie
-                    ? '后续解析微博公告和艺人资料时会自动使用当前登录信息。'
-                    : '先完成一次微博登录，后续抓取功能才能直接读取受限内容。'}
+                    ? '解析微博内容时会自动使用。'
+                    : '完成登录后即可开始使用。'}
                 </Text>
               </View>
             </View>
@@ -139,16 +168,28 @@ export default function WeiboScreen() {
                   color: colors.textSecondary,
                 }}
               >
-                如果后续解析失败，通常是登录态过期，重新登录一次即可刷新。
+                解析失败时，重新登录即可。
               </Text>
             ) : null}
+          </View>
+
+          <View style={{ marginTop: 14, gap: 4 }}>
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary }}>
+              1. 轻点「去登录微博」
+            </Text>
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary }}>
+              2. 在打开的页面完成登录
+            </Text>
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary }}>
+              3. 轻点右上角「完成」保存
+            </Text>
           </View>
 
           <TouchableOpacity
             onPress={handleLogin}
             activeOpacity={0.72}
             style={{
-              marginTop: 16,
+              marginTop: 12,
               minHeight: 48,
               borderRadius: 14,
               backgroundColor: colors.accent,
@@ -164,6 +205,26 @@ export default function WeiboScreen() {
               {hasCookie ? '重新登录微博' : '去登录微博'}
             </Text>
           </TouchableOpacity>
+
+          {hasCookie ? (
+            <TouchableOpacity
+              onPress={handleClearCookie}
+              activeOpacity={0.6}
+              style={{
+                marginTop: 8,
+                minHeight: 36,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <AppIcon name="trash" size={15} color={colors.danger} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.danger }}>
+                清除登录状态
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -197,9 +258,28 @@ export default function WeiboScreen() {
                 {webViewNav || webViewUrl}
               </Text>
             </View>
-            <TouchableOpacity onPress={handleLoginDone} activeOpacity={0.6}>
-              <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '700' }}>完成</Text>
+            <TouchableOpacity onPress={handleLoginDone} activeOpacity={0.6} disabled={saving}>
+              <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '700' }}>
+                {saving ? '读取中…' : '完成'}
+              </Text>
             </TouchableOpacity>
+          </View>
+
+          <View
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              backgroundColor: colors.cardAlt,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.inputBorder,
+            }}
+          >
+            <Text style={{ fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+              1. 在页面中完成登录
+            </Text>
+            <Text style={{ fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
+              2. 轻点右上角「完成」保存
+            </Text>
           </View>
 
           {webViewUrl ? (
@@ -207,7 +287,11 @@ export default function WeiboScreen() {
               source={{ uri: webViewUrl }}
               sharedCookiesEnabled
               thirdPartyCookiesEnabled
-              cacheEnabled={false}
+              // iOS: 保留默认持久化 WKWebsiteDataStore，CookieManager.get(url, true)
+              // 才能读到 WebView 登录后写入的 Cookie（cacheEnabled={false} 会让
+              // react-native-webview 切换到非持久 store，导致 iOS 读不到 Cookie）。
+              // Android 继续沿用原来的关闭缓存行为。
+              cacheEnabled={Platform.OS === 'android' ? false : undefined}
               onNavigationStateChange={(nav: WebViewNavigation) => setWebViewNav(nav.url)}
               userAgent={
                 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'
