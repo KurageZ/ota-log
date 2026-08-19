@@ -477,20 +477,13 @@ export default function HomeScreen() {
       activeOpacity={0.65}
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       onPress={() => router.push('/events/compose')}
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.accent,
-      }}
+      style={{ paddingRight: 4 }}
       accessibilityLabel="新建活动"
       accessibilityRole="button"
     >
-      <AppIcon name="add" size={22} color={colors.onAccent} />
+      <AppIcon name="add" size={24} color={colors.accent} />
     </TouchableOpacity>
-  ), [colors.accent, colors.onAccent, router]);
+  ), [colors.accent, router]);
 
   const renderHeaderRight = useCallback(() => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
