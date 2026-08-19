@@ -176,7 +176,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="偏好" />
+          <SectionLabel label="外观与显示" />
           <MenuCard>
             <MenuItem
               icon="appearance"
@@ -185,6 +185,20 @@ export default function SettingsScreen() {
               tint={appearanceTint}
               onPress={() => router.push('/settings/appearance')}
             />
+            <MenuItem
+              icon="image"
+              label="拍立得展示方式"
+              subtitle="艺人、活动、记录详情与切册的图片展示方式"
+              tint={preferenceTint}
+              isLast
+              onPress={() => router.push('/settings/cheki-display')}
+            />
+          </MenuCard>
+        </View>
+
+        <View style={{ marginBottom: 16 }}>
+          <SectionLabel label="偏好" />
+          <MenuCard>
             <MenuItem
               icon="viewSettings"
               label="功能"
@@ -197,29 +211,8 @@ export default function SettingsScreen() {
               label="日历"
               subtitle="周起始日与月视图展示"
               tint={preferenceTint}
-              onPress={() => router.push('/settings/calendar')}
-            />
-            <MenuItem
-              icon="image"
-              label="拍立得展示方式"
-              subtitle="艺人、活动、记录详情与切册的图片展示方式"
-              tint={preferenceTint}
-              onPress={() => router.push('/settings/cheki-display')}
-            />
-            <MenuItem
-              icon="filter"
-              label="首页自定义"
-              subtitle="调整首页卡片顺序和显示内容"
-              tint={settingsTints.home}
-              onPress={() => router.push('/settings/home')}
-            />
-            <MenuItem
-              icon="stats"
-              label="统计自定义"
-              subtitle="编辑统计内容顺序和显示状态"
-              tint={preferenceTint}
               isLast
-              onPress={() => router.push('/settings/stats')}
+              onPress={() => router.push('/settings/calendar')}
             />
           </MenuCard>
         </View>

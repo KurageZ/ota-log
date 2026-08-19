@@ -14,8 +14,8 @@ import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 const CHEKI_DISPLAY_MODE_OPTIONS: ChekiDisplayMode[] = ['portrait', 'original'];
 
 const CHEKI_DISPLAY_MODE_DESCRIPTIONS: Record<ChekiDisplayMode, string> = {
-  portrait: '图片统一按三寸竖版比例显示。',
-  original: '图片按自身比例居中显示在正方形网格中，不撑满整格。',
+  portrait: '图片按三寸竖版拍立得比例显示。',
+  original: '图片按自身原始比例完整显示。',
 };
 
 export default function ChekiDisplaySettingsScreen() {
