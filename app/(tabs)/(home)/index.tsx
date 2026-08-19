@@ -494,7 +494,7 @@ export default function HomeScreen() {
         onPress={() => router.push('/settings/home')}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <AppIcon name="settings" size={22} color={colors.accent} />
+        <AppIcon name="viewSettings" size={22} color={colors.accent} />
       </TouchableOpacity>
       {renderCreateEventIcon()}
     </View>

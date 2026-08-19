@@ -688,13 +688,12 @@ export default function StatsScreen() {
   const renderAndroidAdjustButton = useCallback(() => (
     <TouchableOpacity
       onPress={() => router.push('/settings/stats')}
-      activeOpacity={0.7}
+      activeOpacity={0.65}
       accessibilityRole="button"
       accessibilityLabel="编辑统计内容"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}
     >
-      <AppIcon name="settings" size={22} color={colors.accent} />
+      <AppIcon name="viewSettings" size={22} color={colors.accent} />
     </TouchableOpacity>
   ), [colors.accent, router]);
 

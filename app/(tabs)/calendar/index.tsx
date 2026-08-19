@@ -69,7 +69,6 @@ const CALENDAR_RANKING_PREVIEW_LIMIT = 10;
 const CALENDAR_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const CALENDAR_MONTH_CELL_HEIGHT = 92;
 const CALENDAR_MONTH_CELL_COMPACT_HEIGHT = 89;
-const CALENDAR_MONTH_TOP_SPACING = 12;
 function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
@@ -399,22 +398,14 @@ export default function CalendarScreen() {
   const renderCalendarSettingsButton = useCallback(() => (
     <TouchableOpacity
       onPress={() => router.push('/settings/calendar')}
-      activeOpacity={0.7}
+      activeOpacity={0.65}
       accessibilityRole="button"
       accessibilityLabel="日历设置"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={{
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: isDark ? colors.input : colors.inputBorder,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
     >
-      <AppIcon name="settings" size={18} color={colors.accent} />
+      <AppIcon name="viewSettings" size={22} color={colors.accent} />
     </TouchableOpacity>
-  ), [colors.accent, colors.input, colors.inputBorder, isDark]);
+  ), [colors.accent, router]);
 
   const renderChekiStack = useCallback((summary: ChekiCalendarDaySummary) => {
     const imageSource: ImageSourcePropType | null = summary.latestPhotoUri
@@ -568,7 +559,7 @@ export default function CalendarScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingHorizontal: 16,
-        paddingTop: (isIOS ? 0 : androidHeader.contentTopPadding) + CALENDAR_MONTH_TOP_SPACING,
+        paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,
         paddingBottom: contentBottomPadding,
       }}
       contentInsetAdjustmentBehavior="automatic"
@@ -1030,7 +1021,7 @@ export default function CalendarScreen() {
           <Stack.Toolbar placement="right">
             <Stack.Toolbar.Button
               accessibilityLabel="日历设置"
-              icon={getAppIconSFSymbol('settings')}
+              icon={getAppIconSFSymbol('viewSettings')}
               onPress={() => router.push('/settings/calendar')}
             />
           </Stack.Toolbar>
