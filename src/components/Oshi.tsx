@@ -128,15 +128,19 @@ export function OshiAvatar({
   source,
   size,
   isOshi,
+  fallbackText,
 }: {
   source: ImageSourcePropType | null;
   size: number;
   isOshi: boolean;
+  /** 缺少头像时用文字替代默认图标，例如艺人名首字 */
+  fallbackText?: string;
 }) {
   const { colors } = useAppTheme();
   const ringWidth = isOshi ? Math.max(2, Math.round(size * 0.05)) : 0;
   const innerSize = isOshi ? size - ringWidth * 2 : size;
   const radius = size / 2;
+  const fallbackFontSize = Math.max(11, Math.round(size * 0.38));
   const rotateValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -168,7 +172,16 @@ export function OshiAvatar({
       }}>
         {source
           ? <Image source={source} style={{ width: size, height: size, borderRadius: radius }} />
-          : <AppIcon name="artist" size={Math.round(size * 0.45)} color={colors.textSecondary} />
+          : fallbackText
+            ? (
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: fallbackFontSize, lineHeight: size, fontWeight: '700', color: colors.textSecondary }}
+              >
+                {fallbackText}
+              </Text>
+            )
+            : <AppIcon name="artist" size={Math.round(size * 0.45)} color={colors.textSecondary} />
         }
       </View>
     );
@@ -209,7 +222,16 @@ export function OshiAvatar({
       }}>
         {source
           ? <Image source={source} style={{ width: innerSize, height: innerSize, borderRadius: innerSize / 2 }} />
-          : <AppIcon name="artist" size={Math.round(size * 0.38)} color={colors.textSecondary} />
+          : fallbackText
+            ? (
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: fallbackFontSize, lineHeight: innerSize, fontWeight: '700', color: colors.textSecondary }}
+              >
+                {fallbackText}
+              </Text>
+            )
+            : <AppIcon name="artist" size={Math.round(size * 0.38)} color={colors.textSecondary} />
         }
       </View>
       <View style={{

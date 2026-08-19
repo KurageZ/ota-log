@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,10 +15,11 @@ import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { OshiAvatar } from '../../src/components/Oshi';
 import { AppIcon } from '../../src/components/AppIcon';
+import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
+import { MenuCard, MenuIconTile } from '../../src/components/SettingsMenu';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import { showSaveFailedAlert } from '../../src/utils/failureAlert';
-import type { InferredArtistTypeConversion } from '../../src/repositories/ArtistRepository';
 import {
   ArtistTypeConversionGroup,
   buildArtistTypeConversionGraph,
@@ -27,13 +28,14 @@ import {
 } from '../../src/utils/artistTypeConversion';
 
 interface ConversionSection {
-  key: 'selected' | 'available';
+  key: 'relationships' | 'isolated';
   data: ArtistTypeConversionGroup[];
 }
 
 export default function ArtistTypeConversionScreen() {
   const db = useDB();
   const { colors, isDark } = useAppTheme();
+  const dataTint = colors.settingsMenu.backupExport;
   const [artists, setArtists] = useState<Artist[]>([]);
   const [activityCounts, setActivityCounts] = useState<Record<string, number>>({});
   const [decisions, setDecisions] = useState<Record<string, ArtistType | null>>({});
@@ -41,22 +43,21 @@ export default function ArtistTypeConversionScreen() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [inferred, setInferred] = useState<InferredArtistTypeConversion | null>(null);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const [all, inferredConversion, directActivityCounts] = await Promise.all([
+      const [all, directActivityCounts] = await Promise.all([
         db.artists.findAll(),
-        db.artists.inferTypeConversion(),
         db.artists.findDirectActivityCounts(),
       ]);
       const unset = all.filter((artist) => artist.artist_type == null);
       setArtists(unset);
       setActivityCounts(directActivityCounts);
       setDecisions(Object.fromEntries(unset.map((artist) => [artist.id, null])));
-      setInferred(inferredConversion);
     } catch {
       setLoadFailed(true);
     } finally {
@@ -76,18 +77,27 @@ export default function ArtistTypeConversionScreen() {
   ), [decisions]);
   const selectedGroups = useMemo(() => groups.filter(isGroupSelected), [groups, isGroupSelected]);
   const normalizedKeyword = keyword.trim().toLocaleLowerCase();
-  const availableGroups = useMemo(() => groups.filter((group) => {
-    if (isGroupSelected(group)) return false;
+  const matchesKeyword = useCallback((group: ArtistTypeConversionGroup) => {
     if (!normalizedKeyword) return true;
     return group.artists.some((artist) => (
       artist.name.toLocaleLowerCase().includes(normalizedKeyword)
       || artist.short_name?.toLocaleLowerCase().includes(normalizedKeyword)
     ));
-  }), [groups, isGroupSelected, normalizedKeyword]);
+  }, [normalizedKeyword]);
+  const relationshipGroups = useMemo(() => groups.filter((group) => (
+    group.isRelationship && matchesKeyword(group)
+  )), [groups, matchesKeyword]);
+  const isolatedGroups = useMemo(() => groups.filter((group) => (
+    !group.isRelationship && matchesKeyword(group)
+  )), [groups, matchesKeyword]);
   const sections = useMemo<ConversionSection[]>(() => [
-    { key: 'selected', data: selectedGroups },
-    { key: 'available', data: availableGroups },
-  ], [availableGroups, selectedGroups]);
+    ...(relationshipGroups.length > 0
+      ? [{ key: 'relationships' as const, data: relationshipGroups }]
+      : []),
+    ...(isolatedGroups.length > 0
+      ? [{ key: 'isolated' as const, data: isolatedGroups }]
+      : []),
+  ], [isolatedGroups, relationshipGroups]);
 
   const selectedCount = Object.values(decisions).filter(Boolean).length;
   const selectedPersonCount = Object.values(decisions).filter((type) => type === 'person').length;
@@ -97,8 +107,11 @@ export default function ArtistTypeConversionScreen() {
       && decisions[artist.id] === 'person'
       && decisions[artist.parent_id] === 'group'
   )).length;
-  const selectableGroups = groups.filter((group) => !group.ambiguous);
-  const allSelectableSelected = selectableGroups.length > 0 && selectableGroups.every(isGroupSelected);
+  const selectableRelationshipGroups = useMemo(() => groups.filter((group) => (
+    group.isRelationship && !group.ambiguous
+  )), [groups]);
+  const allRelationshipGroupsSelected = selectableRelationshipGroups.length > 0
+    && selectableRelationshipGroups.every(isGroupSelected);
 
   const updateDecision = useCallback((artistId: string, nextType: ArtistType | null) => {
     setDecisions((current) => updateLinkedTypeDecision(current, artistId, nextType, graph));
@@ -117,20 +130,12 @@ export default function ArtistTypeConversionScreen() {
     }
   }, [graph.suggestedTypes, isGroupSelected, updateDecision]);
 
-  const previewInferred = () => {
-    if (!inferred || Object.keys(inferred.decisions).length === 0) return;
-    setDecisions(Object.fromEntries(artists.map((artist) => [
-      artist.id,
-      inferred.decisions[artist.id] ?? null,
-    ])));
-  };
-
-  const toggleSelectAll = () => {
+  const toggleRelationshipSelectAll = () => {
     setDecisions((current) => {
       const next = { ...current };
-      for (const group of selectableGroups) {
+      for (const group of selectableRelationshipGroups) {
         for (const artist of group.artists) {
-          next[artist.id] = allSelectableSelected
+          next[artist.id] = allRelationshipGroupsSelected
             ? null
             : (graph.suggestedTypes[artist.id] ?? 'person');
         }
@@ -138,6 +143,45 @@ export default function ArtistTypeConversionScreen() {
       return next;
     });
   };
+
+  const allIsolatedArtists = useMemo(() => groups
+    .filter((group) => !group.isRelationship)
+    .flatMap((group) => group.artists), [groups]);
+
+  const selectAllIsolated = (type: ArtistType) => {
+    setDecisions((current) => {
+      const next = { ...current };
+      for (const artist of allIsolatedArtists) {
+        next[artist.id] = type;
+      }
+      return next;
+    });
+  };
+
+  const toggleGroupExpanded = useCallback((groupId: string) => {
+    setExpandedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
+
+  // 勾选关系组后自动展开成员区，方便在提交前看到整组转换结果。
+  useEffect(() => {
+    setExpandedGroupIds((current) => {
+      const toExpand = groups.filter((group) => (
+        group.isRelationship && isGroupSelected(group) && !current.has(group.id)
+      ));
+      if (toExpand.length === 0) return current;
+      const next = new Set(current);
+      toExpand.forEach((group) => next.add(group.id));
+      return next;
+    });
+  }, [groups, isGroupSelected]);
 
   const apply = async () => {
     if (selectedCount === 0) return;
@@ -156,74 +200,44 @@ export default function ArtistTypeConversionScreen() {
     }
   };
 
-  const confirmApply = () => {
+  const openConfirm = () => {
     if (selectedCount === 0) return;
-    Alert.alert(
-      '确认转换？',
-      `将设置 ${selectedPersonCount} 位个人、${selectedGroupCount} 个团体，并转换 ${selectedMembershipCount} 段所属关系。`,
-      [
-        { text: '取消', style: 'cancel' },
-        { text: '确认转换', onPress: () => { void apply(); } },
-      ],
-    );
+    setConfirmOpen(true);
   };
 
-  const renderArtistRow = (
-    artist: Artist,
-    group: ArtistTypeConversionGroup,
-    isPrimary: boolean,
-  ) => {
+  const renderMemberRow = (artist: Artist) => {
     const selectedType = decisions[artist.id];
     const directActivityCount = activityCounts[artist.id] ?? 0;
-    const groupSelected = isGroupSelected(group);
     return (
       <View
         key={artist.id}
         style={{
-          minHeight: isPrimary ? 58 : 50,
-          paddingLeft: isPrimary ? 8 : 52,
+          minHeight: 46,
+          paddingLeft: 52,
           paddingRight: 12,
           flexDirection: 'row',
           alignItems: 'center',
-          borderTopWidth: isPrimary ? 0 : 1,
+          borderTopWidth: 1,
           borderTopColor: colors.divider,
-          backgroundColor: isPrimary && groupSelected ? colors.accentSofter : isPrimary ? colors.card : colors.cardMuted,
+          backgroundColor: colors.cardMuted,
         }}
       >
-        {isPrimary ? (
-          <TouchableOpacity
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: groupSelected, disabled: group.ambiguous }}
-            accessibilityLabel={`${groupSelected ? '取消转换' : '选择转换'} ${artist.name}${group.isRelationship ? '及其成员' : ''}`}
-            disabled={group.ambiguous || saving}
-            onPress={() => toggleGroup(group)}
-            activeOpacity={0.65}
-            style={{ width: 40, height: 48, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <AppIcon
-              name="checkbox"
-              variant={groupSelected ? 'selected' : 'unselected'}
-              size={22}
-              color={groupSelected ? colors.accent : colors.chevron}
-            />
-          </TouchableOpacity>
-        ) : null}
-        <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={isPrimary ? 38 : 32} isOshi={false} />
+        <OshiAvatar
+          source={resolveAvatarSource(artist.avatar_uri)}
+          size={28}
+          isOshi={false}
+          fallbackText={artist.name.slice(0, 1)}
+        />
         <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
-          <Text numberOfLines={1} style={{ color: colors.text, fontSize: isPrimary ? 14.5 : 13.5, fontWeight: '700' }}>
+          <Text numberOfLines={1} style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
             {artist.name}
           </Text>
-          <View style={{ marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>
-              {group.ambiguous
-                ? '多层所属，需先整理'
-                : group.isRelationship && isPrimary
-                  ? `${group.artists.length - 1} 位成员 · ${selectedType === 'group' ? '转换为团体' : '建议：团体'}`
-                  : selectedType === 'group' ? '转换为团体'
-                  : selectedType === 'person' ? '转换为个人'
-                    : graph.suggestedTypes[artist.id] === 'group' ? '建议：团体'
-                      : graph.suggestedTypes[artist.id] === 'person' ? '建议：个人' : '类型待选择'}
-            </Text>
+          <View style={{ marginTop: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {selectedType != null ? (
+              <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>
+                {selectedType === 'person' ? '转换为个人' : '转换为团体'}
+              </Text>
+            ) : null}
             {directActivityCount > 0 ? (
               <Text style={{ color: colors.accentText, fontSize: 11.5, fontWeight: '700' }}>
                 {directActivityCount} 场活动
@@ -231,55 +245,60 @@ export default function ArtistTypeConversionScreen() {
             ) : null}
           </View>
         </View>
-
-        {!group.isRelationship && !group.ambiguous ? (
-          <View style={{ marginLeft: 8, flexDirection: 'row', gap: 5 }}>
-            {([
-              { value: 'person' as const, label: '个人' },
-              { value: 'group' as const, label: '团体' },
-            ]).map((option) => {
-              const active = selectedType === option.value;
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
-                  disabled={saving}
-                  onPress={() => updateDecision(artist.id, option.value)}
-                  style={{
-                    minWidth: 58,
-                    minHeight: 44,
-                    paddingHorizontal: 8,
-                    borderRadius: 9,
-                    flexDirection: 'row',
-                    gap: 5,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: active ? colors.accent : colors.inputBorder,
-                    backgroundColor: active ? colors.accentSoft : colors.input,
-                  }}
-                >
-                  <AppIcon
-                    name="checkbox"
-                    variant={active ? 'selected' : 'unselected'}
-                    size={15}
-                    color={active ? colors.accent : colors.textMuted}
-                  />
-                  <Text style={{ color: active ? colors.accentText : colors.textSecondary, fontSize: 12, fontWeight: '700' }}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : null}
       </View>
     );
   };
 
-  const renderGroup = ({ item }: { item: ArtistTypeConversionGroup }) => {
-    const selected = isGroupSelected(item);
+  const renderMemberStrip = (group: ArtistTypeConversionGroup) => {
+    const members = group.artists.slice(1);
+    const visibleMembers = members.slice(0, 6);
+    const hiddenCount = members.length - visibleMembers.length;
+    return (
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{ expanded: false }}
+        accessibilityLabel={`展开${members.length} 位成员`}
+        disabled={saving}
+        onPress={() => toggleGroupExpanded(group.id)}
+        activeOpacity={0.72}
+        style={{
+          minHeight: 44,
+          paddingVertical: 7,
+          paddingHorizontal: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          borderTopWidth: 1,
+          borderTopColor: colors.divider,
+        }}
+      >
+        {visibleMembers.map((artist) => (
+          <OshiAvatar
+            key={artist.id}
+            source={resolveAvatarSource(artist.avatar_uri)}
+            size={28}
+            isOshi={false}
+            fallbackText={artist.name.slice(0, 1)}
+          />
+        ))}
+        <View style={{ marginLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: '800' }}>
+            {hiddenCount > 0 ? `+${hiddenCount} · ` : ''}{members.length} 位成员
+          </Text>
+          <AppIcon name="chevron" variant="down" size={14} color={colors.accentText} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderGroup = ({ item: group }: { item: ArtistTypeConversionGroup }) => {
+    const selected = isGroupSelected(group);
+    const primary = group.artists[0];
+    const primaryType = decisions[primary.id];
+    const members = group.artists.slice(1);
+    const directActivityCount = activityCounts[primary.id] ?? 0;
+    const expanded = group.ambiguous || expandedGroupIds.has(group.id);
+    const isIsolated = !group.isRelationship;
     return (
       <View style={{
         marginBottom: 10,
@@ -289,7 +308,189 @@ export default function ArtistTypeConversionScreen() {
         borderColor: selected ? colors.accentBorder : colors.divider,
         backgroundColor: colors.card,
       }}>
-        {item.artists.map((artist, index) => renderArtistRow(artist, item, index === 0))}
+        <View style={{
+          minHeight: 58,
+          paddingLeft: 8,
+          paddingRight: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: selected ? colors.accentSofter : colors.card,
+        }}>
+          <TouchableOpacity
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected, disabled: group.ambiguous }}
+            accessibilityLabel={`${selected ? '取消转换' : '选择转换'} ${primary.name}${group.isRelationship ? '及其成员' : ''}`}
+            disabled={group.ambiguous || saving}
+            onPress={() => toggleGroup(group)}
+            activeOpacity={0.65}
+            style={{ width: 44, height: 48, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <AppIcon
+              name="checkbox"
+              variant={selected ? 'selected' : 'unselected'}
+              size={22}
+              color={selected ? colors.accent : colors.chevron}
+            />
+          </TouchableOpacity>
+          <OshiAvatar
+            source={resolveAvatarSource(primary.avatar_uri)}
+            size={38}
+            isOshi={false}
+            fallbackText={primary.name.slice(0, 1)}
+          />
+          <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14.5, fontWeight: '700' }}>
+              {primary.name}
+            </Text>
+            <View style={{ marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>
+                {group.ambiguous
+                  ? '多层所属，需先整理'
+                  : group.isRelationship
+                    ? selected
+                      ? `将转为 1 个团体 + ${members.length} 位个人`
+                      : `${members.length} 位成员`
+                    : primaryType === 'group' ? '转换为团体'
+                    : primaryType === 'person' ? '转换为个人'
+                      : '类型待选择'}
+              </Text>
+              {directActivityCount > 0 ? (
+                <Text style={{ color: colors.accentText, fontSize: 11.5, fontWeight: '700' }}>
+                  {directActivityCount} 场活动
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {isIsolated && !group.ambiguous ? (
+            <View style={{ marginLeft: 8, flexDirection: 'row', gap: 5 }}>
+              {([
+                { value: 'person' as const, label: '个人' },
+                { value: 'group' as const, label: '团体' },
+              ]).map((option) => {
+                const active = primaryType === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    disabled={saving}
+                    onPress={() => updateDecision(primary.id, option.value)}
+                    style={{
+                      minWidth: 58,
+                      minHeight: 44,
+                      paddingHorizontal: 8,
+                      borderRadius: 9,
+                      flexDirection: 'row',
+                      gap: 5,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: active ? colors.accent : colors.inputBorder,
+                      backgroundColor: active ? colors.accentSoft : colors.input,
+                    }}
+                  >
+                    <AppIcon
+                      name="checkbox"
+                      variant={active ? 'selected' : 'unselected'}
+                      size={15}
+                      color={active ? colors.accent : colors.textMuted}
+                    />
+                    <Text style={{ color: active ? colors.accentText : colors.textSecondary, fontSize: 12, fontWeight: '700' }}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : group.isRelationship && !group.ambiguous ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              accessibilityLabel={`${expanded ? '收起' : '展开'}${members.length} 位成员`}
+              disabled={saving}
+              onPress={() => toggleGroupExpanded(group.id)}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <AppIcon name="chevron" variant={expanded ? 'up' : 'down'} size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {group.isRelationship ? (
+          expanded ? (
+            members.map((artist) => renderMemberRow(artist))
+          ) : (
+            renderMemberStrip(group)
+          )
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderConfirmGroup = (group: ArtistTypeConversionGroup) => {
+    const primary = group.artists[0];
+    const members = group.artists.slice(1);
+    const directActivityCount = activityCounts[primary.id] ?? 0;
+    return (
+      <View key={group.id} style={{
+        marginBottom: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.divider,
+        backgroundColor: colors.card,
+        overflow: 'hidden',
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10 }}>
+          <OshiAvatar
+            source={resolveAvatarSource(primary.avatar_uri)}
+            size={34}
+            isOshi={false}
+            fallbackText={primary.name.slice(0, 1)}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+              {primary.name}
+            </Text>
+            <View style={{ marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: '700' }}>
+                {group.isRelationship
+                  ? `转为团体 · ${members.length} 位成员转为个人`
+                  : decisions[primary.id] === 'group' ? '转为团体' : '转为个人'}
+              </Text>
+              {directActivityCount > 0 ? (
+                <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>
+                  {directActivityCount} 场活动
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        </View>
+        {group.isRelationship ? members.map((artist) => (
+          <View
+            key={artist.id}
+            style={{
+              minHeight: 40,
+              paddingLeft: 18,
+              paddingRight: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderTopWidth: 1,
+              borderTopColor: colors.divider,
+            }}
+          >
+            <OshiAvatar
+              source={resolveAvatarSource(artist.avatar_uri)}
+              size={24}
+              isOshi={false}
+              fallbackText={artist.name.slice(0, 1)}
+            />
+            <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, marginLeft: 8, color: colors.text, fontSize: 13 }}>
+              {artist.name}
+            </Text>
+            <Text style={{ color: colors.accentText, fontSize: 11.5, fontWeight: '700' }}>转为个人</Text>
+          </View>
+        )) : null}
       </View>
     );
   };
@@ -334,84 +535,37 @@ export default function ArtistTypeConversionScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 104 }}
           ListHeaderComponent={(
             <View>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 20 }}>
-                每张卡片代表一整组所属关系。选择或取消卡片时，团体与全部成员会一起变化。
-              </Text>
-              <View style={{
-                marginTop: 16,
-                padding: 16,
-                borderRadius: 16,
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.accentBorder,
-              }}>
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>一键推测</Text>
-                <Text style={{ marginTop: 6, color: colors.textSecondary, fontSize: 13, lineHeight: 19 }}>
-                  成员推测为个人，上级推测为团体。生成后可按关系组检查；孤立艺人仍需明确选择类型。
-                </Text>
-                <Text style={{ marginTop: 10, color: colors.text, fontSize: 13, fontWeight: '700' }}>
-                  建议 {inferred?.personCount ?? 0} 位个人 · {inferred?.groupCount ?? 0} 个团体 · {inferred?.membershipCount ?? 0} 段关系
-                </Text>
-                <TouchableOpacity
-                  onPress={previewInferred}
-                  disabled={saving || !inferred || Object.keys(inferred.decisions).length === 0}
-                  style={{
-                    marginTop: 14,
-                    minHeight: 44,
-                    borderRadius: 11,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: colors.accent,
-                    opacity: saving || !inferred || Object.keys(inferred.decisions).length === 0 ? 0.45 : 1,
-                  }}
-                >
-                  <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: '800' }}>
-                    {!inferred || Object.keys(inferred.decisions).length === 0 ? '没有可推测的关系' : '生成转换预览'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          renderSectionHeader={({ section }) => section.key === 'selected' ? (
-            <View style={{ marginTop: 22, marginBottom: section.data.length > 0 ? 10 : 18 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: colors.heading, fontSize: 17, fontWeight: '700' }}>已选择</Text>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  disabled={saving || selectableGroups.length === 0}
-                  onPress={toggleSelectAll}
-                  style={{ minHeight: 44, paddingLeft: 16, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: '800' }}>
-                    {allSelectableSelected ? '取消全选' : '全选'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
-                已选择 {selectedCount} 位艺人；有活动记录的关系优先显示
-              </Text>
-              {section.data.length === 0 ? (
-                <View style={{
-                  marginTop: 10,
-                  minHeight: 54,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: colors.cardMuted,
-                  borderWidth: 1,
-                  borderColor: colors.divider,
-                }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 12.5 }}>尚未选择要转换的关系或艺人</Text>
+              <MenuCard>
+                <View style={{ padding: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <MenuIconTile tint={dataTint} name="artists" />
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                      整理未设置类型的艺人
+                    </Text>
+                  </View>
+                  {[
+                    '已有所属关系的艺人只能整组转换，团体和成员会一起变化。',
+                    '单独艺人可以分别选择个人或团体。',
+                    '最后会弹出确认清单，检查无误后再生效。',
+                  ].map((line) => (
+                    <View key={line} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 6 }}>
+                      <View style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: 2,
+                        backgroundColor: colors.accent,
+                        marginTop: 8,
+                        marginRight: 8,
+                      }} />
+                      <Text style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                        {line}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={{ marginTop: 22, marginBottom: 12 }}>
-              <Text style={{ color: colors.heading, fontSize: 17, fontWeight: '700' }}>未选择</Text>
-              <Text style={{ marginTop: 3, marginBottom: 10, color: colors.textMuted, fontSize: 12 }}>
-                关系按组选择；有活动记录的内容排在前面
-              </Text>
+              </MenuCard>
               <View style={{
+                marginTop: 14,
                 height: 44,
                 paddingHorizontal: 12,
                 flexDirection: 'row',
@@ -435,17 +589,74 @@ export default function ArtistTypeConversionScreen() {
                   style={{ flex: 1, height: 42, paddingVertical: 0, color: colors.text, fontSize: 14 }}
                 />
               </View>
-              {section.data.length === 0 ? (
-                <Text style={{ marginTop: 26, textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
-                  {groups.length === 0
-                    ? '没有未设置类型的艺人，可返回艺人管理继续整理'
-                    : groups.length === selectedGroups.length
-                    ? '所有可转换内容都已选择'
-                    : normalizedKeyword ? '没有找到匹配的关系或艺人' : '没有未选择的内容'}
-                </Text>
-              ) : null}
             </View>
           )}
+          renderSectionHeader={({ section }) => {
+            const isRelationships = section.key === 'relationships';
+            return (
+              <View style={{ marginTop: 22, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                    <Text style={{ color: colors.heading, fontSize: 17, fontWeight: '700' }}>
+                      {isRelationships ? '已有所属关系' : '单独艺人'}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600' }}>
+                      {isRelationships ? `${section.data.length} 组` : `${section.data.length} 位`}
+                    </Text>
+                  </View>
+                  {isRelationships ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      disabled={saving || selectableRelationshipGroups.length === 0}
+                      onPress={toggleRelationshipSelectAll}
+                      style={{ minHeight: 44, paddingLeft: 16, justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: '800' }}>
+                        {allRelationshipGroupsSelected ? '取消全选' : '全选'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="全部设为个人"
+                        disabled={saving || allIsolatedArtists.length === 0}
+                        onPress={() => selectAllIsolated('person')}
+                        style={{ minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: '800' }}>
+                          全选为个人
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="全部设为团体"
+                        disabled={saving || allIsolatedArtists.length === 0}
+                        onPress={() => selectAllIsolated('group')}
+                        style={{ minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: '800' }}>
+                          全选为团体
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ marginTop: 3, color: colors.textMuted, fontSize: 12 }}>
+                  {isRelationships
+                    ? '已有所属关系的艺人仅能整组转换'
+                    : '没有所属关系，可单独选择个人或团体'}
+                </Text>
+              </View>
+            );
+          }}
+          ListFooterComponent={relationshipGroups.length + isolatedGroups.length === 0 ? (
+            <Text style={{ marginTop: 26, textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
+              {groups.length === 0
+                ? '没有未设置类型的艺人，可返回艺人管理继续整理'
+                : '没有找到匹配的关系或艺人'}
+            </Text>
+          ) : null}
           renderItem={renderGroup}
         />
       )}
@@ -463,7 +674,7 @@ export default function ArtistTypeConversionScreen() {
         borderTopColor: colors.divider,
       }}>
         <TouchableOpacity
-          onPress={confirmApply}
+          onPress={openConfirm}
           disabled={saving || selectedCount === 0}
           style={{
             height: 48,
@@ -481,6 +692,70 @@ export default function ArtistTypeConversionScreen() {
           )}
         </TouchableOpacity>
       </View> : null}
+
+      <BottomSheetDialog
+        visible={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="确认转换"
+        scrollable
+        footer={(
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setConfirmOpen(false)}
+              disabled={saving}
+              style={{
+                flex: 1,
+                height: 48,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.cardAlt,
+                borderWidth: 1,
+                borderColor: colors.divider,
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>取消</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              disabled={saving}
+              onPress={() => { setConfirmOpen(false); void apply(); }}
+              style={{
+                flex: 1.4,
+                height: 48,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.accent,
+                opacity: saving ? 0.45 : 1,
+              }}
+            >
+              {saving ? <ActivityIndicator color={colors.onAccent} /> : (
+                <Text style={{ color: colors.onAccent, fontSize: 15, fontWeight: '800' }}>确认转换</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      >
+        <View>
+          <Text style={{ color: colors.text, fontSize: 14, lineHeight: 21 }}>
+            {`将设置 ${selectedPersonCount} 位个人、${selectedGroupCount} 个团体，并转换 ${selectedMembershipCount} 段所属关系。`}
+          </Text>
+          <View style={{
+            marginTop: 12,
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: colors.warningSoft,
+          }}>
+            <Text style={{ color: colors.warning, fontSize: 12.5, lineHeight: 18 }}>
+              转换后，普通所属将变为正式团体履历（无起止日期），这些艺人的类型将不再允许直接修改。
+            </Text>
+          </View>
+          {confirmOpen ? selectedGroups.map(renderConfirmGroup) : null}
+        </View>
+      </BottomSheetDialog>
     </SafeAreaView>
   );
 }
