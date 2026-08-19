@@ -18,11 +18,12 @@
 
 ## 技术栈
 
-- Expo SDK 56
+- Expo SDK 57
 - Expo Router v6
-- React Native 0.85
+- React Native 0.86
 - TypeScript strict
 - SQLite（`expo-sqlite`）
+- expo-dev-client（Dev 版使用）
 
 更多长期技术约束见 [docs/tech/stack.md](docs/tech/stack.md)。
 
@@ -42,11 +43,13 @@ design/         一次性原型或视觉验证产物
 - Node.js
 - npm
 - Xcode（iOS 本地运行时需要）
-- Android Studio + Android SDK（Android 本地运行时需要）
+- Android Studio + Android SDK + JDK 17（Android 本地运行时需要）
 
 本仓库是移动端优先项目。`web` 脚本主要用于局部调试，不保证完整产品体验。
 
 ## 快速开始
+
+以下流程构建的是本地 Dev 版本：独立的 `ota log Dev`（`com.otalog.app.dev`），带 expo-dev-client，可连接 Metro 实时开发，不会覆盖 Preview 或正式版。
 
 ### 1. 安装依赖
 
@@ -56,7 +59,21 @@ npm install
 
 安装完成后会自动执行 `postinstall`，对少量第三方依赖打补丁。
 
-### 2. 首次安装 Dev 版
+### 2. 生成本地原生工程（首次或原生配置变更后）
+
+根级 `ios/` 与 `android/` 默认不跟踪、视为本地生成产物。工作树中缺失这两个目录，或需要从当前 `app.json` / `app.config.js` 重新生成时，先执行下面的命令。必须带 `development` 变体，才会生成 Dev 版的 Bundle ID / Package：
+
+```sh
+# 同时生成 iOS 与 Android
+APP_VARIANT=development npx expo prebuild --clean
+
+# 也可以只生成单平台；iOS 已有等价脚本
+npm run prebuild:ios:dev
+```
+
+注意：`prebuild --clean` 会删除并重新生成原生目录，本地未提交的原生改动会丢失。
+
+### 3. 首次构建并安装 Dev 版
 
 iOS 模拟器：
 
@@ -76,9 +93,14 @@ Android 需要先启动模拟器，或连接已开启 USB 调试的真机：
 npm run android
 ```
 
+Android 本地构建还需要：
+
+- `android/local.properties` 中设置本机 SDK 路径，例如 `sdk.dir=/path/to/Android/sdk`（Android Studio 首次打开会自动生成）
+- 如需从源码构建 expo-sqlite（启用 FTS），在 `android/gradle.properties` 中加入 `expo.sqlite.enableFTS=true`，详见 [docs/tech/stack.md](docs/tech/stack.md)
+
 这些命令安装的都是独立的 `ota log Dev`，不会覆盖 Preview 或正式版。
 
-### 3. 日常运行 Dev 版
+### 4. 日常运行 Dev 版
 
 Dev 版安装完成后，如果只修改 JavaScript、TypeScript、页面或样式，不需要重新构建原生 App。启动 Metro：
 
@@ -92,7 +114,7 @@ npm run start:dev
 npm run start:dev -- --tunnel
 ```
 
-安装或升级原生依赖、修改 Expo config plugin、权限、Bundle ID、App Group 或小组件后，需要重新运行对应的 iOS 或 Android 安装命令。
+安装或升级原生依赖、修改 Expo config plugin、权限、Bundle ID、App Group 或小组件后，需要重新执行第 2、3 步（必要时先用 `--clean` 重新 prebuild）。
 
 ## 应用版本与分发渠道
 
@@ -123,15 +145,7 @@ iOS Preview 使用 Ad Hoc provisioning profile，只能安装到其中已登记 
 
 ## 关于 `ios/` 和 `android/`
 
-根级 `ios/` 与 `android/` 目录在这个仓库里默认不跟踪，视为本地生成产物。
-
-如果你的工作树里还没有这两个目录，或需要从当前 `app.json` 重新生成原生工程，可以执行：
-
-```sh
-npx expo prebuild
-```
-
-首次配置 Android 本地环境后，通常还需要在本机生成的 `android/local.properties` 中设置 SDK 路径。
+根级 `ios/` 与 `android/` 目录在这个仓库里默认不跟踪，视为本地生成产物。缺失或需要从当前配置重新生成时，按上面「生成本地原生工程」的步骤执行 `APP_VARIANT=development npx expo prebuild --clean`；Preview / 正式版的原生工程由 EAS Build 在云端按 `eas.json` 生成，不需要本地 prebuild。
 
 ## 常用命令
 
