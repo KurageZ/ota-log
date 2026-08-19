@@ -219,6 +219,10 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const [transitionCoverLoaded, setTransitionCoverLoaded] = useState(false);
   const controlsAnimation = useRef(new Animated.Value(1)).current;
   const transitionAnimation = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const selectedIndex = useMemo(() => {
     if (!selectedId) return 0;
@@ -248,7 +252,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   useEffect(() => {
     if (!visible) return;
     if (items.length === 0) {
-      onClose();
+      onCloseRef.current();
       return;
     }
     const nextIndex = clampIndex(selectedIndex);
@@ -261,7 +265,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     setControlsVisible(!opensWithTransition);
     controlsAnimation.setValue(opensWithTransition ? 0 : 1);
     setDetailsExpanded(false);
-  }, [clampIndex, controlsAnimation, initialTransitionOrigin, items.length, onClose, selectedIndex, visible]);
+  }, [clampIndex, controlsAnimation, initialTransitionOrigin, items.length, selectedIndex, visible]);
 
   useEffect(() => {
     if (!visible || items.length === 0) return;
@@ -450,7 +454,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   }, [
     clampIndex,
     initialTransitionOrigin,
-    items,
+    items.length,
     selectedIndex,
     transitionAnimation,
     visible,

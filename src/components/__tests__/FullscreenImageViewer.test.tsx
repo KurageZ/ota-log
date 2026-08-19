@@ -108,6 +108,42 @@ describe('FullscreenImageViewer opening transition', () => {
       .toBe('auto');
   });
 
+  test('does not replay the opening transition when items or callbacks change while open', () => {
+    jest.useFakeTimers();
+    const transitionOrigin = { x: 16, y: 120, width: 108, height: 172, borderRadius: 10 };
+    const render = (items: Array<{ id: string; photoUri: string; favorite: boolean }>) => (
+      <FullscreenImageViewer
+        visible
+        items={items}
+        selectedId="cheki-1"
+        initialTransitionOrigin={transitionOrigin}
+        onClose={jest.fn()}
+        isFavorite={(item) => item.favorite}
+        onToggleFavorite={jest.fn()}
+      />
+    );
+
+    act(() => {
+      renderer = create(render([{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg', favorite: false }]));
+    });
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.imageHidden).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.imageHidden).toBe(false);
+
+    // 收藏切换会重建 items 数组，父组件也会传入新的 onClose 引用。
+    act(() => {
+      renderer.update(render([{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg', favorite: true }]));
+    });
+
+    expect(renderer.root.findByProps({ testID: 'image-viewing' }).props.imageHidden).toBe(false);
+    expect(renderer.root.findAllByProps({ testID: 'image-opening-transition' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'image-viewer-header-controls' }).props.pointerEvents)
+      .toBe('auto');
+  });
+
   test('places edit in the top-right and delete in the bottom-right', () => {
     const onEdit = jest.fn();
     const onDelete = jest.fn();
