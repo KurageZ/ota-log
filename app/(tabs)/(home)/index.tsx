@@ -13,8 +13,9 @@ import {
 import { HomeTimelineEventCard } from '../../../src/components/HomeTimelineEventCard';
 import {
   EventRow,
-  EventRowLocationMeta,
+  EventRowMetaText,
 } from '../../../src/components/EventRow';
+import { EventRatingStars } from '../../../src/components/EventPrimitives';
 import {
   HomeChekiOverviewCard,
   HomeChekiPreview,
@@ -559,19 +560,36 @@ export default function HomeScreen() {
               elevation: 2,
             }}
           >
-            {recent.map((event, index) => (
-              <EventRow
-                key={event.id}
-                title={event.title}
-                subtitle={
-                  <EventRowLocationMeta city={event.city} venue={event.venue} />
-                }
-                trailing={event.review_score != null ? `${event.review_score} 分` : undefined}
-                onPress={() => router.push(`/events/${event.id}`)}
-                isLast={index === recent.length - 1}
-                accessibilityLabel={`查看活动详情：${event.title}`}
-              />
-            ))}
+            {recent.map((event, index) => {
+              const dateLabel = event.event_date
+                ? (() => {
+                    const [, month, day] = event.event_date.split('-').map(Number);
+                    return month > 0 && day > 0 ? `${month}月${day}日` : event.event_date;
+                  })()
+                : '';
+              const locationText = [event.city, event.venue].filter(Boolean).join(' · ');
+              return (
+                <EventRow
+                  key={event.id}
+                  title={event.title}
+                  subtitle={
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        {dateLabel ? <EventRowMetaText>{dateLabel}</EventRowMetaText> : null}
+                        {dateLabel && locationText ? <EventRowMetaText>·</EventRowMetaText> : null}
+                        {locationText ? <EventRowMetaText>{locationText}</EventRowMetaText> : null}
+                      </View>
+                      {event.review_score != null ? (
+                        <EventRatingStars score={event.review_score} size="sm" />
+                      ) : null}
+                    </View>
+                  }
+                  onPress={() => router.push(`/events/${event.id}`)}
+                  isLast={index === recent.length - 1}
+                  accessibilityLabel={`查看活动详情：${event.title}`}
+                />
+              );
+            })}
           </View>
         </View>
       );

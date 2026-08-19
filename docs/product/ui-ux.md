@@ -514,7 +514,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 计划活动按 `src/utils/homeTimeline.ts` 分组。组标题使用小圆点、标题、日期范围和横线，避免重复大卡片标题。
 
 - 首页未来活动时间线卡片使用 `AnimatedPressable`：`HomeTimelineEventCard` 可用 `pressedScale 0.975`。
-- 最近完成区使用 `EventRow` 行列表，外层包圆角 16、边框 `divider`、轻阴影的容器卡；副文本为地点（`eventLocation` icon + 城市 · 地点），右侧为评分。最近完成可配置为全部展示。
+- 最近完成区使用 `EventRow` 行列表，外层包圆角 16、边框 `divider`、轻阴影的容器卡；第二行左侧为日期（`M月D日`，不含年份）与地点（城市 · 地点，无前置图标），右侧为评分星级（`EventRatingStars`）。最近完成可配置为全部展示。
 
 ---
 
