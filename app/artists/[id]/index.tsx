@@ -9,13 +9,13 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { ScrollView as GestureHandlerScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -594,7 +594,7 @@ export default function ArtistDetailScreen() {
                     {relatedArtists.length} 位
                   </Text>
                 </View>
-                <ScrollView
+                <GestureHandlerScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 14 }}
@@ -624,7 +624,7 @@ export default function ArtistDetailScreen() {
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </GestureHandlerScrollView>
               </MenuCard>
             ) : null}
             {renderMembershipCard('artist-history-card', '所属团体', memberships, true, '个')}

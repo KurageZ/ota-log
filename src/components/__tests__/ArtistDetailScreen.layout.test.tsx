@@ -9,6 +9,7 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: {
+      createAnimatedComponent: (component: unknown) => component,
       FlatList: ReactNative.FlatList,
       ScrollView: ReactNative.ScrollView,
       View: ReactNative.View,
