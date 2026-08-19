@@ -186,7 +186,7 @@ export function CustomFloatingTabBar({ state, descriptors, navigation }: BottomT
     ? (containerWidth - SHELL_PADDING_HORIZONTAL * 2) / state.routes.length
     : 0;
   const shellHeight = barHeight - safeBottom;
-  const shellBottomOffset = bottomOffset;
+  const shellBottomOffset = safeBottom + bottomOffset;
   const shellBorderRadius = shellHeight / 2;
   const shellPaddingTop = 0;
   const shellPaddingBottom = 0;
