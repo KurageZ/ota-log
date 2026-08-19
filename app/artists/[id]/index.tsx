@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import SegmentedControl from '@expo/ui/community/segmented-control';
 import {
   GlassView,
   isGlassEffectAPIAvailable,
@@ -35,6 +34,7 @@ import Animated, {
 
 import { EventCard } from '../../../src/components/EventCard';
 import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
+import IOSLargeSegmentedControl from '../../../src/components/IOSLargeSegmentedControl';
 import { AppIcon, type AppIconName, type AppIconVariant } from '../../../src/components/AppIcon';
 import { BottomSheetDialog } from '../../../src/components/BottomSheetDialog';
 import { ChekiManualEntryList } from '../../../src/components/ChekiManualEntryList';
@@ -1763,7 +1763,7 @@ function ArtistSectionTabs({
 
   if (Platform.OS === 'ios') {
     return (
-      <SegmentedControl
+      <IOSLargeSegmentedControl
         testID="artist-section-segmented-control"
         values={values}
         selectedIndex={selectedTab === 'events' ? 0 : 1}
@@ -1772,7 +1772,6 @@ function ArtistSectionTabs({
           const nextTab = TAB_KEYS[nativeEvent.selectedSegmentIndex];
           if (nextTab) onSelect(nextTab);
         }}
-        style={{ height: 60 }}
       />
     );
   }
@@ -1828,9 +1827,9 @@ function TabButton({
       onPress={onPress}
       style={{
         flex: 1,
-        minHeight: 60,
+        minHeight: 40,
         justifyContent: 'center',
-        paddingVertical: 9,
+        paddingVertical: 4,
         borderRadius: 9,
         alignItems: 'center',
         backgroundColor: active ? (activeBg ?? colors.card) : 'transparent',
@@ -1867,7 +1866,7 @@ function TabSwitcherSurface({
   const contentStyle = {
     flexDirection: 'row' as const,
     borderRadius: 14,
-    padding: 4,
+    padding: 2,
     overflow: 'hidden' as const,
   };
 
