@@ -71,6 +71,46 @@ export function hapticCopySuccess(): void {
 }
 
 /**
+ * A favorite was toggled on or off.
+ * iOS: selection tick. Android: system toggle feedback matching the direction.
+ */
+export function hapticFavoriteToggle(nextValue: boolean): void {
+  if (Platform.OS === 'ios') {
+    runHaptic(() => Haptics.selectionAsync());
+  } else if (Platform.OS === 'android') {
+    runHaptic(() => Haptics.performAndroidHapticsAsync(
+      nextValue ? Haptics.AndroidHaptics.Toggle_On : Haptics.AndroidHaptics.Toggle_Off,
+    ));
+  }
+}
+
+/**
+ * A switch was flipped by the user.
+ * iOS: selection tick. Android: system toggle feedback matching the direction.
+ */
+export function hapticToggle(nextValue: boolean): void {
+  if (Platform.OS === 'ios') {
+    runHaptic(() => Haptics.selectionAsync());
+  } else if (Platform.OS === 'android') {
+    runHaptic(() => Haptics.performAndroidHapticsAsync(
+      nextValue ? Haptics.AndroidHaptics.Toggle_On : Haptics.AndroidHaptics.Toggle_Off,
+    ));
+  }
+}
+
+/**
+ * A save operation succeeded.
+ * iOS: light impact. Android: system confirmation feedback.
+ */
+export function hapticSaveSuccess(): void {
+  if (Platform.OS === 'ios') {
+    runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+  } else if (Platform.OS === 'android') {
+    runHaptic(() => Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm));
+  }
+}
+
+/**
  * A warning-level failure occurred. Use the system warning/rejection feedback,
  * never a heavy impact as a substitute.
  * iOS: warning notification. Android: system rejection feedback.

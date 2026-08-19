@@ -16,6 +16,7 @@ import ImageViewing from 'react-native-image-viewing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
+import { useReducedMotionEnabled } from '../utils/useReducedMotionEnabled';
 
 const HEADER_HEIGHT = 64;
 const COLLAPSED_PILL_HEIGHT = 44;
@@ -113,6 +114,75 @@ function HeaderButton({
       })}
     >
       <AppIcon name={icon} variant={variant} size={20} color={color} />
+    </Pressable>
+  );
+}
+
+function FavoriteHeaderButton({
+  isFavorite,
+  accessibilityLabel,
+  color,
+  onPress,
+  restBackgroundColor,
+  pressedBackgroundColor,
+}: {
+  isFavorite: boolean;
+  accessibilityLabel: string;
+  color: string;
+  onPress: () => void;
+  restBackgroundColor: string;
+  pressedBackgroundColor: string;
+}) {
+  const reducedMotion = useReducedMotionEnabled();
+  const popScale = useRef(new Animated.Value(1)).current;
+  const popOpacity = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    if (!reducedMotion) {
+      if (isFavorite) {
+        // 取消收藏：先缩小淡出，再回到静止态，作为"收回"反馈。
+        popScale.setValue(1);
+        popOpacity.setValue(1);
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(popScale, { toValue: 0.9, duration: 90, useNativeDriver: true }),
+            Animated.timing(popScale, { toValue: 1, duration: 140, useNativeDriver: true }),
+          ]),
+          Animated.sequence([
+            Animated.timing(popOpacity, { toValue: 0.5, duration: 90, useNativeDriver: true }),
+            Animated.timing(popOpacity, { toValue: 1, duration: 140, useNativeDriver: true }),
+          ]),
+        ]).start();
+      } else {
+        // 收藏：一个轻快的 spring pop。
+        popScale.setValue(1);
+        Animated.sequence([
+          Animated.spring(popScale, { toValue: 1.25, speed: 24, bounciness: 10, useNativeDriver: true }),
+          Animated.spring(popScale, { toValue: 1, speed: 18, bounciness: 6, useNativeDriver: true }),
+        ]).start();
+      }
+    }
+    onPress();
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      hitSlop={12}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      style={({ pressed }) => ({
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: pressed ? pressedBackgroundColor : restBackgroundColor,
+      })}
+    >
+      <Animated.View style={{ transform: [{ scale: popScale }], opacity: popOpacity }}>
+        <AppIcon name="favorite" variant={isFavorite ? 'active' : 'inactive'} size={20} color={color} />
+      </Animated.View>
     </Pressable>
   );
 }
@@ -528,9 +598,8 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
                 />
               ) : null}
               {onToggleFavorite ? (
-                <HeaderButton
-                  icon="favorite"
-                  variant={isFavorite?.(item) ? 'active' : 'inactive'}
+                <FavoriteHeaderButton
+                  isFavorite={isFavorite?.(item) ?? false}
                   accessibilityLabel={isFavorite?.(item) ? '取消收藏这张拍立得' : '收藏这张拍立得'}
                   color={isFavorite?.(item) ? colors.danger : colors.white}
                   onPress={() => onToggleFavorite(item)}

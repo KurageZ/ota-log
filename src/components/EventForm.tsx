@@ -30,6 +30,7 @@ import { showPhotoLibraryPermissionAlert, showSaveFailedAlert } from '../utils/f
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
+import { hapticSaveSuccess } from '../utils/haptics';
 import { AppIcon } from './AppIcon';
 import { FormFieldLabel, FormSectionLabel } from './FormPrimitives';
 import { generateId } from '../utils/uuid';
@@ -550,6 +551,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
         artist_ids: artistIds, setlist_text: setlistText.trim(),
         review_score: status === 'completed' ? reviewScore : null,
       });
+      hapticSaveSuccess();
     } catch (e) {
       showSaveFailedAlert(e);
     } finally {

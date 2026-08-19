@@ -55,6 +55,7 @@ import { buildChekiViewerItems, getChekiManualCount } from '../../../src/utils/c
 import { buildEventMonthSections } from '../../../src/utils/eventSections';
 import { sortArtistsWithOshi } from '../../../src/utils/filter';
 import { showDeleteFailedAlert } from '../../../src/utils/failureAlert';
+import { hapticError, hapticFavoriteToggle } from '../../../src/utils/haptics';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { toISODate } from '../../../src/utils/date';
 
@@ -251,6 +252,8 @@ export default function ArtistDetailScreen() {
       Alert.alert('单推艺人已收藏', '单推艺人会保持收藏。若要更换或清除单推，请前往「我的 → 设置 → 单推设置」。');
       return;
     }
+    const nextFavorite = artist.is_favorite !== 1;
+    hapticFavoriteToggle(nextFavorite);
     await db.artists.toggleFavorite(artist.id);
     setArtist((prev) => (prev ? { ...prev, is_favorite: prev.is_favorite ? 0 : 1 } : prev));
   };
@@ -276,6 +279,7 @@ export default function ArtistDetailScreen() {
 
   const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
     const nextFavorite = item.isFavorite !== true;
+    hapticFavoriteToggle(nextFavorite);
     const itemId = item.itemId ?? item.id;
     setChekiList((current) => current.map((cheki) => (
       cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 1 : 0 } : cheki
@@ -283,6 +287,7 @@ export default function ArtistDetailScreen() {
     try {
       await db.cheki.setFavorite(itemId, nextFavorite);
     } catch {
+      hapticError();
       setChekiList((current) => current.map((cheki) => (
         cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 0 : 1 } : cheki
       )));

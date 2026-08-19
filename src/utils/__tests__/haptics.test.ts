@@ -6,6 +6,9 @@ import {
   hapticDragReorder,
   hapticDragStart,
   hapticError,
+  hapticFavoriteToggle,
+  hapticSaveSuccess,
+  hapticToggle,
   hapticWarning,
 } from '../haptics';
 
@@ -33,6 +36,8 @@ jest.mock('expo-haptics', () => ({
     Gesture_End: 'gesture-end',
     Drag_Start: 'drag-start',
     Segment_Tick: 'segment-tick',
+    Toggle_On: 'toggle-on',
+    Toggle_Off: 'toggle-off',
   },
 }));
 
@@ -93,6 +98,18 @@ describe('haptics', () => {
       expect(notificationAsync).toHaveBeenCalledWith('success');
     });
 
+    test('favorite and switch toggles use a selection tick', () => {
+      hapticFavoriteToggle(true);
+      hapticToggle(false);
+      expect(selectionAsync).toHaveBeenCalledTimes(2);
+      expect(performAndroidHapticsAsync).not.toHaveBeenCalled();
+    });
+
+    test('save success uses a light impact', () => {
+      hapticSaveSuccess();
+      expect(impactAsync).toHaveBeenCalledWith('light');
+    });
+
     test('warning and error use the matching notification types', () => {
       hapticWarning();
       expect(notificationAsync).toHaveBeenLastCalledWith('warning');
@@ -137,6 +154,25 @@ describe('haptics', () => {
       expect(performAndroidHapticsAsync).toHaveBeenCalledWith('confirm');
     });
 
+    test('favorite toggle matches the toggle direction', () => {
+      hapticFavoriteToggle(true);
+      expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('toggle-on');
+      hapticFavoriteToggle(false);
+      expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('toggle-off');
+    });
+
+    test('switch toggle matches the toggle direction', () => {
+      hapticToggle(true);
+      expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('toggle-on');
+      hapticToggle(false);
+      expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('toggle-off');
+    });
+
+    test('save success uses the system confirmation feedback', () => {
+      hapticSaveSuccess();
+      expect(performAndroidHapticsAsync).toHaveBeenCalledWith('confirm');
+    });
+
     test('warning and error use the system rejection feedback', () => {
       hapticWarning();
       expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('reject');
@@ -155,6 +191,9 @@ describe('haptics', () => {
       hapticDragReorder();
       hapticDragEnd();
       hapticCopySuccess();
+      hapticFavoriteToggle(true);
+      hapticToggle(true);
+      hapticSaveSuccess();
       hapticWarning();
       hapticError();
 

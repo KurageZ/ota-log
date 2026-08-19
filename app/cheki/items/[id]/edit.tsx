@@ -4,7 +4,6 @@ import {
   Alert,
   Image,
   Platform,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -15,6 +14,7 @@ import { Stack, router, useLocalSearchParams, useNavigation } from 'expo-router'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../../../src/components/AppIcon';
+import { AppSwitch } from '../../../../src/components/AppSwitch';
 import { FormCard, FormFieldLabel, FormSectionLabel } from '../../../../src/components/FormPrimitives';
 import { useDB } from '../../../../src/context/DBContext';
 import {
@@ -435,7 +435,7 @@ export default function EditChekiItemScreen() {
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>收藏这张拍立得</Text>
             </View>
-            <Switch
+            <AppSwitch
               value={isFavorite}
               onValueChange={setIsFavorite}
               trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}

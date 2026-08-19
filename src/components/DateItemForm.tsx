@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { AppIcon, AppIconName } from './AppIcon';
+import { AppSwitch } from './AppSwitch';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { FormCard, FormFieldLabel } from './FormPrimitives';
 import { OshiAvatar } from './Oshi';
@@ -25,6 +25,7 @@ import { resolveAvatarSource } from '../utils/avatarSource';
 import { getDateItemPresetKind, getPresetDateItemTitle } from '../utils/dateItemDisplay';
 import { toISODate } from '../utils/date';
 import { showSaveFailedAlert } from '../utils/failureAlert';
+import { hapticSaveSuccess } from '../utils/haptics';
 import { withAlpha } from '../utils/color';
 import { sortArtistsWithOshi } from '../utils/filter';
 
@@ -375,6 +376,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
         for (const [anniversaryId, draft] of Object.entries(anniversaryDrafts)) {
           await db.dateItems.updateAnniversaryRule(anniversaryId, draft);
         }
+        hapticSaveSuccess();
         onSaved(initial.item.id);
         return;
       }
@@ -388,6 +390,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
         show_on_calendar: showOnCalendar,
         artistIds: resolvedArtistIds,
       });
+      hapticSaveSuccess();
       onSaved(created.id);
     } catch (error) {
       showSaveFailedAlert(error);
@@ -713,7 +716,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
           }}>
             <View style={{ minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>展示在日历</Text>
-              <Switch
+              <AppSwitch
                 value={showOnCalendar}
                 onValueChange={setShowOnCalendar}
                 trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}
@@ -742,7 +745,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
                     <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '800', color: colors.text }} numberOfLines={1}>
                       {anniversary.label}
                     </Text>
-                    <Switch
+                    <AppSwitch
                       value={draft?.enabled === 1}
                       onValueChange={(value) => updateAnniversaryDraft(anniversary.id, { enabled: value ? 1 : 0 })}
                       trackColor={{ false: colors.inputBorder, true: withAlpha(colors.accent, 0.38) }}

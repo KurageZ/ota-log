@@ -31,6 +31,7 @@ import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../utils/safeArea';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
+import { hapticSaveSuccess } from '../utils/haptics';
 import { AppIcon } from './AppIcon';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { FormCard, FormFieldLabel, FormSectionLabel } from './FormPrimitives';
@@ -555,6 +556,7 @@ export function ChekiRecordForm({
         allowNavigationRef.current = true;
         router.back();
       }
+      hapticSaveSuccess();
     } catch (error) {
       showSaveFailedAlert(error);
     } finally {

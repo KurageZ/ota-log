@@ -1,4 +1,5 @@
 import { Alert, AlertButton } from 'react-native';
+import { hapticError } from './haptics';
 
 interface FailureAlertOptions {
   title: string;
@@ -45,6 +46,7 @@ export function showCameraPermissionAlert() {
 }
 
 export function showSaveFailedAlert(details?: unknown) {
+  hapticError();
   showFailureAlert({
     title: '保存失败',
     reason: '保存失败',

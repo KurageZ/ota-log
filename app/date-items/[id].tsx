@@ -1,8 +1,9 @@
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '../../src/components/AppIcon';
+import { AppSwitch } from '../../src/components/AppSwitch';
 import { OshiAvatar } from '../../src/components/Oshi';
 import { PresetDateItemTitle } from '../../src/components/PresetDateItemTitle';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
@@ -348,7 +349,7 @@ export default function DateItemDetailScreen() {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 15, color: colors.text, fontWeight: '700' }}>展示在日历</Text>
             </View>
-            <Switch
+            <AppSwitch
               value={item.item.show_on_calendar === 1}
               onValueChange={handleToggleCalendar}
               disabled={pendingSetting !== null}
@@ -381,7 +382,7 @@ export default function DateItemDetailScreen() {
                       <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '800', color: colors.text }} numberOfLines={1}>
                         {anniversary.label}
                       </Text>
-                      <Switch
+                      <AppSwitch
                         value={anniversary.enabled === 1}
                         onValueChange={(value) => handleToggleAnniversary(anniversary.id, value ? 1 : 0)}
                         disabled={pendingAnniversaryId !== null}

@@ -19,6 +19,7 @@ import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
 import { AppIcon } from '../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { hapticError, hapticFavoriteToggle } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { toISODate } from '../../src/utils/date';
@@ -49,7 +50,6 @@ export default function ArtistsScreen() {
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [pendingFavoriteArtistId, setPendingFavoriteArtistId] = useState<string | null>(null);
 
   const parentNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -202,21 +202,23 @@ export default function ArtistsScreen() {
   }, [hasChekiOnly, eventFilter, groupFilter, typeFilter]);
 
   const handleToggleFavorite = async (artist: Artist) => {
-    if (pendingFavoriteArtistId) return;
     if (artist.id === oshiArtistId && artist.is_favorite === 1) {
       Alert.alert('单推艺人已收藏', '单推艺人会保持收藏。若要更换或清除单推，请前往「我的 → 设置 → 单推设置」。');
       return;
     }
-    setPendingFavoriteArtistId(artist.id);
+    const nextFavorite = artist.is_favorite !== 1;
+    hapticFavoriteToggle(nextFavorite);
+    setArtists((prev) =>
+      prev.map((a) => a.id === artist.id ? { ...a, is_favorite: nextFavorite ? 1 : 0 } : a)
+    );
     try {
       await db.artists.toggleFavorite(artist.id);
-      setArtists((prev) =>
-        prev.map((a) => a.id === artist.id ? { ...a, is_favorite: a.is_favorite ? 0 : 1 } : a)
-      );
     } catch (error) {
+      hapticError();
+      setArtists((prev) =>
+        prev.map((a) => a.id === artist.id ? { ...a, is_favorite: nextFavorite ? 0 : 1 } : a)
+      );
       showOperationFailedAlert('无法更新收藏状态。', '请稍后再试一次。', error);
-    } finally {
-      setPendingFavoriteArtistId(null);
     }
   };
 
@@ -428,20 +430,14 @@ export default function ArtistsScreen() {
                   <View style={{ flexDirection: 'row', gap: 16, marginLeft: 8 }}>
                     <TouchableOpacity
                       onPress={() => handleToggleFavorite(artist)}
-                      disabled={pendingFavoriteArtistId != null}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ opacity: pendingFavoriteArtistId && pendingFavoriteArtistId !== artist.id ? 0.45 : 1 }}
                     >
-                      {pendingFavoriteArtistId === artist.id ? (
-                        <ActivityIndicator size="small" color={colors.accent} />
-                      ) : (
-                        <AppIcon
-                          name="favorite"
-                          variant={isFav ? 'active' : 'inactive'}
-                          size={20}
-                          color={isFav ? colors.danger : colors.chevron}
-                        />
-                      )}
+                      <AppIcon
+                        name="favorite"
+                        variant={isFav ? 'active' : 'inactive'}
+                        size={20}
+                        color={isFav ? colors.danger : colors.chevron}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>

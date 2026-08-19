@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, AccessibilityInfo, ActivityIndicator, Platform, type LayoutChangeEvent,
+  View, Text, FlatList, TouchableOpacity, Alert, Image, useWindowDimensions, ScrollView, ActivityIndicator, Platform, type LayoutChangeEvent,
 } from 'react-native';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useDB } from '../context/DBContext';
@@ -28,6 +28,8 @@ import {
   useChekiAlbumGridLayout,
 } from '../components/ChekiAlbumThumbnail';
 import { showDeleteFailedAlert } from '../utils/failureAlert';
+import { useReducedMotionEnabled } from '../utils/useReducedMotionEnabled';
+import { hapticError, hapticFavoriteToggle } from '../utils/haptics';
 import { ThemeColors, useAppTheme } from '../theme/appTheme';
 import { ChekiRecordListItem } from '../components/ChekiRecordListItem';
 import { EventSectionHeader } from '../components/EventSectionHeader';
@@ -393,24 +395,6 @@ function BrowseModeOptions({
       })}
     </View>
   );
-}
-
-function useReducedMotionEnabled(): boolean {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    let isActive = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (isActive) setReducedMotion(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
-    return () => {
-      isActive = false;
-      subscription.remove();
-    };
-  }, []);
-
-  return reducedMotion;
 }
 
 export default function ChekiLibraryScreen() {
@@ -979,6 +963,7 @@ export default function ChekiLibraryScreen() {
 
   const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
     const nextFavorite = item.isFavorite !== true;
+    hapticFavoriteToggle(nextFavorite);
     const itemId = item.itemId ?? item.id;
     const update = (chekis: Cheki[], isFavorite: boolean): Cheki[] => {
       const favoriteValue: Cheki['is_favorite'] = isFavorite ? 1 : 0;
@@ -1000,6 +985,7 @@ export default function ChekiLibraryScreen() {
     try {
       await db.chekiRecords.setItemFavorite(itemId, nextFavorite);
     } catch {
+      hapticError();
       setBrowseItems((current) => updateBrowseItems(current, !nextFavorite));
       setViewerState((current) => current ? {
         ...current,
@@ -1010,20 +996,21 @@ export default function ChekiLibraryScreen() {
   }, [db]);
 
   const renderHeaderActions = useCallback(() => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 4 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <TouchableOpacity
         accessibilityLabel="电子切册显示选项"
         accessibilityRole="button"
         onPress={() => setViewSettingsVisible(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <AppIcon name="settings" size={22} color={colors.accent} />
+        <AppIcon name="viewSettings" size={22} color={colors.accent} />
       </TouchableOpacity>
       <TouchableOpacity
         accessibilityLabel="添加拍立得记录"
         accessibilityRole="button"
         onPress={openUnifiedCreate}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{ paddingRight: 4 }}
       >
         <AppIcon name="add" size={24} color={colors.accent} />
       </TouchableOpacity>

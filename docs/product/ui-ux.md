@@ -327,6 +327,38 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 - 不用于普通文本链接、Modal 遮罩、拖拽手柄、长列表行或需要系统原生反馈的控件。
 - 通用 `EventCard`、排行行等可能批量渲染的列表项继续使用 `TouchableOpacity`，避免页面切换和首屏 mount 变重。
 
+### AppSwitch
+
+文件：`src/components/AppSwitch.tsx`
+
+所有开关统一使用 `AppSwitch`，不要在页面里直接使用 RN 原生 `Switch`。
+
+- 包装 RN `Switch`，保留 `value` / `onValueChange` / `disabled` / `trackColor` / `thumbColor` / `accessibilityLabel` 等 props。
+- 用户切换时触发轻触感（iOS `selection`，Android `Toggle_On` / `Toggle_Off`）；程序化赋值不触发。
+- 不额外做动画，开关的视觉动效交给系统原生实现。
+
+### 触感反馈
+
+文件：`src/utils/haptics.ts`（页面与组件不直接 import `expo-haptics`）
+
+触感是操作确认，不是装饰。映射如下：
+
+| 动作 | iOS | Android |
+| --- | --- | --- |
+| 拖拽排序（开始/换位/结束） | selection / light impact | Drag_Start / Segment_Tick / Gesture_End |
+| 收藏 / 取消收藏 | selection | Toggle_On / Toggle_Off |
+| 开关切换 | selection | Toggle_On / Toggle_Off |
+| 复制成功 | success | Confirm |
+| 保存成功 | light impact | Confirm |
+| 保存失败 / 操作错误 | error / warning | Reject |
+
+规则：
+
+- 不提供 App 内触感总开关；默认开启，遵守系统触感/振动设置（iOS 关闭系统触感后反馈自动失效，Android 跟随系统振动设置）。
+- 表单校验失败（未点保存）不震动；只有实际保存失败才给 error 反馈。
+- 装饰性动效（如收藏心形 pop）跟随系统「减少动态效果」（`useReducedMotionEnabled`）；触感不跟随，因为它属于反馈而非装饰。
+- 高频反馈（如拖拽换位）需要在 `haptics.ts` 内节流，避免连续震动。
+
 ### SearchFilterBar
 
 文件：`src/components/SearchFilterBar.tsx`
@@ -872,6 +904,7 @@ Shell：
 - Modal 必须实现 `onRequestClose`。
 - `RefreshControl tintColor` 使用 `accent`。
 - 产品 UI 不做装饰性入场动画。动画只用于 tab 选中、筛选 sheet、展开/收起、加载和反馈。
+- 开关统一使用 `AppSwitch`；触感映射和 reduceMotion 规则见上方「触感反馈」。
 
 ---
 

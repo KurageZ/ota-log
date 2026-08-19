@@ -35,7 +35,7 @@ import {
   showFailureAlert,
   showOperationFailedAlert,
 } from '../../src/utils/failureAlert';
-import { hapticCopySuccess } from '../../src/utils/haptics';
+import { hapticCopySuccess, hapticError, hapticFavoriteToggle } from '../../src/utils/haptics';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
@@ -833,6 +833,7 @@ export default function EventDetailScreen() {
 
   const handleToggleChekiFavorite = useCallback(async (item: ChekiViewerItem) => {
     const nextFavorite = item.isFavorite !== true;
+    hapticFavoriteToggle(nextFavorite);
     const itemId = item.itemId ?? item.id;
     setChekiList((current) => current.map((cheki) => (
       cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 1 : 0 } : cheki
@@ -840,6 +841,7 @@ export default function EventDetailScreen() {
     try {
       await db.cheki.setFavorite(itemId, nextFavorite);
     } catch {
+      hapticError();
       setChekiList((current) => current.map((cheki) => (
         cheki.id === itemId ? { ...cheki, is_favorite: nextFavorite ? 0 : 1 } : cheki
       )));

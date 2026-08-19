@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { MenuCard, MenuRowSeparator, SectionLabel, SettingsChoiceCard } from '../../src/components/SettingsMenu';
+import { AppSwitch } from '../../src/components/AppSwitch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { AppCalendarWeekStart, APP_CALENDAR_WEEK_START_LABELS } from '../../src/theme/config';
 import { withAlpha } from '../../src/utils/color';
@@ -116,7 +117,7 @@ export default function CalendarSettingsScreen() {
                 <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: '500' }}>
                   {row.label}
                 </Text>
-                <Switch
+                <AppSwitch
                   value={row.value}
                   disabled={pendingDisplayKey !== null}
                   onValueChange={(value) => handleToggleDisplay(row.key, value)}
