@@ -25,6 +25,7 @@ import { extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop'
 import { withAlpha } from '../../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
 import { ArtistTypeSelector } from '../../../src/components/ArtistTypeSelector';
+import { AspectCropModal } from '../../../src/components/AspectCropModal';
 import { formatDateInput, isValidISODate, normalizeDateInput, toISODate } from '../../../src/utils/date';
 import { generateId } from '../../../src/utils/uuid';
 
@@ -52,6 +53,11 @@ export default function EditArtistScreen() {
   const [typedSearch, setTypedSearch] = useState('');
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [backgroundPickedUri, setBackgroundPickedUri] = useState<string | null>(null);
+  const [backgroundCropSource, setBackgroundCropSource] = useState<{
+    uri: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [presetAvatar, setPresetAvatar] = useState<string | null>(null);
@@ -231,24 +237,54 @@ export default function EditArtistScreen() {
       aspect: [4, 5],
       quality: 0.85,
     });
-    if (!result.canceled && result.assets[0]) {
-      try {
-        const permanentUri = await copyToDocuments(result.assets[0].uri, {
-          filenamePrefix: 'artist_bg',
-          cropAspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
-          maxBytes: MAX_ARTIST_BACKGROUND_BYTES,
-        });
-        const extractedColor = await extractArtistBackgroundColor(permanentUri);
-        setBackgroundPickedUri(permanentUri);
-        setBackgroundColor(extractedColor);
-      } catch (error) {
-        showFailureAlert({
-          title: '背景图处理失败',
-          reason: '背景图压缩后仍然超过 5MB，或图片文件无法处理。',
-          nextStep: '请换一张更小的图片后再试一次。',
-          details: error,
-        });
-      }
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+
+    // iOS 的系统裁切框固定为正方形，与 4:5 背景比例不符，
+    // 因此选图后进入应用内裁切界面手动调整。
+    if (Platform.OS === 'ios') {
+      setBackgroundCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+      return;
+    }
+
+    try {
+      const permanentUri = await copyToDocuments(asset.uri, {
+        filenamePrefix: 'artist_bg',
+        cropAspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
+        maxBytes: MAX_ARTIST_BACKGROUND_BYTES,
+      });
+      const extractedColor = await extractArtistBackgroundColor(permanentUri);
+      setBackgroundPickedUri(permanentUri);
+      setBackgroundColor(extractedColor);
+    } catch (error) {
+      showFailureAlert({
+        title: '背景图处理失败',
+        reason: '背景图压缩后仍然超过 5MB，或图片文件无法处理。',
+        nextStep: '请换一张更小的图片后再试一次。',
+        details: error,
+      });
+    }
+  };
+
+  const handleBackgroundCropConfirmed = async (croppedUri: string) => {
+    try {
+      const permanentUri = await copyToDocuments(croppedUri, {
+        filenamePrefix: 'artist_bg',
+        cropAspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
+        maxBytes: MAX_ARTIST_BACKGROUND_BYTES,
+      });
+      const extractedColor = await extractArtistBackgroundColor(permanentUri);
+      setBackgroundPickedUri(permanentUri);
+      setBackgroundColor(extractedColor);
+    } catch (error) {
+      showFailureAlert({
+        title: '背景图处理失败',
+        reason: '背景图压缩后仍然超过 5MB，或图片文件无法处理。',
+        nextStep: '请换一张更小的图片后再试一次。',
+        details: error,
+      });
+    } finally {
+      setBackgroundCropSource(null);
     }
   };
 
@@ -854,6 +890,15 @@ export default function EditArtistScreen() {
 
         </KeyboardAwareScrollView>
       </SafeAreaView>
+      <AspectCropModal
+        visible={backgroundCropSource != null}
+        sourceUri={backgroundCropSource?.uri ?? ''}
+        sourceWidth={backgroundCropSource?.width ?? 0}
+        sourceHeight={backgroundCropSource?.height ?? 0}
+        title="调整背景图"
+        onCancel={() => setBackgroundCropSource(null)}
+        onConfirm={handleBackgroundCropConfirmed}
+      />
     </>
   );
 }
