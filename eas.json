@@ -20,6 +20,9 @@
     "beta": {
       "distribution": "store",
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "APP_VARIANT": "production"
       }
@@ -27,6 +30,9 @@
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "APP_VARIANT": "production"
       }

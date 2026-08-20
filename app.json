@@ -15,7 +15,8 @@
       },
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true
-      }
+      },
+      "appleTeamId": "BP9RKVU242"
     },
     "android": {
       "versionCode": 10500,
