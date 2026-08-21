@@ -154,8 +154,8 @@ export function ChekiRecordForm({
   const parsedQuantity = parseQuantity(quantity);
   const requiredItemCount = retainedExistingItemCount
     + Math.max(0, pendingPhotos.length - retainedEmptyItemCount);
-  const addedPhotoCount = retainedImageItemCount + pendingPhotos.length;
-  const hasAddedPhotos = addedPhotoCount > 0;
+  const itemsWithImagesCount = retainedImageItemCount + pendingPhotos.length;
+  const hasAddedPhotos = itemsWithImagesCount > 0;
   const isHandlingPhotos = photoPickerPending || photoImportProgress != null;
 
   useEffect(() => {
@@ -641,7 +641,9 @@ export function ChekiRecordForm({
         <FormCard>
           <View style={{ marginBottom: 10 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
-              已添加 {addedPhotoCount}{parsedQuantity == null ? '' : ` / ${parsedQuantity}`} 张图片
+              {hasAddedPhotos
+                ? `已添加：${itemsWithImagesCount} 张拍立得`
+                : '暂无图片'}
             </Text>
           </View>
 
@@ -783,7 +785,7 @@ export function ChekiRecordForm({
             </TouchableOpacity>
           </View>
           <Text style={{ marginTop: 8, fontSize: 12, lineHeight: 18, color: colors.textSecondary }}>
-            {hasAddedPhotos ? '数量可多于图片数。' : '可直接填写数量。'}
+            图片超过当前数量时会自动增加数量。
           </Text>
         </FormCard>
 
@@ -828,9 +830,19 @@ export function ChekiRecordForm({
               {artistDecision === 'unconfirmed' ? (
                 <TouchableOpacity
                   onPress={confirmNoArtist}
-                  style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityRole="button"
+                  style={{
+                    minHeight: 44,
+                    marginTop: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.inputBorder,
+                    borderRadius: 10,
+                    backgroundColor: colors.cardAlt,
+                  }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>暂不关联艺人</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>暂不关联艺人</Text>
                 </TouchableOpacity>
               ) : null}
             </>
@@ -943,12 +955,13 @@ export function ChekiRecordForm({
 
         <View style={{ paddingHorizontal: 4, paddingVertical: 10, alignItems: 'center' }}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-            共 {parsedQuantity ?? 0} 张
+            共 {parsedQuantity ?? 0} 张拍立得
           </Text>
-          <Text style={{ marginTop: 4, fontSize: 12, color: colors.textSecondary }}>
-            已添加 {addedPhotoCount} 张图片
-            {pendingRemovedItemIds.length > 0 ? `，待移除 ${pendingRemovedItemIds.length} 张` : ''}
-          </Text>
+          {pendingRemovedItemIds.length > 0 ? (
+            <Text style={{ marginTop: 4, fontSize: 12, color: colors.textSecondary }}>
+              待移除 {pendingRemovedItemIds.length} 张
+            </Text>
+          ) : null}
         </View>
       </KeyboardAwareScrollView>
     </SafeAreaView>
