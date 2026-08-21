@@ -3,26 +3,42 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { Image, Modal, StyleSheet } from 'react-native';
 import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
-jest.mock('react-native-image-viewing', () => ({
-  __esModule: true,
-  default: ({ HeaderComponent, FooterComponent, imageIndex, imageHidden, images, onImageIndexChange }: {
+const mockImageViewingLifecycle: string[] = [];
+
+jest.mock('react-native-image-viewing', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  function ImageViewingInstance({ HeaderComponent, FooterComponent, imageIndex, imageHidden, images, onImageIndexChange }: {
     HeaderComponent?: React.ComponentType<{ imageIndex: number }>;
     FooterComponent?: React.ComponentType<{ imageIndex: number }>;
     imageIndex: number;
     imageHidden?: boolean;
     images: Array<{ uri: string }>;
     onImageIndexChange?: (index: number) => void;
-  }) => {
-    const React = require('react');
-    const { View } = require('react-native');
+  }) {
+    React.useEffect(() => {
+      mockImageViewingLifecycle.push(`mount:${imageIndex}`);
+      return () => mockImageViewingLifecycle.push(`unmount:${imageIndex}`);
+    }, []);
+
     return React.createElement(
       View,
       { testID: 'image-viewing', imageHidden, imageIndex, images, onImageIndexChange },
       HeaderComponent ? React.createElement(HeaderComponent, { imageIndex }) : null,
       FooterComponent ? React.createElement(FooterComponent, { imageIndex }) : null,
     );
-  },
-}));
+  }
+
+  return {
+    __esModule: true,
+    // Match react-native-image-viewing: changing imageIndex remounts its Modal host.
+    default: (props: { imageIndex: number }) => React.createElement(
+      ImageViewingInstance,
+      { ...props, key: props.imageIndex },
+    ),
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
@@ -51,6 +67,7 @@ describe('FullscreenImageViewer opening transition', () => {
   let renderer: ReactTestRenderer;
 
   beforeEach(() => {
+    mockImageViewingLifecycle.length = 0;
     jest.spyOn(Image, 'getSizeWithHeaders').mockImplementation((_, __, success) => {
       success(540, 860);
       return undefined as never;
@@ -80,6 +97,24 @@ describe('FullscreenImageViewer opening transition', () => {
     expect(renderer.root.findByProps({ testID: 'image-opening-transition' })).toBeTruthy();
     const headerControls = renderer.root.findByProps({ testID: 'image-viewer-header-controls' });
     expect(StyleSheet.flatten(headerControls.props.style).opacity).toBe(0);
+  });
+
+  test('mounts the native viewer once at the selected image index', () => {
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[
+            { id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' },
+            { id: 'cheki-2', photoUri: 'file:///cheki-2.jpg' },
+          ]}
+          selectedId="cheki-2"
+          onClose={jest.fn()}
+        />,
+      );
+    });
+
+    expect(mockImageViewingLifecycle).toEqual(['mount:1']);
   });
 
   test('reveals the viewer when opening transition image callbacks never arrive', () => {

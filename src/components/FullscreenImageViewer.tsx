@@ -206,8 +206,6 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const { colors } = useAppTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
-  // react-native-image-viewing remounts when imageIndex changes; treat it as open-time initial state.
-  const [initialImageIndex, setInitialImageIndex] = useState(0);
   const [showingAlternate, setShowingAlternate] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
@@ -257,7 +255,6 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     }
     const nextIndex = clampIndex(selectedIndex);
     const opensWithTransition = Boolean(initialTransitionOrigin);
-    setInitialImageIndex(nextIndex);
     setCurrentIndex(nextIndex);
     setShowingAlternate(false);
     setTransitionReady(!opensWithTransition);
@@ -270,7 +267,6 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   useEffect(() => {
     if (!visible || items.length === 0) return;
     setCurrentIndex((index) => clampIndex(index));
-    setInitialImageIndex((index) => clampIndex(index));
   }, [clampIndex, items.length, visible]);
 
   const handleImageIndexChange = useCallback((imageIndex: number) => {
@@ -280,10 +276,10 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   }, []);
 
   const handleViewerImageLoad = useCallback((imageIndex: number) => {
-    if (imageIndex === initialImageIndex) {
+    if (imageIndex === selectedIndex) {
       setViewerContentLoaded(true);
     }
-  }, [initialImageIndex]);
+  }, [selectedIndex]);
 
   useEffect(() => {
     Animated.timing(controlsAnimation, {
@@ -805,7 +801,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   return (
     <ImageViewing
       images={images}
-      imageIndex={initialImageIndex}
+      imageIndex={selectedIndex}
       visible={visible}
       onRequestClose={onClose}
       onImageIndexChange={handleImageIndexChange}
