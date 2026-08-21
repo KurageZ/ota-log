@@ -175,44 +175,75 @@ export default function WeiboFollowingScreen() {
     if (selectedUsers.length === 0) return;
 
     setImporting(true);
+    const succeeded: WeiboFollowingUser[] = [];
+    const succeededArtists: Artist[] = [];
+    const failed: Array<{ user: WeiboFollowingUser; message: string }> = [];
     try {
-      await db.rawDb.withTransactionAsync(async () => {
-        for (const user of selectedUsers) {
+      for (const user of selectedUsers) {
+        try {
           const artist = await db.artists.create({
             name: cleanOfficialSuffix(user.screenName) || user.screenName,
             avatar_uri: user.avatarUrl,
             url: user.profileUrl,
+            is_favorite: favoriteUserIds.has(user.id) ? 1 : 0,
           });
-          if (favoriteUserIds.has(user.id)) {
-            await db.artists.update(artist.id, { is_favorite: 1 });
-          }
+          succeeded.push(user);
+          succeededArtists.push(artist);
+        } catch (error) {
+          failed.push({
+            user,
+            message: error instanceof Error ? error.message : String(error),
+          });
         }
-      });
+      }
 
       const nextArtists = await db.artists.findAll();
       setArtists(nextArtists);
-      setSelectedUserIds(new Set());
-      setFavoriteUserIds(new Set());
-      const importedFavoriteCount = selectedUsers.filter((user) => favoriteUserIds.has(user.id)).length;
-      Alert.alert(
-        '加入完成',
-        importedFavoriteCount > 0
-          ? `已加入 ${selectedUsers.length} 个艺人，其中 ${importedFavoriteCount} 个已收藏。`
-          : `已将 ${selectedUsers.length} 个微博账号加入艺人数据库。`,
-      );
+
+      const importedFavoriteCount = succeeded.filter((user) => favoriteUserIds.has(user.id)).length;
+      if (failed.length === 0) {
+        Alert.alert(
+          '加入完成',
+          importedFavoriteCount > 0
+            ? `已加入 ${succeeded.length} 个艺人，其中 ${importedFavoriteCount} 个已收藏。`
+            : `已将 ${succeeded.length} 个微博账号加入艺人数据库。`,
+        );
+      } else {
+        const failedNames = failed.slice(0, 10).map(({ user }) => user.screenName).join('、');
+        const remainingCount = failed.length - 10;
+        Alert.alert(
+          '部分加入失败',
+          `成功加入 ${succeeded.length} 个艺人，${failed.length} 个未能写入：\n\n${failedNames}${remainingCount > 0 ? ` 等 ${failed.length} 个` : ''}\n\n失败项仍保持勾选，可直接重试。`,
+        );
+      }
     } catch (error) {
+      setArtists((current) => {
+        const nextById = new Map(current.map((artist) => [artist.id, artist]));
+        for (const artist of succeededArtists) nextById.set(artist.id, artist);
+        return [...nextById.values()];
+      });
       showFailureAlert({
-        title: '加入失败',
-        reason: '未能将所选微博账号写入艺人数据库。',
-        nextStep: '请稍后重试；如果问题持续出现，请减少本次选择数量。',
+        title: '刷新失败',
+        reason: '导入已完成，但艺人列表刷新失败。',
+        nextStep: '请返回后重新进入此页面查看最新数据。',
         details: error,
       });
     } finally {
+      const succeededIds = new Set(succeeded.map((user) => user.id));
+      setSelectedUserIds((current) => {
+        const next = new Set(current);
+        for (const id of succeededIds) next.delete(id);
+        return next;
+      });
+      setFavoriteUserIds((current) => {
+        const next = new Set(current);
+        for (const id of succeededIds) next.delete(id);
+        return next;
+      });
       setImporting(false);
     }
   }, [
     db.artists,
-    db.rawDb,
     existingUserIds,
     favoriteUserIds,
     importing,

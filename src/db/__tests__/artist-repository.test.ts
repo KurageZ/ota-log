@@ -122,6 +122,18 @@ describe('ArtistRepository artist media metadata support', () => {
     });
   });
 
+  test('create persists is_favorite when provided', async () => {
+    const artist = await artistRepository.create({
+      name: 'Favorite Artist',
+      is_favorite: 1,
+    });
+
+    expect(
+      rawDb.prepare('SELECT is_favorite FROM artists WHERE id = ?').pluck().get('generated-artist-id')
+    ).toBe(1);
+    expect(artist.is_favorite).toBe(1);
+  });
+
   test('update replaces background_uri, persists background_color, and cleans up the previous file', async () => {
     await artistRepository.update('artist-1', {
       background_uri: 'file:///artist-bg-next.jpg',

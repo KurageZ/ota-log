@@ -318,6 +318,7 @@ export interface CreateArtistInput {
   background_uri?: string | null;
   background_color?: string | null;
   url?: string | null;
+  is_favorite?: number;
 }
 
 export interface CreateArtistGroupMembershipInput {

@@ -200,6 +200,7 @@ export class ArtistRepository {
     const background_uri = typeof input === 'string' ? null : (input.background_uri ?? null);
     const background_color = typeof input === 'string' ? null : (input.background_color ?? null);
     const url = typeof input === 'string' ? null : (input.url ?? null);
+    const is_favorite = typeof input === 'string' ? 0 : (input.is_favorite ?? 0);
 
     const artist: Artist = {
       id: generateId(),
@@ -211,7 +212,7 @@ export class ArtistRepository {
       background_uri,
       background_color,
       url,
-      is_favorite: 0,
+      is_favorite,
       created_at: toISODateTime(),
     };
     await this.withTransaction(async () => {
@@ -219,9 +220,10 @@ export class ArtistRepository {
         `INSERT INTO artists
           (id, name, short_name, artist_type, avatar_uri, background_uri,
            background_color, url, is_favorite, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [artist.id, artist.name, artist.short_name, artist.artist_type, artist.avatar_uri,
-          artist.background_uri, artist.background_color, artist.url, artist.created_at],
+          artist.background_uri, artist.background_color, artist.url, artist.is_favorite,
+          artist.created_at],
       );
       if (parent_id) {
         await this.db.runAsync(
