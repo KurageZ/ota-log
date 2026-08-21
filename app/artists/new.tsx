@@ -143,7 +143,7 @@ export default function NewArtistScreen() {
             ? '当前登录状态可能已失效。'
             : '艺人信息提取失败。',
           nextStep: result.kind === 'captcha'
-            ? '请先前往「我的 → 设置 → 配置微博抓取功能」重新登录，再回来继续解析。'
+            ? '请先前往「我的 → 工具箱 → 登录微博」重新登录，再回来继续解析。'
             : '请先尝试重新登录微博后再试；如果还是失败，可以手动填写艺人信息。',
           details: result.kind === 'captcha' ? undefined : result.message,
         });

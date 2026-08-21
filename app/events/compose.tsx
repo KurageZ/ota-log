@@ -751,7 +751,7 @@ export default function NewEventScreen() {
               ? '当前登录状态可能已失效。'
               : '公告内容提取失败。',
             nextStep: result.kind === 'captcha'
-              ? '请先前往「我的 → 设置 → 配置微博抓取功能」重新登录，再回来继续解析；也可以改为粘贴公告正文，或直接手动创建。'
+              ? '请先前往「我的 → 工具箱 → 登录微博」重新登录，再回来继续解析；也可以改为粘贴公告正文，或直接手动创建。'
               : '请先尝试重新登录微博后再试；也可以复制公告正文到文本框继续解析，或直接手动创建。',
             details: result.kind === 'captcha' ? undefined : result.message,
             buttons: [
