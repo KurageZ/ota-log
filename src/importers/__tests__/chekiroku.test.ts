@@ -85,13 +85,21 @@ describe('Chekiroku import planning', () => {
       .rejects.toThrow('危险路径');
   });
 
+  test('does not reject an otherwise valid future container version before checking its contents', async () => {
+    const futureVersionZip = new JSZip();
+    futureVersionZip.file('version.json', JSON.stringify({ version: 999 }));
+    futureVersionZip.file('my.db', 'not-a-database');
+    await expect(parseChekirokuArchiveBytes(await futureVersionZip.generateAsync({ type: 'uint8array' })))
+      .rejects.toThrow('不是有效的 SQLite 数据库');
+  });
+
   test('preserves memo and losslessly appends activity, hall, and non-default category', () => {
     expect(buildChekirokuNotes({
       memo: '原始备注',
       eventName: '春日活动',
       hallName: '一号会场',
       categoryName: '自拍',
-    })).toBe('原始备注\n\n[Chekiroku 导入信息]\n活动：春日活动\n会场：一号会场\n类别：自拍');
+    })).toBe('原始备注\n\n[外部数据导入信息]\n活动：春日活动\n会场：一号会场\n类别：自拍');
     expect(buildChekirokuNotes({ categoryName: '拍立得' })).toBeNull();
     expect(buildChekirokuNotes({ eventName: '  ', hallName: null })).toBeNull();
   });
@@ -204,5 +212,18 @@ describe('Chekiroku import planning', () => {
       expect.objectContaining({ title: '1 个已有艺人将同步设为收藏' }),
     ]));
     expect(JSON.stringify(notices)).not.toMatch(/table|column|数据库|源行|Item|same_person/i);
+  });
+
+  test('reports populated unknown source data as partial support', () => {
+    const plan = buildChekirokuImportPlan(createSnapshot({
+      unknownTables: ['cheki_images'],
+      unknownColumns: {},
+      unknownTableRowCounts: { cheki_images: 3 },
+    }), [], { createId: createTestIdFactory() });
+
+    expect(plan.preview.unsupportedData).toEqual(['发现 3 条外部扩展数据不会导入']);
+    expect(buildChekirokuImportNotices(plan.preview)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '部分外部数据不会导入' }),
+    ]));
   });
 });

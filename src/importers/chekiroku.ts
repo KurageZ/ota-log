@@ -85,6 +85,8 @@ export interface ChekirokuSourceSnapshot {
   userDefinedOrderCount: number;
   unknownTables: string[];
   unknownColumns: Record<string, string[]>;
+  /** Row counts for tables that are present but not understood by this importer. */
+  unknownTableRowCounts?: Record<string, number>;
   warnings: string[];
 }
 
@@ -145,6 +147,7 @@ export interface ChekirokuImportPreview {
   ignoredSourceImageCount: number;
   unknownTables: string[];
   unknownColumns: Record<string, string[]>;
+  unsupportedData: string[];
   warnings: string[];
   fatalErrors: string[];
 }
@@ -221,14 +224,11 @@ async function readSourceSnapshotFromDatabase(
   db: SQLiteDatabase,
   containerVersion: number,
 ): Promise<ChekirokuSourceSnapshot> {
-  const databaseVersion = (await db.getFirstAsync<SourceDbVersionRow>('PRAGMA user_version'))?.user_version;
-  if (databaseVersion !== CHEKIROKU_DATABASE_VERSION) {
-    throw new Error(`不支持的 Chekiroku 数据库版本：${databaseVersion ?? '未知'}，当前仅支持 v${CHEKIROKU_DATABASE_VERSION}`);
-  }
+  const databaseVersion = (await db.getFirstAsync<SourceDbVersionRow>('PRAGMA user_version'))?.user_version ?? 0;
 
   const integrity = await db.getFirstAsync<SourceIntegrityRow>('PRAGMA integrity_check');
   if (integrity?.integrity_check !== 'ok') {
-    throw new Error(`Chekiroku SQLite 完整性检查失败：${integrity?.integrity_check ?? '未知错误'}`);
+    throw new Error(`外部备份文件的 SQLite 完整性检查失败：${integrity?.integrity_check ?? '未知错误'}`);
   }
 
   const tableRows = await db.getAllAsync<SourceDbTableRow>(
@@ -237,7 +237,7 @@ async function readSourceSnapshotFromDatabase(
   const tableNames = new Set(tableRows.map((row) => row.name));
   const missingTables = Object.keys(REQUIRED_TABLE_COLUMNS).filter((name) => !tableNames.has(name));
   if (missingTables.length > 0) {
-    throw new Error(`Chekiroku 缺少必需数据表：${missingTables.join('、')}`);
+    throw new Error(`外部备份文件缺少必需数据表：${missingTables.join('、')}`);
   }
 
   const unknownTables = [...tableNames].filter((name) => (
@@ -245,13 +245,30 @@ async function readSourceSnapshotFromDatabase(
     && !OPTIONAL_TABLES.includes(name as (typeof OPTIONAL_TABLES)[number])
   ));
   const unknownColumns: Record<string, string[]> = {};
+  const missingColumns: string[] = [];
   for (const [tableName, expected] of Object.entries(REQUIRED_TABLE_COLUMNS)) {
     const columns = await db.getAllAsync<SourceDbColumnRow>(
       `PRAGMA table_info(${quotePragmaIdentifier(tableName)})`,
     );
-    const extras = columns.map((column) => column.name).filter((name) => !expected.includes(name));
+    const columnNames = new Set(columns.map((column) => column.name));
+    missingColumns.push(...expected
+      .filter((name) => !columnNames.has(name))
+      .map((name) => `${tableName}.${name}`));
+    const extras = [...columnNames].filter((name) => !expected.includes(name));
     if (extras.length > 0) unknownColumns[tableName] = extras;
   }
+  if (missingColumns.length > 0) {
+    throw new Error(`外部备份文件缺少必需字段：${missingColumns.join('、')}`);
+  }
+
+  const countTable = async (tableName: string): Promise<number> => {
+    if (!tableNames.has(tableName)) return 0;
+    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${quotePragmaIdentifier(tableName)}`);
+    return row?.count ?? 0;
+  };
+  const unknownTableRowCounts = Object.fromEntries(
+    await Promise.all(unknownTables.map(async (tableName) => [tableName, await countTable(tableName)] as const)),
+  );
 
   const [groups, members, records, eventRows, hallRows, categoryRows] = await Promise.all([
     db.getAllAsync<{ id: SourceScalar; name: SourceScalar }>('SELECT id, name FROM group_name'),
@@ -276,12 +293,6 @@ async function readSourceSnapshotFromDatabase(
     db.getAllAsync<{ id: SourceScalar; hall_name: SourceScalar }>('SELECT id, hall_name FROM hall_name'),
     db.getAllAsync<{ id: SourceScalar; name: SourceScalar }>('SELECT id, name FROM category_name'),
   ]);
-
-  const countTable = async (tableName: string): Promise<number> => {
-    if (!tableNames.has(tableName)) return 0;
-    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${quotePragmaIdentifier(tableName)}`);
-    return row?.count ?? 0;
-  };
 
   let samePersonGroupCount = 0;
   let samePersonRelationCount = 0;
@@ -357,6 +368,7 @@ async function readSourceSnapshotFromDatabase(
     userDefinedOrderCount,
     unknownTables,
     unknownColumns,
+    unknownTableRowCounts,
     warnings: [],
   };
 }
@@ -370,18 +382,18 @@ function isUnsafeArchivePath(name: string): boolean {
 function parseContainerVersion(bytes: Uint8Array): number {
   try {
     const value = JSON.parse(new TextDecoder().decode(bytes)) as { version?: unknown };
-    if (value.version !== CHEKIROKU_CONTAINER_VERSION) {
-      throw new Error(`不支持的 Chekiroku 容器版本：${String(value.version ?? '未知')}，当前仅支持 v${CHEKIROKU_CONTAINER_VERSION}`);
+    if (typeof value.version !== 'number' || !Number.isSafeInteger(value.version) || value.version < 1) {
+      throw new Error('外部备份文件的容器版本无效');
     }
-    return CHEKIROKU_CONTAINER_VERSION;
+    return value.version;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('不支持的 Chekiroku')) throw error;
-    throw new Error('Chekiroku 的 version.json 无法解析');
+    if (error instanceof Error && error.message === '外部备份文件的容器版本无效') throw error;
+    throw new Error('外部备份文件的 version.json 无法解析');
   }
 }
 
 export async function parseChekirokuArchiveBytes(bytes: Uint8Array): Promise<ChekirokuSourceSnapshot> {
-  if (bytes.byteLength > MAX_ARCHIVE_TOTAL_BYTES) throw new Error('Chekiroku 文件超过大小限制');
+  if (bytes.byteLength > MAX_ARCHIVE_TOTAL_BYTES) throw new Error('外部备份文件超过大小限制');
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(bytes);
@@ -389,31 +401,31 @@ export async function parseChekirokuArchiveBytes(bytes: Uint8Array): Promise<Che
     throw new Error('文件不是有效的 ZIP 容器');
   }
   const entries = Object.values(zip.files).filter((entry) => !entry.dir);
-  if (entries.length > MAX_ARCHIVE_FILES) throw new Error('Chekiroku 文件包含过多内容');
+  if (entries.length > MAX_ARCHIVE_FILES) throw new Error('外部备份文件包含过多内容');
   let declaredTotalBytes = 0;
   for (const entry of entries) {
     const originalName = (entry as unknown as { unsafeOriginalName?: string }).unsafeOriginalName ?? entry.name;
-    if (isUnsafeArchivePath(originalName)) throw new Error(`Chekiroku 包含危险路径：${originalName}`);
+    if (isUnsafeArchivePath(originalName)) throw new Error(`外部备份文件包含危险路径：${originalName}`);
     const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
     if (typeof declaredSize === 'number' && Number.isFinite(declaredSize)) {
-      if (declaredSize > MAX_ARCHIVE_FILE_BYTES) throw new Error(`Chekiroku 文件超过单文件大小限制：${entry.name}`);
+      if (declaredSize > MAX_ARCHIVE_FILE_BYTES) throw new Error(`外部备份文件超过单文件大小限制：${entry.name}`);
       declaredTotalBytes += declaredSize;
     }
   }
-  if (declaredTotalBytes > MAX_ARCHIVE_TOTAL_BYTES) throw new Error('Chekiroku 解压后内容超过大小限制');
+  if (declaredTotalBytes > MAX_ARCHIVE_TOTAL_BYTES) throw new Error('外部备份文件解压后内容超过大小限制');
   const versionEntry = zip.file('version.json');
   const databaseEntry = zip.file('my.db');
-  if (!versionEntry) throw new Error('Chekiroku 缺少 version.json');
-  if (!databaseEntry) throw new Error('Chekiroku 缺少 my.db');
+  if (!versionEntry) throw new Error('外部备份文件缺少 version.json');
+  if (!databaseEntry) throw new Error('外部备份文件缺少 my.db');
   const versionBytes = await versionEntry.async('uint8array');
   const containerVersion = parseContainerVersion(versionBytes);
   const databaseBytes = await databaseEntry.async('uint8array');
-  if (databaseBytes.byteLength > MAX_ARCHIVE_FILE_BYTES) throw new Error('Chekiroku 数据库文件超过大小限制');
+  if (databaseBytes.byteLength > MAX_ARCHIVE_FILE_BYTES) throw new Error('外部备份文件数据库超过大小限制');
   let sourceDb: SQLiteDatabase;
   try {
     sourceDb = await SQLite.deserializeDatabaseAsync(databaseBytes);
   } catch {
-    throw new Error('Chekiroku 的 my.db 不是有效的 SQLite 数据库');
+    throw new Error('外部备份文件的 my.db 不是有效的 SQLite 数据库');
   }
   try {
     return await readSourceSnapshotFromDatabase(sourceDb, containerVersion);
@@ -464,7 +476,7 @@ export function buildChekirokuNotes(input: {
     categoryName && categoryName !== DEFAULT_CATEGORY_NAME ? `类别：${categoryName}` : null,
   ].filter((value): value is string => value != null);
   if (details.length === 0) return memo.length > 0 ? memo : null;
-  const block = `[Chekiroku 导入信息]\n${details.join('\n')}`;
+  const block = `[外部数据导入信息]\n${details.join('\n')}`;
   return memo.length > 0 ? `${memo}\n\n${block}` : block;
 }
 
@@ -598,6 +610,24 @@ export function buildChekirokuImportPlan(
   let eventOrHallRecordCount = 0;
   let nonDefaultCategoryRecordCount = 0;
   let ignoredSourceImageCount = snapshot.members.filter((member) => member.imagePath != null).length;
+  const unsupportedData: string[] = [];
+  const unknownTableRowCounts = snapshot.unknownTableRowCounts ?? {};
+  const populatedUnknownTables = Object.entries(unknownTableRowCounts)
+    .filter(([, rowCount]) => rowCount > 0);
+  if (populatedUnknownTables.length > 0) {
+    const rowCount = populatedUnknownTables.reduce((sum, [, count]) => sum + count, 0);
+    unsupportedData.push(`发现 ${rowCount} 条外部扩展数据不会导入`);
+  }
+  if (snapshot.unknownTables.length > populatedUnknownTables.length) {
+    const emptyUnknownTables = snapshot.unknownTables.filter((tableName) => !(tableName in unknownTableRowCounts));
+    if (emptyUnknownTables.length > 0) {
+      unsupportedData.push('发现外部数据包含无法识别的扩展内容，其内容可能不会导入');
+    }
+  }
+  const unknownColumnTables = Object.entries(snapshot.unknownColumns);
+  if (unknownColumnTables.length > 0) {
+    unsupportedData.push('发现外部数据中的扩展字段，ota-log 不会导入这些字段');
+  }
 
   for (const sourceRecord of snapshot.records) {
     const sourceCount = Number(sourceRecord.count);
@@ -645,7 +675,7 @@ export function buildChekirokuImportPlan(
   if (samePersonSeparateCount > 0) warnings.push(`${samePersonSeparateCount} 组 same_person 关系选择分开导入，关系本身不会写入 ota-log`);
   if (samePersonMergeCount > 0) warnings.push(`${samePersonMergeCount} 组 same_person 关系已按选择合并到指定成员数据`);
   if (snapshot.hiddenMemberCount > 0) warnings.push('隐藏成员列表没有 ota-log 对应字段，未迁移');
-  if (snapshot.sortingRowCount > 0 || snapshot.userDefinedOrderCount > 0) warnings.push('Chekiroku 排序设置没有 ota-log 对应模型，未迁移');
+  if (snapshot.sortingRowCount > 0 || snapshot.userDefinedOrderCount > 0) warnings.push('外部数据的排序设置没有 ota-log 对应模型，未迁移');
   if (snapshot.anniversarySettingCount > 0) warnings.push('纪念日设置未迁移，避免产生通知副作用');
   if (ignoredSourceImageCount > 0) warnings.push(`有 ${ignoredSourceImageCount} 个成员图片路径未找到可导入媒体，已忽略`);
 
@@ -690,6 +720,7 @@ export function buildChekirokuImportPlan(
       ignoredSourceImageCount,
       unknownTables: snapshot.unknownTables,
       unknownColumns: snapshot.unknownColumns,
+      unsupportedData,
       warnings: [...new Set(warnings)],
       fatalErrors: [...new Set(fatalErrors)],
     },
@@ -758,7 +789,7 @@ export async function applyChekirokuImportPlan(
       createdImages: 0,
     };
   });
-  if (!result) throw new Error('Chekiroku 导入未返回结果');
+  if (!result) throw new Error('外部数据导入未返回结果');
   return result;
 }
 
@@ -776,7 +807,7 @@ export function buildChekirokuImportNotices(preview: ChekirokuImportPreview): Ch
     notices.push({
       tone: 'info',
       title: `${preview.nonMidnightDateCount} 条记录的日期已按原始日期保存`,
-      detail: 'Chekiroku 中的时间部分不会写入拍立得记录。',
+      detail: '外部数据中的时间部分不会写入拍立得记录。',
     });
   }
   if (preview.emptyMemberNameCount > 0) {
@@ -812,7 +843,7 @@ export function buildChekirokuImportNotices(preview: ChekirokuImportPreview): Ch
     notices.push({
       tone: 'info',
       title: `${preview.favoriteExistingArtistCount} 个已有艺人将同步设为收藏`,
-      detail: '这些成员在 Chekiroku 中已收藏，导入时会同步收藏状态。',
+      detail: '这些成员在外部数据中已收藏，导入时会同步收藏状态。',
     });
   }
   if (preview.ignoredSourceImageCount > 0) {
@@ -820,6 +851,13 @@ export function buildChekirokuImportNotices(preview: ChekirokuImportPreview): Ch
       tone: 'info',
       title: `${preview.ignoredSourceImageCount} 个成员头像无法导入`,
       detail: '拍立得记录和成员名称不受影响。',
+    });
+  }
+  if (preview.unsupportedData.length > 0) {
+    notices.push({
+      tone: 'warning',
+      title: '部分外部数据不会导入',
+      detail: preview.unsupportedData.join('；'),
     });
   }
   if (preview.eventOrHallRecordCount > 0 || preview.nonDefaultCategoryRecordCount > 0) {

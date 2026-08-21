@@ -89,6 +89,29 @@ describe('Chekiroku import application', () => {
     expect(rawDb.prepare("SELECT COUNT(*) AS count FROM cheki_items WHERE unit_price != 0 OR spec != 'three_inch_portrait'").get()).toEqual({ count: 0 });
   });
 
+  test('applies a newer-version plan while preserving a partial-support warning', async () => {
+    const plan = buildChekirokuImportPlan(
+      createSnapshot({
+        databaseVersion: 23,
+        unknownTables: ['cheki_images'],
+        unknownTableRowCounts: { cheki_images: 2 },
+      }),
+      [],
+      {
+        createId: createTestIdFactory(),
+        importedAt: '2026-08-13T00:00:00.000Z',
+      },
+    );
+
+    expect(plan.preview.unsupportedData).toEqual(['发现 2 条外部扩展数据不会导入']);
+
+    const result = await applyChekirokuImportPlan(createAsyncSQLiteAdapter(rawDb), plan);
+
+    expect(result.createdRecords).toBe(1);
+    expect(result.createdItems).toBe(2);
+    expect(rawDb.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 1 });
+  });
+
   test('rolls back artists, records, and items when a later write fails', async () => {
     const plan = buildChekirokuImportPlan(createSnapshot({
       records: [

@@ -37,6 +37,45 @@ function getMemberRecordSummary(snapshot: ChekirokuSourceSnapshot, memberId: str
   return `${quantity} 张拍立得 · ${records.length} 条记录`;
 }
 
+function formatExternalImportError(error: unknown, fallback = '无法读取外部备份文件，请检查文件后重试。'): string {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('缺少必需数据表')) {
+    return '此文件缺少导入所需的核心数据，当前不支持。请重新导出完整文件。';
+  }
+  if (message.includes('缺少必需字段')) {
+    return '此文件的数据结构不完整，当前不支持。请重新导出完整文件。';
+  }
+  if (message.includes('完整性检查')) {
+    return '此备份的数据库完整性检查未通过，无法安全导入。请重新导出文件。';
+  }
+  if (message.includes('不是有效的 SQLite') || message.includes('不是有效的 ZIP')) {
+    return '此文件不是可识别的外部备份文件。';
+  }
+  if (message.includes('危险路径') || message.includes('超过大小限制') || message.includes('包含过多内容')) {
+    return '此文件不符合安全导入要求。';
+  }
+  return fallback;
+}
+
+function ImportHintList() {
+  const { colors } = useAppTheme();
+  const hints = [
+    '支持 .chekiroku 文件，兼容范围有限。',
+    '导入前会检查数据，并展示不会导入的内容。',
+    '文件仅在本机处理，本工具与第三方无关。',
+  ];
+  return (
+    <View style={{ marginTop: 16, width: '100%', maxWidth: 320, gap: 9 }}>
+      {hints.map((hint) => (
+        <View key={hint} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
+          <View style={{ width: 5, height: 5, marginTop: 7, borderRadius: 3, backgroundColor: colors.accent }} />
+          <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 19 }}>{hint}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ActionButton({
   label,
   icon,
@@ -129,7 +168,7 @@ export default function ChekirokuImportScreen() {
       setStatus('ready');
     } catch (caughtError) {
       setStatus(snapshot ? 'ready' : 'idle');
-      setError(caughtError instanceof Error ? caughtError.message : '无法读取 Chekiroku 文件');
+      setError(formatExternalImportError(caughtError));
     }
   }, [db.artists, snapshot, status]);
 
@@ -155,7 +194,7 @@ export default function ChekirokuImportScreen() {
       setStatus('done');
     } catch (caughtError) {
       setStatus('ready');
-      setError(caughtError instanceof Error ? caughtError.message : '导入失败，数据未发生变化');
+      setError(formatExternalImportError(caughtError, '导入失败，数据未发生变化，请重试。'));
     }
   };
 
@@ -208,7 +247,7 @@ export default function ChekirokuImportScreen() {
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Screen
         options={{
-          title: snapshot ? '确认导入' : '导入 Chekiroku',
+          title: snapshot ? '确认导入' : '外部数据导入',
           headerRight: Platform.OS !== 'ios' && snapshot ? () => status === 'parsing' ? (
             <View style={{ minWidth: 66, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' }}>
               <ActivityIndicator size="small" color={colors.accent} />
@@ -242,10 +281,8 @@ export default function ChekirokuImportScreen() {
             <View style={{ width: 68, height: 68, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft }}>
               <AppIcon name="backupDownload" size={32} color={colors.accent} />
             </View>
-            <Text style={{ marginTop: 20, color: colors.heading, fontSize: 21, fontWeight: '800' }}>导入 Chekiroku 记录</Text>
-            <Text style={{ marginTop: 9, maxWidth: 310, color: colors.textSecondary, fontSize: 14, lineHeight: 22, textAlign: 'center' }}>
-              选择 Chekiroku 导出的文件，确认内容后再加入电子切册。现有记录不会被删除或替换。
-            </Text>
+            <Text style={{ marginTop: 20, color: colors.heading, fontSize: 21, fontWeight: '800' }}>导入外部数据</Text>
+            <ImportHintList />
           </View>
           {error ? (
             <View style={{ marginTop: 24, borderRadius: 14, padding: 14, backgroundColor: colors.dangerSoft }}>
@@ -254,7 +291,7 @@ export default function ChekirokuImportScreen() {
           ) : null}
           <View style={{ marginTop: 28 }}>
             <ActionButton
-              label={status === 'parsing' ? '正在读取文件' : '选择 Chekiroku 文件'}
+              label={status === 'parsing' ? '正在读取文件' : '选择文件'}
               icon="backupDownload"
               loading={status === 'parsing'}
               onPress={() => { void pickFile(); }}
@@ -297,7 +334,7 @@ export default function ChekirokuImportScreen() {
                   ) : null}
                 </View>
                 <Text style={{ marginBottom: 10, color: colors.textSecondary, fontSize: 13, lineHeight: 20 }}>
-                  Chekiroku 将这些资料标记为同一人，请选择导入后的处理方式。
+                  外部数据将这些资料标记为同一人，请选择导入后的处理方式。
                 </Text>
                 <View style={{ gap: 12 }}>
                   {snapshot.samePersonGroups.map((group) => {
@@ -388,7 +425,7 @@ export default function ChekirokuImportScreen() {
                         {plan.preview.invalidCountCount} 条记录的拍立得数量无效
                       </Text>
                       <Text style={{ marginTop: 3, color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                        请在 Chekiroku 中修正这些记录并重新导出文件。
+                        请修正原始数据后重新导出文件。
                       </Text>
                     </View>
                   </View>
@@ -496,6 +533,12 @@ export default function ChekirokuImportScreen() {
             <Text style={{ color: colors.text, fontSize: 14, lineHeight: 22 }}>
               将新增 {preview.newMemberCount + preview.newGroupCount} 个艺人，并匹配 {preview.reusedMemberCount + preview.reusedGroupCount} 个已有艺人。
             </Text>
+            {preview.unsupportedData.length > 0 ? (
+              <View style={{ marginTop: 14, borderRadius: 12, padding: 12, backgroundColor: colors.warningSoft }}>
+                <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '700', lineHeight: 19 }}>部分外部数据不会导入</Text>
+                <Text style={{ marginTop: 4, color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>{preview.unsupportedData.join('；')}</Text>
+              </View>
+            ) : null}
             <View style={{ marginTop: 14, marginBottom: 8, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: colors.warningSoft }}>
               <AppIcon name="info" size={18} color={colors.warning} />
               <Text style={{ flex: 1, color: colors.text, fontSize: 12.5, lineHeight: 19 }}>
