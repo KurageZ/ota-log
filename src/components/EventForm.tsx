@@ -23,10 +23,13 @@ import {
   toISODate,
 } from '../utils/date';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
-import { filterArtistsByQuery } from '../utils/filter';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { EventStatusChips } from './EventStatusChips';
-import { showPhotoLibraryPermissionAlert, showSaveFailedAlert } from '../utils/failureAlert';
+import {
+  showArtistCreateFailedAlert,
+  showPhotoLibraryPermissionAlert,
+  showSaveFailedAlert,
+} from '../utils/failureAlert';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
@@ -319,6 +322,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [artistSearch, setArtistSearch] = useState('');
+  const [creatingArtist, setCreatingArtist] = useState(false);
   const [activeVenueKey, setActiveVenueKey] = useState<string | null>(null);
   const [venueSuggestions, setVenueSuggestions] = useState<string[]>([]);
   const [startedWithMultipleSessions] = useState(() => merged.sessions.length > 1);
@@ -379,13 +383,15 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     );
   }, []);
 
-  const handleAddArtistFromSearch = async () => {
-    const name = artistSearch.trim();
-    if (!name) return;
-    const artist = await db.artists.create(name);
-    setAllArtists((prev) => [...prev, artist]);
-    setArtistIds((prev) => [...prev, artist.id]);
-    setArtistSearch('');
+  const handleAddArtistFromSearch = async (name: string) => {
+    try {
+      const artist = await db.artists.create(name);
+      setAllArtists((prev) => [...prev, artist]);
+      setArtistIds((prev) => [...prev, artist.id]);
+      setArtistSearch('');
+    } catch (error) {
+      showArtistCreateFailedAlert(error);
+    }
   };
 
   const updateSession = useCallback((key: string, patch: Partial<EventFormSessionValues>) => {
@@ -446,10 +452,6 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     );
   }, []);
 
-  const filteredArtists = useMemo(() => {
-    return filterArtistsByQuery(allArtists, artistSearch, oshiArtistId);
-  }, [allArtists, artistSearch, oshiArtistId]);
-
   const artistIdSet = useMemo(() => new Set(artistIds), [artistIds]);
 
   const selectedArtists = useMemo(() => {
@@ -490,11 +492,6 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
     () => Object.fromEntries(allArtists.map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [allArtists],
   );
-  const canCreateArtistFromSearch = useMemo(() => {
-    const query = artistSearch.trim();
-    if (!query) return false;
-    return filteredArtists.length === 0;
-  }, [artistSearch, filteredArtists]);
   const handlePickInfoPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { showPhotoLibraryPermissionAlert(); return; }
@@ -511,6 +508,7 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
   };
 
   const handleSave = async () => {
+    if (saving || creatingArtist) return;
     setDidTrySubmit(true);
     if (titleError) { Alert.alert(titleError); return; }
     const firstSessionError = sessionErrors.find(Boolean);
@@ -839,43 +837,8 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
           selectedOverflowLabel={(_, total) => `展开全部 ${total} 位出演者`}
           onSelectArtist={(artist) => toggleArtist(artist.id)}
           onRemoveArtist={(artist) => toggleArtist(artist.id)}
-          extraContentAfterSearch={
-            canCreateArtistFromSearch ? (
-              <TouchableOpacity
-                onPress={handleAddArtistFromSearch}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 12,
-                  marginBottom: 8,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  borderColor: colors.accent,
-                  backgroundColor: isDark ? colors.accentSoft : withAlpha(colors.accent, 0.05),
-                }}
-              >
-                <View style={{
-                  width: 26, height: 26, borderRadius: 13,
-                  alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: withAlpha(colors.accent, 0.14),
-                }}>
-                  <AppIcon name="artist" size={14} color={colors.accent} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>
-                    新建艺人「{artistSearch.trim()}」
-                  </Text>
-                  <Text style={{ fontSize: 11, color: isDark ? colors.accentBorder : colors.accentStrong, marginTop: 2 }}>
-                    当前列表中没有匹配的艺人
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ) : null
-          }
+          onCreateArtist={handleAddArtistFromSearch}
+          onCreateArtistPendingChange={setCreatingArtist}
         />
       </Card>
 
@@ -1095,14 +1058,14 @@ export const EventForm = forwardRef<EventFormHandle, Props>(function EventForm(
       {!hideSubmitButton && (
         <TouchableOpacity
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || creatingArtist}
           style={{
-            backgroundColor: saving ? colors.accentBorder : colors.accent,
+            backgroundColor: saving || creatingArtist ? colors.accentBorder : colors.accent,
             borderRadius: 16, paddingVertical: 16,
             alignItems: 'center', marginTop: 4,
           }}
         >
-          {saving
+          {saving || creatingArtist
             ? <ActivityIndicator color={colors.onAccent} />
             : <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>{submitLabel}</Text>
           }

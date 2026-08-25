@@ -1,11 +1,12 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Artist } from '../types/models';
 import { filterArtistsByQuery, sortArtistsByPreference } from '../utils/filter';
 import type { ArtistTypePreference } from '../utils/filter';
 import { ArtistDisplayMode } from '../utils/artistDisplay';
 import { useAppTheme } from '../theme/appTheme';
+import { withAlpha } from '../utils/color';
 import { AppIcon } from './AppIcon';
 import { ArtistOptionRow } from './ArtistOptionRow';
 import { ArtistPickerList } from './ArtistPickerList';
@@ -32,7 +33,8 @@ export function ArtistSearchPicker({
   selectedLabel,
   maxVisibleSelected = DEFAULT_VISIBLE_SELECTED_ARTISTS,
   selectedOverflowLabel,
-  extraContentAfterSearch,
+  onCreateArtist,
+  onCreateArtistPendingChange,
   hideSelectedFromCandidates = true,
   displayMode = 'compact',
   inputVariant = 'plain',
@@ -62,7 +64,9 @@ export function ArtistSearchPicker({
   selectedLabel?: string;
   maxVisibleSelected?: number;
   selectedOverflowLabel?: (hiddenCount: number, totalCount: number) => string;
-  extraContentAfterSearch?: ReactNode;
+  /** 搜索无结果时显示快捷新建入口；调用方只负责持久化与创建后的业务联动 */
+  onCreateArtist?: (name: string) => Promise<void>;
+  onCreateArtistPendingChange?: (pending: boolean) => void;
   hideSelectedFromCandidates?: boolean;
   displayMode?: ArtistDisplayMode;
   inputVariant?: 'plain' | 'bottomSheet';
@@ -74,6 +78,8 @@ export function ArtistSearchPicker({
 }) {
   const { colors } = useAppTheme();
   const [showAllSelected, setShowAllSelected] = useState(false);
+  const [creatingArtist, setCreatingArtist] = useState(false);
+  const creatingArtistRef = useRef(false);
   const SearchInput = inputVariant === 'bottomSheet' ? BottomSheetTextInput : TextInput;
   const selectedSet = useMemo(
     () => selectedIds instanceof Set ? selectedIds : new Set(selectedIds ?? []),
@@ -105,6 +111,25 @@ export function ArtistSearchPicker({
   const hasExtraSelectedRows = Boolean(extraSelectedRows && extraSelectedRows.length > 0);
   const trimmedSearch = searchValue.trim();
   const candidateRenderLimit = renderLimit ?? (trimmedSearch ? 80 : 32);
+  const canCreateArtist = Boolean(
+    onCreateArtist
+    && trimmedSearch
+    && filteredArtists.length === 0,
+  );
+
+  const handleCreateArtist = async () => {
+    if (!onCreateArtist || !canCreateArtist || creatingArtistRef.current) return;
+    creatingArtistRef.current = true;
+    setCreatingArtist(true);
+    onCreateArtistPendingChange?.(true);
+    try {
+      await onCreateArtist(trimmedSearch);
+    } finally {
+      creatingArtistRef.current = false;
+      setCreatingArtist(false);
+      onCreateArtistPendingChange?.(false);
+    }
+  };
 
   return (
     <View>
@@ -226,7 +251,52 @@ export function ArtistSearchPicker({
         />
       </View>
 
-      {extraContentAfterSearch}
+      {canCreateArtist ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`新建艺人${trimmedSearch}`}
+          accessibilityState={{ disabled: creatingArtist, busy: creatingArtist }}
+          onPress={handleCreateArtist}
+          activeOpacity={0.7}
+          disabled={creatingArtist}
+          style={{
+            minHeight: 52,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            marginBottom: 8,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: colors.accent,
+            backgroundColor: isDark ? colors.accentSoft : withAlpha(colors.accent, 0.05),
+            opacity: creatingArtist ? 0.55 : 1,
+          }}
+        >
+          <View style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: withAlpha(colors.accent, 0.14),
+          }}>
+            {creatingArtist
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <AppIcon name="artist" size={15} color={colors.accent} />}
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={2} style={{ fontSize: 13, lineHeight: 18, fontWeight: '700', color: colors.accent }}>
+              {creatingArtist ? '正在新建艺人…' : `新建艺人「${trimmedSearch}」`}
+            </Text>
+            <Text style={{ marginTop: 2, fontSize: 11, lineHeight: 16, color: colors.textSecondary }}>
+              当前列表中没有匹配的艺人
+            </Text>
+          </View>
+        </TouchableOpacity>
+      ) : null}
 
       <ArtistPickerList
         artists={candidateArtists}

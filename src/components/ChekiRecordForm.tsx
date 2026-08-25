@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDB } from '../context/DBContext';
 import { Artist, Event } from '../types/models';
 import type { ChekiRecordWithItems } from '../repositories/ChekiRecordRepository';
@@ -24,6 +25,7 @@ import { copyToDocuments } from '../utils/copyToDocuments';
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 import {
   showCameraPermissionAlert,
+  showArtistCreateFailedAlert,
   showPhotoLibraryPermissionAlert,
   showSaveFailedAlert,
 } from '../utils/failureAlert';
@@ -44,6 +46,7 @@ import {
 
 const PHOTO_PICKER_SELECTION_LIMIT = 20;
 const CHEKI_IMPORT_MAX_DIMENSION = Platform.OS === 'android' ? 1600 : 2000;
+const PHOTO_HINT_DISMISSED_KEY = '@ota_log:cheki_record_photo_hint_dismissed:v1';
 
 type ArtistDecision = 'unconfirmed' | 'selected' | 'none';
 
@@ -130,6 +133,7 @@ export function ChekiRecordForm({
     initialArtistId ? 'selected' : 'unconfirmed',
   );
   const [artistSearch, setArtistSearch] = useState('');
+  const [creatingArtist, setCreatingArtist] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(initialEventId ?? null);
   const [eventSearch, setEventSearch] = useState('');
   const [date, setDate] = useState(initialDate ?? toISODate(new Date()));
@@ -137,6 +141,7 @@ export function ChekiRecordForm({
   const [notes, setNotes] = useState('');
   const [photoPickerPending, setPhotoPickerPending] = useState(false);
   const [photoImportProgress, setPhotoImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [photoHintDismissed, setPhotoHintDismissed] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
   const existingItemCount = record?.items.length ?? 0;
@@ -157,6 +162,20 @@ export function ChekiRecordForm({
   const itemsWithImagesCount = retainedImageItemCount + pendingPhotos.length;
   const hasAddedPhotos = itemsWithImagesCount > 0;
   const isHandlingPhotos = photoPickerPending || photoImportProgress != null;
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(PHOTO_HINT_DISMISSED_KEY)
+      .then((dismissed) => {
+        if (active) setPhotoHintDismissed(dismissed === 'true');
+      })
+      .catch(() => {
+        if (active) setPhotoHintDismissed(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -355,6 +374,11 @@ export function ChekiRecordForm({
     }
   }, [importPhotos, isHandlingPhotos]);
 
+  const handleDismissPhotoHint = useCallback(() => {
+    setPhotoHintDismissed(true);
+    void AsyncStorage.setItem(PHOTO_HINT_DISMISSED_KEY, 'true');
+  }, []);
+
   const handleTakePhoto = useCallback(async () => {
     if (isHandlingPhotos) return;
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -472,6 +496,19 @@ export function ChekiRecordForm({
     () => Object.fromEntries(artists.map((artist) => [artist.id, getArtistPrimaryName(artist)])),
     [artists],
   );
+  const handleCreateArtistFromSearch = useCallback(async (name: string) => {
+    try {
+      const artist = await db.artists.create(name);
+      setArtists((current) => [...current, artist]);
+      setSelectedArtistId(artist.id);
+      setArtistDecision('selected');
+      setArtistSearch('');
+      Keyboard.dismiss();
+      void applyLatestArtistPrice(artist.id);
+    } catch (error) {
+      showArtistCreateFailedAlert(error);
+    }
+  }, [applyLatestArtistPrice, db]);
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
     [events, selectedEventId],
@@ -509,6 +546,7 @@ export function ChekiRecordForm({
     && (artistDecision !== 'selected' || selectedArtist != null);
   const canSave = !loading
     && !saving
+    && !creatingArtist
     && !isHandlingPhotos
     && parsedQuantity != null
     && parsedQuantity >= requiredItemCount
@@ -601,8 +639,8 @@ export function ChekiRecordForm({
           title: mode === 'create' ? '添加拍立得记录' : '编辑拍立得记录',
           headerShadowVisible: false,
           headerLeft: Platform.OS === 'ios' ? undefined : () => (
-            <TouchableOpacity onPress={leaveForm} disabled={saving}>
-              <Text style={{ color: colors.accent, fontSize: 16 }}>取消</Text>
+            <TouchableOpacity onPress={leaveForm} disabled={saving || creatingArtist}>
+              <Text style={{ color: colors.accent, fontSize: 16, opacity: saving || creatingArtist ? 0.4 : 1 }}>取消</Text>
             </TouchableOpacity>
           ),
           headerRight: Platform.OS === 'ios' ? undefined : () => (
@@ -617,7 +655,7 @@ export function ChekiRecordForm({
         }}
       />
       <NativeTextToolbar
-        left={{ label: '取消', onPress: leaveForm, disabled: saving || isHandlingPhotos }}
+        left={{ label: '取消', onPress: leaveForm, disabled: saving || creatingArtist || isHandlingPhotos }}
         right={{ label: saving ? '保存中' : '保存', onPress: handleSave, disabled: !canSave, variant: 'done' }}
       />
 
@@ -639,6 +677,41 @@ export function ChekiRecordForm({
       >
         <FormSectionLabel label="拍立得" />
         <FormCard>
+          <FormFieldLabel required>拍立得数量</FormFieldLabel>
+          <View style={{
+            height: 46,
+            flexDirection: 'row',
+            alignItems: 'center',
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: quantity !== '' && parsedQuantity == null ? colors.danger : colors.inputBorder,
+            borderRadius: 10,
+            backgroundColor: colors.input,
+          }}>
+            <TouchableOpacity
+              onPress={() => changeQuantity(String(Math.max(minimumQuantity, (parsedQuantity ?? minimumQuantity) - 1)))}
+              disabled={parsedQuantity == null || parsedQuantity <= minimumQuantity}
+              style={{ width: 46, height: '100%', alignItems: 'center', justifyContent: 'center', opacity: parsedQuantity == null || parsedQuantity <= minimumQuantity ? 0.4 : 1 }}
+            >
+              <AppIcon name="remove" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <TextInput
+              value={quantity}
+              onChangeText={changeQuantity}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              selectTextOnFocus
+              style={{ flex: 1, height: '100%', textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.text, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.inputBorder }}
+            />
+            <TouchableOpacity
+              onPress={() => changeQuantity(String((parsedQuantity ?? Math.max(0, requiredItemCount)) + 1))}
+              style={{ width: 46, height: '100%', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <AppIcon name="add" size={18} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ height: 1, marginTop: 20, marginBottom: 16, backgroundColor: colors.divider }} />
+
           <View style={{ marginBottom: 10 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
               {hasAddedPhotos
@@ -726,9 +799,47 @@ export function ChekiRecordForm({
             </View>
           ) : null}
 
-          <Text style={{ marginTop: 10, fontSize: 12, lineHeight: 18, color: colors.textSecondary }}>
-            新拍立得规格默认三寸，横竖版按图片比例自动判断，可在单张编辑中修改。
-          </Text>
+          {photoHintDismissed === false ? (
+            <View
+              accessibilityRole="alert"
+              style={{
+                marginTop: 12,
+                paddingHorizontal: 13,
+                paddingVertical: 12,
+                borderRadius: 12,
+                backgroundColor: colors.infoSoft,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <AppIcon name="info" size={20} color={colors.info} />
+                <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '800', color: colors.text }}>
+                  图片与规格
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="不再显示图片添加提示"
+                  onPress={handleDismissPhotoHint}
+                  style={{ width: 44, height: 44, marginVertical: -8, marginRight: -8, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <AppIcon name="close" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <View style={{ marginTop: 6, gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 5, height: 5, marginTop: 7, borderRadius: 999, backgroundColor: colors.info }} />
+                  <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: colors.textSecondary }}>
+                    相册单次最多选择 20 张照片，可分多次添加。
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ width: 5, height: 5, marginTop: 7, borderRadius: 999, backgroundColor: colors.info }} />
+                  <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: colors.textSecondary }}>
+                    新增拍立得默认为三寸，横竖版会根据图片比例自动识别，可在单张编辑中修改。
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
             <TouchableOpacity
@@ -748,45 +859,6 @@ export function ChekiRecordForm({
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.accent }}>从相册选择</Text>
             </TouchableOpacity>
           </View>
-
-          <View style={{ height: 1, marginTop: 20, marginBottom: 16, backgroundColor: colors.divider }} />
-
-          <FormFieldLabel required>拍立得数量</FormFieldLabel>
-          <View style={{
-            height: 46,
-            flexDirection: 'row',
-            alignItems: 'center',
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: quantity !== '' && parsedQuantity == null ? colors.danger : colors.inputBorder,
-            borderRadius: 10,
-            backgroundColor: colors.input,
-          }}>
-            <TouchableOpacity
-              onPress={() => changeQuantity(String(Math.max(minimumQuantity, (parsedQuantity ?? minimumQuantity) - 1)))}
-              disabled={parsedQuantity == null || parsedQuantity <= minimumQuantity}
-              style={{ width: 46, height: '100%', alignItems: 'center', justifyContent: 'center', opacity: parsedQuantity == null || parsedQuantity <= minimumQuantity ? 0.4 : 1 }}
-            >
-              <AppIcon name="remove" size={18} color={colors.text} />
-            </TouchableOpacity>
-            <TextInput
-              value={quantity}
-              onChangeText={changeQuantity}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              selectTextOnFocus
-              style={{ flex: 1, height: '100%', textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.text, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.inputBorder }}
-            />
-            <TouchableOpacity
-              onPress={() => changeQuantity(String((parsedQuantity ?? Math.max(0, requiredItemCount)) + 1))}
-              style={{ width: 46, height: '100%', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <AppIcon name="add" size={18} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-          <Text style={{ marginTop: 8, fontSize: 12, lineHeight: 18, color: colors.textSecondary }}>
-            图片超过当前数量时会自动增加数量。
-          </Text>
         </FormCard>
 
         <FormSectionLabel label="记录信息" />
@@ -811,6 +883,7 @@ export function ChekiRecordForm({
                 typePreference="person"
                 searchValue={artistSearch}
                 onSearchChange={setArtistSearch}
+                placeholder="搜索或新建艺人..."
                 onSelectArtist={(artist) => {
                   setSelectedArtistId(artist.id);
                   setArtistDecision('selected');
@@ -825,7 +898,9 @@ export function ChekiRecordForm({
                 parentNameMap={artistNameMap}
                 maxHeight={220}
                 emptyText="没有找到匹配的艺人"
-                idleEmptyText="输入关键词搜索艺人"
+                idleEmptyText="搜索艺人或输入名称新建"
+                onCreateArtist={handleCreateArtistFromSearch}
+                onCreateArtistPendingChange={setCreatingArtist}
               />
               {artistDecision === 'unconfirmed' ? (
                 <TouchableOpacity

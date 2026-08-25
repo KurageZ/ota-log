@@ -55,6 +55,16 @@ export function showSaveFailedAlert(details?: unknown) {
   });
 }
 
+export function showArtistCreateFailedAlert(details?: unknown) {
+  hapticError();
+  showFailureAlert({
+    title: '新建艺人失败',
+    reason: '未能创建该艺人。',
+    nextStep: '请确认艺人名称后再试一次；如果问题持续出现，请稍后重试。',
+    details,
+  });
+}
+
 export function showDeleteFailedAlert(details?: unknown) {
   showFailureAlert({
     title: '删除失败',
