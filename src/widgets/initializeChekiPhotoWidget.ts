@@ -1,5 +1,3 @@
-import type { ChekiRepository } from '../repositories/ChekiRepository';
+import type { ChekiWidgetGroupRepository } from '../repositories/ChekiWidgetGroupRepository';
 
-type ChekiReader = Pick<ChekiRepository, 'findAll'>;
-
-export async function initializeChekiPhotoWidget(_chekiRepository: ChekiReader): Promise<void> {}
+export async function initializeChekiPhotoWidget(_repository: ChekiWidgetGroupRepository): Promise<void> {}

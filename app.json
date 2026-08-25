@@ -62,7 +62,7 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "16.4"
+            "deploymentTarget": "17.0"
           }
         }
       ],
@@ -76,6 +76,7 @@
         }
       ],
       "./plugins/with-expo-widgets-no-push",
+      "./plugins/with-cheki-widget-string-slot",
       [
         "expo-widgets",
         {
@@ -85,12 +86,31 @@
               "name": "ChekiPhotoWidget",
               "displayName": "拍立得回忆",
               "description": "展示电子切册中的拍立得照片",
-              "ios": {
-                "supportedFamilies": [
-                  "systemSmall",
-                  "systemMedium"
-                ],
-                "contentMarginsDisabled": true
+                "ios": {
+                  "supportedFamilies": [
+                    "systemSmall",
+                    "systemMedium"
+                  ],
+                "contentMarginsDisabled": true,
+                "configuration": {
+                  "title": "选择拍立得分组",
+                  "description": "选择此小组件展示的分组",
+                  "parameters": {
+                    "slot": {
+                      "title": "分组",
+                      "type": "enum",
+                      "values": [
+                        { "name": "分组 1", "value": "group1" },
+                        { "name": "分组 2", "value": "group2" },
+                        { "name": "分组 3", "value": "group3" },
+                        { "name": "分组 4", "value": "group4" },
+                        { "name": "分组 5", "value": "group5" },
+                        { "name": "分组 6", "value": "group6" }
+                      ],
+                      "default": "group1"
+                    }
+                  }
+                }
               }
             },
             {

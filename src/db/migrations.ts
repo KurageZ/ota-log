@@ -21,8 +21,10 @@ import {
   ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS,
   createArtistsTableSql,
 } from './artistRelationshipSchema';
+import { CHEKI_WIDGET_GROUP_SCHEMA_STATEMENTS } from './chekiWidgetGroupSchema';
+import { defaultChekiWidgetGroupName, type ChekiWidgetSlot } from '../types/chekiWidgetGroups';
 
-export const CURRENT_VERSION = 22;
+export const CURRENT_VERSION = 23;
 
 interface LegacyEventV17Row {
   id: string;
@@ -416,6 +418,22 @@ async function migrateArtistRelationships(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+async function migrateChekiWidgetGroups(db: SQLiteDatabase): Promise<void> {
+  const now = new Date().toISOString();
+  await db.withTransactionAsync(async () => {
+    for (const statement of CHEKI_WIDGET_GROUP_SCHEMA_STATEMENTS) await db.runAsync(statement);
+    for (let slot = 1 as ChekiWidgetSlot; slot <= 6; slot = (slot + 1) as ChekiWidgetSlot) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO cheki_widget_groups
+          (slot, name, source_type, created_at, updated_at) VALUES (?, ?, NULL, ?, ?)`,
+        [slot, defaultChekiWidgetGroupName(slot), now, now],
+      );
+    }
+  });
+  const errors = await db.getAllAsync<Record<string, unknown>>('PRAGMA foreign_key_check');
+  if (errors.length > 0) throw new Error('Cheki widget group migration foreign key verification failed');
+}
+
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
@@ -427,6 +445,7 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
       await db.runAsync(stmt);
     }
     await db.runAsync('PRAGMA foreign_keys = ON');
+    await migrateChekiWidgetGroups(db);
   } else if (version < CURRENT_VERSION) {
     // Upgrade: incremental migrations, user data preserved
     if (version < 6) {
@@ -554,6 +573,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     }
     if (version < 22) {
       await migrateArtistRelationships(db);
+    }
+    if (version < 23) {
+      await migrateChekiWidgetGroups(db);
     }
     // Future versions: add more `if (version < N)` blocks here
   }

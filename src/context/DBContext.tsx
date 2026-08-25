@@ -18,6 +18,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { rebaseLegacyLocalMediaUris } from '../utils/localMedia';
 import { materializePresetArtistAvatars } from '../utils/presetArtistMedia';
 import { toISODate } from '../utils/date';
+import { ChekiWidgetGroupRepository } from '../repositories/ChekiWidgetGroupRepository';
 
 export interface Repositories {
   artists: ArtistRepository;
@@ -31,6 +32,7 @@ export interface Repositories {
   chekiRecords: ChekiRecordRepository;
   userConfig: UserConfigRepository;
   dateItems: DateItemRepository;
+  chekiWidgetGroups: ChekiWidgetGroupRepository;
   rawDb: SQLiteDatabase;
 }
 
@@ -54,6 +56,7 @@ function buildRepositories(db: SQLiteDatabase): Repositories {
     chekiRecords: new ChekiRecordRepository(db),
     userConfig: new UserConfigRepository(db),
     dateItems: new DateItemRepository(db),
+    chekiWidgetGroups: new ChekiWidgetGroupRepository(db),
   };
 }
 

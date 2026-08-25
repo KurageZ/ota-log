@@ -113,7 +113,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(22);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(23);
     expect(getScalar<number>(db, 'SELECT COUNT(*) FROM artists')).toBe(0);
     expect(getScalar<number>(db, "SELECT COUNT(*) FROM artists WHERE avatar_uri LIKE 'preset://%'"))
       .toBe(0);
@@ -137,7 +137,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(22);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(23);
     expect(getScalar<string>(db, "SELECT artist_confirmation_mode FROM user_config WHERE id = 'default'"))
       .toBe('always');
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cheki_records'")).toBe('cheki_records');
@@ -160,7 +160,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(22);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(23);
     expect(getScalar<number>(db, 'SELECT SUM(quantity) FROM cheki_records')).toBe(4);
     expect(getScalar<number>(db, 'SELECT SUM(unit_price) FROM cheki_items')).toBe(60);
     expect(getScalar<number>(db, 'SELECT COUNT(*) FROM cheki_items')).toBe(4);
@@ -275,7 +275,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(22);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(23);
     expect(getScalar<string>(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'artists'")).toBe('artists');
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_uri'")).toBe('background_uri');
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_color'")).toBe('background_color');
@@ -405,7 +405,7 @@ describe('Forward migrations from v11', () => {
 
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(22);
+    expect(getScalar<number>(db, 'PRAGMA user_version')).toBe(23);
     expect(getScalar<string>(db, "SELECT name FROM pragma_table_info('artists') WHERE name = 'background_color'")).toBe('background_color');
     expect(getScalar<string>(db, "SELECT background_uri FROM artists WHERE id = 'artist-v14'")).toBe('file:///artist-background-v14.jpg');
     expect(getScalar<null>(db, "SELECT background_color FROM artists WHERE id = 'artist-v14'")).toBeNull();

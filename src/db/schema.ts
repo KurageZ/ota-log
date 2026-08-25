@@ -9,6 +9,7 @@ import {
   ARTIST_RELATIONSHIP_SCHEMA_STATEMENTS,
   createArtistsTableSql,
 } from './artistRelationshipSchema';
+import { CHEKI_WIDGET_GROUP_SCHEMA_STATEMENTS } from './chekiWidgetGroupSchema';
 
 export const SCHEMA_STATEMENTS = [
   createArtistsTableSql(),
@@ -53,6 +54,8 @@ export const SCHEMA_STATEMENTS = [
   )`,
 
   ...CHEKI_V2_SCHEMA_STATEMENTS,
+
+  ...CHEKI_WIDGET_GROUP_SCHEMA_STATEMENTS,
 
   `CREATE TABLE IF NOT EXISTS user_config (
     id            TEXT PRIMARY KEY,

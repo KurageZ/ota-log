@@ -12,6 +12,7 @@ import {
 } from '../domain/chekiSpec';
 import { generateId } from '../utils/uuid';
 import { toISODateTime } from '../utils/date';
+import { RepositoryChangeEmitter } from './RepositoryChangeEmitter';
 
 export interface CreateChekiRecordInput {
   event_id?: string | null;
@@ -125,6 +126,9 @@ function assertSpec(spec: ChekiSpec | undefined): void {
 }
 
 export class ChekiRecordRepository {
+  private readonly changes = new RepositoryChangeEmitter();
+  readonly subscribeToChanges = this.changes.subscribe;
+
   constructor(
     private readonly db: SQLiteDatabase,
     private readonly createId: () => string = generateId,
@@ -157,6 +161,7 @@ export class ChekiRecordRepository {
       created = { ...record, items: createdItems };
     });
     if (!created) throw new Error('Failed to create cheki record');
+    this.changes.notify();
     return created;
   }
 
@@ -231,6 +236,7 @@ export class ChekiRecordRepository {
 
   async deleteRecord(id: string): Promise<void> {
     await this.db.runAsync('DELETE FROM cheki_records WHERE id = ?', [id]);
+    this.changes.notify();
   }
 
   async addItem(recordId: string, input: AddChekiItemInput): Promise<ChekiItemWithImages> {
@@ -244,6 +250,7 @@ export class ChekiRecordRepository {
       created = await this.insertItem(recordId, input);
     });
     if (!created) throw new Error('Failed to create cheki item');
+    this.changes.notify();
     return created;
   }
 
@@ -316,6 +323,7 @@ export class ChekiRecordRepository {
         if (item.backUri) await this.addOrReplaceItemImage(target.id, 'back', item.backUri);
       }
     });
+    this.changes.notify();
   }
 
   async findLatestUnitPriceByArtistId(artistId: string): Promise<number | null> {
@@ -427,6 +435,7 @@ export class ChekiRecordRepository {
     fields.push('updated_at = ?');
     values.push(toISODateTime(), id);
     await this.db.runAsync(`UPDATE cheki_items SET ${fields.join(', ')} WHERE id = ?`, values);
+    this.changes.notify();
   }
 
   async setItemFavorite(id: string, isFavorite: boolean): Promise<void> {
@@ -434,6 +443,7 @@ export class ChekiRecordRepository {
       'UPDATE cheki_items SET is_favorite = ?, updated_at = ? WHERE id = ?',
       [isFavorite ? 1 : 0, toISODateTime(), id],
     );
+    this.changes.notify();
   }
 
   async updateItemWithImages(
@@ -464,6 +474,7 @@ export class ChekiRecordRepository {
         }
       }
     });
+    this.changes.notify();
   }
 
   async addOrReplaceItemImage(
@@ -498,6 +509,7 @@ export class ChekiRecordRepository {
          updated_at = excluded.updated_at`,
       [image.id, image.item_id, image.side, image.photo_uri, image.created_at, image.updated_at],
     );
+    this.changes.notify();
     return image;
   }
 
@@ -521,6 +533,7 @@ export class ChekiRecordRepository {
       'SELECT id FROM cheki_items WHERE id = ?',
       [itemId],
     );
+    this.changes.notify();
     return { removed: true, itemDeleted: item == null };
   }
 
@@ -544,6 +557,7 @@ export class ChekiRecordRepository {
         [toISODateTime(), item.record_id],
       );
     });
+    this.changes.notify();
   }
 
   async findRecordById(id: string): Promise<ChekiRecordWithItems | null> {

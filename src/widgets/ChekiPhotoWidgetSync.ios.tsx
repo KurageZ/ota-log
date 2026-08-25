@@ -2,10 +2,9 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useDB } from '../context/DBContext';
 import { initializeChekiPhotoWidget } from './initializeChekiPhotoWidget';
-import { subscribeToChekiPhotoWidgetPreferenceChanges } from './chekiPhotoWidgetPreferences';
 
 export function ChekiPhotoWidgetSync() {
-  const { cheki } = useDB();
+  const { cheki, chekiRecords, chekiWidgetGroups, artists, events } = useDB();
 
   useEffect(() => {
     let disposed = false;
@@ -19,7 +18,7 @@ export function ChekiPhotoWidgetSync() {
         return;
       }
 
-      syncInProgress = initializeChekiPhotoWidget(cheki)
+      syncInProgress = initializeChekiPhotoWidget(chekiWidgetGroups)
         .catch((error: unknown) => {
           console.warn('Failed to synchronize the cheki photo widget', error);
         })
@@ -34,7 +33,10 @@ export function ChekiPhotoWidgetSync() {
 
     requestSync();
     const unsubscribeFromChekiChanges = cheki.subscribeToChanges(requestSync);
-    const unsubscribeFromPreferenceChanges = subscribeToChekiPhotoWidgetPreferenceChanges(requestSync);
+    const unsubscribeFromRecordChanges = chekiRecords.subscribeToChanges(requestSync);
+    const unsubscribeFromGroupChanges = chekiWidgetGroups.subscribeToChanges(requestSync);
+    const unsubscribeFromArtistChanges = artists.subscribeToChanges(requestSync);
+    const unsubscribeFromEventChanges = events.subscribeToChanges(requestSync);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') requestSync();
     });
@@ -42,10 +44,13 @@ export function ChekiPhotoWidgetSync() {
     return () => {
       disposed = true;
       unsubscribeFromChekiChanges();
-      unsubscribeFromPreferenceChanges();
+      unsubscribeFromRecordChanges();
+      unsubscribeFromGroupChanges();
+      unsubscribeFromArtistChanges();
+      unsubscribeFromEventChanges();
       appStateSubscription.remove();
     };
-  }, [cheki]);
+  }, [artists, cheki, chekiRecords, chekiWidgetGroups, events]);
 
   return null;
 }

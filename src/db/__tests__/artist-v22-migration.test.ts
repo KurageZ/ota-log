@@ -35,7 +35,7 @@ describe('Artist relationship v22 migration', () => {
   test('rebuilds artists, preserves legacy affiliations, and keeps all artists unset', async () => {
     await runMigrations(createAsyncSQLiteAdapter(db));
 
-    expect(db.pragma('user_version', { simple: true })).toBe(22);
+    expect(db.pragma('user_version', { simple: true })).toBe(23);
     const columns = (db.pragma('table_info(artists)') as Array<{ name: string }>).map(({ name }) => name);
     expect(columns).toEqual([
       'id', 'name', 'short_name', 'artist_type', 'avatar_uri', 'background_uri',

@@ -11,6 +11,7 @@ import { generateId } from '../utils/uuid';
 import { isValidISODate, toISODate, toISODateTime } from '../utils/date';
 import { deleteLocalFileIfUnreferenced } from '../utils/localMedia';
 import { analyzeArtistTypeConversionGraph } from '../utils/artistTypeConversion';
+import { RepositoryChangeEmitter } from './RepositoryChangeEmitter';
 
 interface MembershipArtistRow extends ArtistGroupMembership {
   related_artist_id: string;
@@ -46,6 +47,9 @@ function validateMembershipDates(startDate?: string | null, endDate?: string | n
 }
 
 export class ArtistRepository {
+  private readonly changes = new RepositoryChangeEmitter();
+  readonly subscribeToChanges = this.changes.subscribe;
+
   constructor(private db: SQLiteDatabase) {}
 
   private async withTransaction<T>(callback: () => Promise<T>): Promise<T> {
@@ -627,5 +631,6 @@ export class ArtistRepository {
 
   async delete(id: string): Promise<void> {
     await this.db.runAsync('DELETE FROM artists WHERE id = ?', [id]);
+    this.changes.notify();
   }
 }

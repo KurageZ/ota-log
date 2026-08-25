@@ -47,6 +47,10 @@ import { DateFilterHeader } from '../components/DateFilterHeader';
 import { FilterBatchChip } from '../components/FilterBatchChip';
 import { FilteredEmptyState } from '../components/FilteredEmptyState';
 import { AppIcon, getAppIconSFSymbol } from '../components/AppIcon';
+import {
+  ModeChoiceButtons,
+  type ModeChoiceOption,
+} from '../components/mode-choice-buttons';
 import { getArtistSearchText } from '../utils/filter';
 import { withAlpha } from '../utils/color';
 import { measureImageTransitionOrigin } from '../utils/imageTransition';
@@ -69,6 +73,7 @@ import {
   cloneChekiRecordFilters,
   countChekiItemFilterCategories,
   countChekiRecordFilterCategories,
+  matchesChekiItemFilters,
   type ChekiItemFilters,
   type ChekiRecordFilters,
 } from '../utils/chekiFilters';
@@ -334,68 +339,10 @@ function SegmentedOptions({
   );
 }
 
-function BrowseModeOptions({
-  colors,
-  value,
-  onChange,
-}: {
-  colors: ThemeColors;
-  value: ChekiBrowseMode;
-  onChange: (value: ChekiBrowseMode) => void;
-}) {
-  const options: Array<{
-    value: ChekiBrowseMode;
-    label: string;
-    icon: 'album' | 'reorder';
-  }> = [
-    { value: 'album', label: '相册', icon: 'album' },
-    { value: 'record', label: '记录', icon: 'reorder' },
-  ];
-
-  return (
-    <View style={{ flexDirection: 'row', gap: 10 }}>
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <TouchableOpacity
-            key={option.value}
-            activeOpacity={0.72}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selected }}
-            accessibilityLabel={option.label}
-            onPress={() => onChange(option.value)}
-            style={{
-              flex: 1,
-              minHeight: 56,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: 14,
-              borderWidth: selected ? 1.5 : 1,
-              borderColor: selected ? colors.accent : colors.inputBorder,
-              backgroundColor: selected ? colors.accentSofter : colors.card,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.cardAlt }}>
-                <AppIcon name={option.icon} size={17} color={selected ? colors.onAccent : colors.textSecondary} />
-              </View>
-              <Text style={{ flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '800', color: colors.heading }}>
-                {option.label}
-              </Text>
-              <AppIcon
-                name="radio"
-                variant={selected ? 'selected' : 'unselected'}
-                size={18}
-                color={selected ? colors.accent : colors.textMuted}
-                secondaryColor={colors.card}
-              />
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
+const BROWSE_MODE_OPTIONS: ReadonlyArray<ModeChoiceOption<ChekiBrowseMode>> = [
+  { value: 'album', label: '相册', icon: 'album' },
+  { value: 'record', label: '记录', icon: 'reorder' },
+];
 
 export default function ChekiLibraryScreen() {
   const params = useLocalSearchParams<ChekiFilterRouteParams>();
@@ -564,21 +511,12 @@ export default function ChekiLibraryScreen() {
     () => {
       if (isRecordMode) return [];
       return indexedBrowseItems.filter(({ item, searchIndex }) => {
-        const { record } = item;
-        if (!matchesArtist(record.artist_id)) return false;
-        if (itemFilters.date && !matchesDateRange(record, itemFilters.date.startDate, itemFilters.date.endDate)) return false;
-        if (itemFilters.specs.length > 0 && !itemFilters.specs.includes(item.spec)) return false;
-        if (itemFilters.hasLinkedEvent && !record.event_id) return false;
-        if (itemFilters.hasNotes && !item.notes?.trim()) return false;
-        if (itemFilters.isFavorite && item.is_favorite !== 1) return false;
-        if (itemFilters.hasBackImage && !item.images.some((image) => image.side === 'back')) return false;
-
+        if (!matchesChekiItemFilters(item, itemFilters)) return false;
         return matchesChekiSearchIndex(searchIndex, searchTokens);
       }).map(({ item }) => browseItemToCheki(item));
     },
     [
       indexedBrowseItems,
-      matchesArtist,
       isRecordMode,
       itemFilters,
       searchTokens,
@@ -1296,8 +1234,9 @@ export default function ChekiLibraryScreen() {
               浏览模式
             </Text>
             <View style={{ marginTop: 12 }}>
-              <BrowseModeOptions
+              <ModeChoiceButtons
                 colors={colors}
+                options={BROWSE_MODE_OPTIONS}
                 value={viewPreferences.browseMode}
                 onChange={handleChangeBrowseMode}
               />

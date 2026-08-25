@@ -1,4 +1,5 @@
 import type { ChekiSpec } from '../domain/chekiSpec';
+import type { ChekiBrowseItem } from '../repositories/ChekiRecordRepository';
 import type { DateFilter } from './dateFilters';
 
 export type ChekiDateFilter = DateFilter;
@@ -76,4 +77,26 @@ export function countChekiItemFilterCategories(filters: ChekiItemFilters): numbe
     + Number(filters.hasNotes)
     + Number(filters.isFavorite)
     + Number(filters.hasBackImage);
+}
+
+export function matchesChekiItemFilters(
+  item: ChekiBrowseItem,
+  filters: ChekiItemFilters,
+): boolean {
+  const { record } = item;
+  const effectiveDate = (record.date ?? record.created_at).slice(0, 10);
+
+  if (filters.artistIds.length > 0) {
+    if (!record.artist_id || !filters.artistIds.includes(record.artist_id)) return false;
+  }
+  if (filters.date) {
+    if (effectiveDate < filters.date.startDate || effectiveDate > filters.date.endDate) return false;
+  }
+  if (filters.specs.length > 0 && !filters.specs.includes(item.spec)) return false;
+  if (filters.hasLinkedEvent && !record.event_id) return false;
+  if (filters.hasNotes && !item.notes?.trim()) return false;
+  if (filters.isFavorite && item.is_favorite !== 1) return false;
+  if (filters.hasBackImage && !item.images.some((image) => image.side === 'back')) return false;
+
+  return true;
 }

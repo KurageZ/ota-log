@@ -12,7 +12,7 @@ import { generateId } from './uuid';
 import { normalizeArtistConfirmationMode } from './artistConfirmation';
 import { normalizeChekiSpec } from '../domain/chekiSpec';
 
-const BACKUP_VERSION = 9;
+export const BACKUP_VERSION = 10;
 /** 备份格式自该版本起支持“艺人类型”（artists.artist_type、普通所属与正式团体履历）。 */
 const ARTIST_TYPE_SUPPORTED_BACKUP_VERSION = 9;
 const FULL_BACKUP_MANIFEST_FORMAT = 'ota-log-full-backup';
@@ -40,6 +40,11 @@ interface BackupData {
   cheki_records: Row[];
   cheki_items: Row[];
   cheki_item_images: Row[];
+  cheki_widget_groups: Row[];
+  cheki_widget_group_manual_items: Row[];
+  cheki_widget_group_artists: Row[];
+  cheki_widget_group_events: Row[];
+  cheki_widget_group_specs: Row[];
   photos: Awaited<ReturnType<Repositories['photos']['findAll']>>;
   user_config: Awaited<ReturnType<Repositories['userConfig']['getConfig']>>;
   important_dates: Row[];
@@ -87,6 +92,11 @@ interface ImportDataShape {
   cheki_records?: Row[];
   cheki_items?: Row[];
   cheki_item_images?: Row[];
+  cheki_widget_groups?: Row[];
+  cheki_widget_group_manual_items?: Row[];
+  cheki_widget_group_artists?: Row[];
+  cheki_widget_group_events?: Row[];
+  cheki_widget_group_specs?: Row[];
   photos?: Row[];
   user_config?: Row;
   important_dates?: Row[];
@@ -131,6 +141,11 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     chekiRecords,
     chekiItems,
     chekiItemImages,
+    chekiWidgetGroups,
+    chekiWidgetGroupManualItems,
+    chekiWidgetGroupArtists,
+    chekiWidgetGroupEvents,
+    chekiWidgetGroupSpecs,
     photos,
     eventArtists,
     importantDates,
@@ -149,6 +164,11 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_records'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_items'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_item_images'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_widget_groups'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_widget_group_manual_items'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_widget_group_artists'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_widget_group_events'),
+    db.rawDb.getAllAsync<Row>('SELECT * FROM cheki_widget_group_specs'),
     db.photos.findAll(),
     db.rawDb.getAllAsync<EventArtistRow>('SELECT * FROM event_artists'),
     db.rawDb.getAllAsync<Row>('SELECT * FROM important_dates'),
@@ -171,6 +191,11 @@ export async function buildBackupData(db: Repositories): Promise<BackupData> {
     cheki_records: chekiRecords,
     cheki_items: chekiItems,
     cheki_item_images: chekiItemImages,
+    cheki_widget_groups: chekiWidgetGroups,
+    cheki_widget_group_manual_items: chekiWidgetGroupManualItems,
+    cheki_widget_group_artists: chekiWidgetGroupArtists,
+    cheki_widget_group_events: chekiWidgetGroupEvents,
+    cheki_widget_group_specs: chekiWidgetGroupSpecs,
     photos,
     user_config: userConfig,
     important_dates: importantDates,
@@ -403,6 +428,11 @@ export function buildRestoredBackupData(
     cheki_records: data.cheki_records ?? [],
     cheki_items: data.cheki_items ?? [],
     cheki_item_images: replaceMediaUris(data.cheki_item_images, 'photo_uri', uriMap),
+    cheki_widget_groups: data.cheki_widget_groups,
+    cheki_widget_group_manual_items: data.cheki_widget_group_manual_items,
+    cheki_widget_group_artists: data.cheki_widget_group_artists,
+    cheki_widget_group_events: data.cheki_widget_group_events,
+    cheki_widget_group_specs: data.cheki_widget_group_specs,
     photos: replaceMediaUris(data.photos, 'local_uri', uriMap),
     user_config: typeof data.user_config?.avatar_uri === 'string'
       ? {
@@ -456,6 +486,11 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
     cheki_records = [],
     cheki_items = [],
     cheki_item_images = [],
+    cheki_widget_groups = [],
+    cheki_widget_group_manual_items = [],
+    cheki_widget_group_artists = [],
+    cheki_widget_group_events = [],
+    cheki_widget_group_specs = [],
     photos = [],
     user_config,
     important_dates = [],
@@ -500,6 +535,11 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
     await db.rawDb.withTransactionAsync(async () => {
       await db.rawDb.execAsync(`
         DELETE FROM scheduled_reminder_state;
+        DELETE FROM cheki_widget_group_manual_items;
+        DELETE FROM cheki_widget_group_artists;
+        DELETE FROM cheki_widget_group_events;
+        DELETE FROM cheki_widget_group_specs;
+        DELETE FROM cheki_widget_groups;
         DELETE FROM important_date_anniversary_rules;
         DELETE FROM important_date_artists;
         DELETE FROM important_dates;
@@ -760,6 +800,47 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
             String(image.updated_at),
           ],
         );
+      }
+
+      const restoredGroups = cheki_widget_groups.length > 0
+        ? cheki_widget_groups
+        : Array.from({ length: 6 }, (_, index) => ({
+            slot: index + 1,
+            name: `分组 ${index + 1}`,
+            source_type: null,
+            favorite_only: 0,
+            date_preset: null,
+            custom_start_date: null,
+            custom_end_date: null,
+            rotation_anchor_at: null,
+            collection_fingerprint: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
+      for (const group of restoredGroups) {
+        await db.rawDb.runAsync(
+          `INSERT INTO cheki_widget_groups
+            (slot, name, source_type, favorite_only, date_preset, custom_start_date, custom_end_date, rotation_anchor_at, collection_fingerprint, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [Number(group.slot), String(group.name), group.source_type ?? null, Number(group.favorite_only ?? 0), group.date_preset ?? null,
+            group.custom_start_date ?? null, group.custom_end_date ?? null, group.rotation_anchor_at ?? null, group.collection_fingerprint ?? null,
+            String(group.created_at), String(group.updated_at)],
+        );
+      }
+      for (const item of cheki_widget_group_manual_items) {
+        const target = await db.rawDb.getFirstAsync<{ id: string }>('SELECT id FROM cheki_items WHERE id = ?', [String(item.item_id)]);
+        if (target) await db.rawDb.runAsync('INSERT OR IGNORE INTO cheki_widget_group_manual_items (slot, item_id, sort_order) VALUES (?, ?, ?)', [Number(item.slot), String(item.item_id), Number(item.sort_order)]);
+      }
+      for (const artist of cheki_widget_group_artists) {
+        const target = await db.rawDb.getFirstAsync<{ id: string }>('SELECT id FROM artists WHERE id = ?', [String(artist.artist_id)]);
+        if (target) await db.rawDb.runAsync('INSERT OR IGNORE INTO cheki_widget_group_artists (slot, artist_id) VALUES (?, ?)', [Number(artist.slot), String(artist.artist_id)]);
+      }
+      for (const event of cheki_widget_group_events) {
+        const target = await db.rawDb.getFirstAsync<{ id: string }>('SELECT id FROM events WHERE id = ?', [String(event.event_id)]);
+        if (target) await db.rawDb.runAsync('INSERT OR IGNORE INTO cheki_widget_group_events (slot, event_id) VALUES (?, ?)', [Number(event.slot), String(event.event_id)]);
+      }
+      for (const spec of cheki_widget_group_specs) {
+        await db.rawDb.runAsync('INSERT OR IGNORE INTO cheki_widget_group_specs (slot, spec) VALUES (?, ?)', [Number(spec.slot), String(spec.spec)]);
       }
 
       for (const ph of photos) {
@@ -1055,6 +1136,7 @@ async function importZipBackup(db: Repositories, file: File): Promise<BackupImpo
     const restoredData = buildRestoredBackupData(payload.data, uriMap);
 
     await restoreBackupData(db, restoredData);
+    db.chekiWidgetGroups.notifyExternalChange();
     return { restored: true, legacyArtistType: Boolean(payload.legacyArtistType) };
   } finally {
     deleteFileQuietly(cachedZip);

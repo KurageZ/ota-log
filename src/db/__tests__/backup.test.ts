@@ -20,6 +20,7 @@ import { PhotoRepository } from '../../repositories/PhotoRepository';
 import { ChekiRepository } from '../../repositories/ChekiRepository';
 import { ChekiManualEntryRepository } from '../../repositories/ChekiManualEntryRepository';
 import { ChekiRecordRepository } from '../../repositories/ChekiRecordRepository';
+import { ChekiWidgetGroupRepository } from '../../repositories/ChekiWidgetGroupRepository';
 import { UserConfigRepository } from '../../repositories/UserConfigRepository';
 import { DateItemRepository } from '../../repositories/DateItemRepository';
 import { EventScheduleRepository } from '../../repositories/EventScheduleRepository';
@@ -113,7 +114,70 @@ function createRepositories(rawDb: Database.Database): Repositories {
     chekiRecords: new ChekiRecordRepository(rawDbAdapter as Repositories['rawDb']),
     userConfig: new UserConfigRepository(rawDbAdapter as Repositories['rawDb']),
     dateItems: new DateItemRepository(rawDbAdapter as Repositories['rawDb']),
+    chekiWidgetGroups: new ChekiWidgetGroupRepository(rawDbAdapter as Repositories['rawDb']),
   };
+}
+
+async function seedChekiWidgetGroups(rawDb: Database.Database, repositories: Repositories): Promise<void> {
+  const now = '2026-08-25T00:00:00.000Z';
+  const insertGroup = rawDb.prepare(
+    `INSERT INTO cheki_widget_groups (slot, name, source_type, created_at, updated_at)
+     VALUES (?, ?, NULL, ?, ?)`,
+  );
+  for (let slot = 1; slot <= 6; slot += 1) insertGroup.run(slot, `分组 ${slot}`, now, now);
+  rawDb.prepare(
+    `INSERT INTO artists (id, name, artist_type, is_favorite, created_at)
+     VALUES ('widget-artist', 'Widget Artist', 'person', 0, ?)`,
+  ).run(now);
+  rawDb.prepare(
+    `INSERT INTO events (id, title, event_type, status, created_at, updated_at)
+     VALUES ('widget-event', 'Widget Event', 'concert', 'completed', ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO event_sessions
+       (id, event_id, session_date, sort_order, created_at, updated_at)
+     VALUES ('widget-session', 'widget-event', '2026-08-25', 0, ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO cheki_records (id, event_id, artist_id, date, quantity, created_at, updated_at)
+     VALUES ('widget-record', 'widget-event', 'widget-artist', '2026-08-25', 2, ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO cheki_items
+       (id, record_id, sort_order, unit_price, spec, is_favorite, created_at, updated_at)
+     VALUES ('widget-item-1', 'widget-record', 0, 0, 'square', 0, ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO cheki_items
+       (id, record_id, sort_order, unit_price, spec, is_favorite, created_at, updated_at)
+     VALUES ('widget-item-2', 'widget-record', 1, 0, 'square', 1, ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO cheki_item_images (id, item_id, side, photo_uri, created_at, updated_at)
+     VALUES ('widget-image-1', 'widget-item-1', 'front', 'file:///widget-one.jpg', ?, ?)`,
+  ).run(now, now);
+  rawDb.prepare(
+    `INSERT INTO cheki_item_images (id, item_id, side, photo_uri, created_at, updated_at)
+     VALUES ('widget-image-2', 'widget-item-2', 'front', 'file:///widget-two.jpg', ?, ?)`,
+  ).run(now, now);
+
+  await repositories.chekiWidgetGroups.save(1, {
+    name: '手动精选',
+    source: { type: 'manual', itemIds: ['widget-item-2', 'widget-item-1'] },
+  }, new Date(now));
+  await repositories.chekiWidgetGroups.save(2, {
+    name: '自动收藏',
+    source: {
+      type: 'filter',
+      rules: {
+        artistIds: ['widget-artist'],
+        eventIds: ['widget-event'],
+        favoriteOnly: true,
+        date: null,
+        specs: ['square'],
+      },
+    },
+  }, new Date(now));
 }
 
 describe('backup artist background metadata support', () => {
@@ -160,6 +224,96 @@ describe('backup artist background metadata support', () => {
         background_color: '#605074',
       }),
     ]);
+  });
+
+  test('buildBackupData exports cheki widget groups and all source relations', async () => {
+    await seedChekiWidgetGroups(rawDb, repositories);
+
+    const payload = await buildBackupData(repositories);
+
+    expect(payload.cheki_widget_groups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ slot: 1, name: '手动精选', source_type: 'manual' }),
+      expect.objectContaining({ slot: 2, name: '自动收藏', source_type: 'filter' }),
+    ]));
+    expect(payload.cheki_widget_group_manual_items).toEqual([
+      { slot: 1, item_id: 'widget-item-2', sort_order: 0 },
+      { slot: 1, item_id: 'widget-item-1', sort_order: 1 },
+    ]);
+    expect(payload.cheki_widget_group_artists).toEqual([{ slot: 2, artist_id: 'widget-artist' }]);
+    expect(payload.cheki_widget_group_events).toEqual([{ slot: 2, event_id: 'widget-event' }]);
+    expect(payload.cheki_widget_group_specs).toEqual([{ slot: 2, spec: 'square' }]);
+  });
+
+  test('round-trips cheki widget group sources, order, and rotation state', async () => {
+    const now = new Date('2026-08-25T00:00:00.000Z');
+    await seedChekiWidgetGroups(rawDb, repositories);
+    const before = await repositories.chekiWidgetGroups.resolveForWidget(now);
+    const payload = await buildBackupData(repositories);
+    await repositories.chekiWidgetGroups.reset(1, now);
+    await repositories.chekiWidgetGroups.reset(2, now);
+
+    await restoreBackupData(
+      repositories,
+      payload as unknown as Parameters<typeof restoreBackupData>[1],
+    );
+
+    const manual = await repositories.chekiWidgetGroups.getEditorState(1, now);
+    expect(manual.source).toEqual({
+      type: 'manual',
+      itemIds: ['widget-item-2', 'widget-item-1'],
+    });
+    expect(manual.resolvedItems.map((item) => item.id)).toEqual(['widget-item-2', 'widget-item-1']);
+
+    const filter = await repositories.chekiWidgetGroups.getEditorState(2, now);
+    expect(filter.source).toEqual({
+      type: 'filter',
+      rules: {
+        artistIds: ['widget-artist'],
+        eventIds: ['widget-event'],
+        favoriteOnly: true,
+        date: null,
+        specs: ['square'],
+      },
+    });
+    expect(filter.resolvedItems.map((item) => item.id)).toEqual(['widget-item-2']);
+
+    const after = await repositories.chekiWidgetGroups.resolveForWidget(now);
+    expect(after[0]).toEqual(expect.objectContaining({
+      collectionFingerprint: before[0].collectionFingerprint,
+      rotationAnchorAt: before[0].rotationAnchorAt,
+    }));
+    expect(after[1]).toEqual(expect.objectContaining({
+      collectionFingerprint: before[1].collectionFingerprint,
+      rotationAnchorAt: before[1].rotationAnchorAt,
+    }));
+  });
+
+  test('restores backups without widget data as six unconfigured groups', async () => {
+    await seedChekiWidgetGroups(rawDb, repositories);
+
+    await restoreBackupData(repositories, {
+      artists: [{
+        id: 'legacy-widget-artist',
+        name: 'Legacy Artist',
+        short_name: null,
+        parent_id: null,
+        avatar_uri: null,
+        background_uri: null,
+        background_color: null,
+        url: null,
+        is_favorite: 0,
+        created_at: '2025-01-01T00:00:00.000Z',
+      }],
+    });
+
+    await expect(repositories.chekiWidgetGroups.listSummaries()).resolves.toEqual(
+      Array.from({ length: 6 }, (_, index) => ({
+        slot: index + 1,
+        name: `分组 ${index + 1}`,
+        sourceType: null,
+        displayCount: 0,
+      })),
+    );
   });
 
   test('backs up and restores artist types, basic affiliations, and timed memberships', async () => {

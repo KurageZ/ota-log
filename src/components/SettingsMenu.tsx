@@ -116,6 +116,7 @@ export function MenuIconTile({
 export function MenuItem({
   icon,
   label,
+  accessibilityLabel,
   subtitle,
   badge,
   onPress,
@@ -125,6 +126,7 @@ export function MenuItem({
 }: {
   icon: AppIconName;
   label: string;
+  accessibilityLabel?: string;
   subtitle?: string;
   badge?: MenuBadge;
   onPress: () => void;
@@ -139,6 +141,7 @@ export function MenuItem({
     <View>
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled }}
         style={{
           flexDirection: 'row',
