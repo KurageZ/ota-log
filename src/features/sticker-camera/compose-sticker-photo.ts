@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { manipulateAsync, SaveFormat, type Action } from 'expo-image-manipulator';
 import {
   BlurStyle,
   ClipOp,
@@ -17,7 +17,7 @@ import {
   type SkSurface,
 } from '@shopify/react-native-skia';
 import {
-  getPreviewMatchedResizeHeight,
+  resolveStickerCameraPhotoTransform,
   resolveStickerStackLayouts,
   type StickerLayout,
 } from './sticker-preset';
@@ -169,7 +169,7 @@ export async function composeStickerPhoto(
   options: ComposeStickerPhotoOptions = {},
 ): Promise<ComposedStickerPhoto> {
   if (stickers.length === 0) throw new Error('至少需要一张贴纸');
-  const resizeHeight = getPreviewMatchedResizeHeight(photo.width, photo.height);
+  const transform = resolveStickerCameraPhotoTransform(photo.width, photo.height);
   let normalizedPhotoUri: string | null = null;
   let backgroundData: SkData | null = null;
   let backgroundImage: SkImage | null = null;
@@ -183,9 +183,12 @@ export async function composeStickerPhoto(
   const maskFilters: SkMaskFilter[] = [];
 
   try {
+    const actions: Action[] = [];
+    if (transform.crop) actions.push({ crop: transform.crop });
+    actions.push({ resize: { height: transform.resizeHeight } });
     const normalized = await manipulateAsync(
       photo.uri,
-      [{ resize: { height: resizeHeight } }],
+      actions,
       { compress: 0.95, format: SaveFormat.JPEG },
     );
     normalizedPhotoUri = normalized.uri;

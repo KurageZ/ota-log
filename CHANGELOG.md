@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [Unreleased]
+
+### Added
+- Android 新增拍立得贴纸相机，复用多选扇形布局、阴影合成、高清导出与分享，并补充 3:4 取景裁切兜底
+
+### Fixed
+- 修复 Android 贴纸相机从拍立得选择器进入拍摄后仍残留顶部标题和上一阶段内容的问题
+
 ## [2.0.0-beta.1] - 2026-08-15
 
 ### Added

@@ -19,7 +19,7 @@
       "appleTeamId": "BP9RKVU242"
     },
     "android": {
-      "versionCode": 10500,
+      "versionCode": 10503,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

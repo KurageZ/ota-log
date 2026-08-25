@@ -31,6 +31,16 @@ export interface StickerLayoutSource {
   height: number;
 }
 
+export interface StickerCameraPhotoTransform {
+  crop: {
+    originX: number;
+    originY: number;
+    width: number;
+    height: number;
+  } | null;
+  resizeHeight: number;
+}
+
 export const DEFAULT_STICKER_PRESET: StickerPreset = {
   singleMaxWidthRatio: 0.36,
   singleMaxHeightRatio: 0.44,
@@ -170,18 +180,44 @@ export function resolveStickerStackLayouts(
 }
 
 /**
- * Expo Camera on iOS already processes a captured photo to match CameraView.
- * Only cap the preview-matched photo's long edge; cropping again changes framing.
+ * Keep the exported photo aligned with the fixed 3:4 preview. Android camera
+ * implementations can still return a nearby sensor size when 4:3 is requested,
+ * so center-crop only when needed and then cap the long edge.
  */
-export function getPreviewMatchedResizeHeight(
+export function resolveStickerCameraPhotoTransform(
   width: number,
   height: number,
-): number {
+): StickerCameraPhotoTransform {
   const safeWidth = positiveDimension(width);
   const safeHeight = positiveDimension(height);
+  const sourceAspectRatio = safeWidth / safeHeight;
+  let cropWidth = safeWidth;
+  let cropHeight = safeHeight;
+
+  if (sourceAspectRatio > STICKER_CAMERA_ASPECT_RATIO) {
+    cropWidth = Math.max(1, Math.min(
+      safeWidth,
+      Math.round(safeHeight * STICKER_CAMERA_ASPECT_RATIO),
+    ));
+  } else if (sourceAspectRatio < STICKER_CAMERA_ASPECT_RATIO) {
+    cropHeight = Math.max(1, Math.min(
+      safeHeight,
+      Math.round(safeWidth / STICKER_CAMERA_ASPECT_RATIO),
+    ));
+  }
+
+  const needsCrop = cropWidth !== safeWidth || cropHeight !== safeHeight;
   const scale = Math.min(
     1,
-    STICKER_CAMERA_MAX_OUTPUT_DIMENSION / Math.max(safeWidth, safeHeight),
+    STICKER_CAMERA_MAX_OUTPUT_DIMENSION / Math.max(cropWidth, cropHeight),
   );
-  return Math.max(1, Math.round(safeHeight * scale));
+  return {
+    crop: needsCrop ? {
+      originX: Math.max(0, Math.floor((safeWidth - cropWidth) / 2)),
+      originY: Math.max(0, Math.floor((safeHeight - cropHeight) / 2)),
+      width: cropWidth,
+      height: cropHeight,
+    } : null,
+    resizeHeight: Math.max(1, Math.round(cropHeight * scale)),
+  };
 }

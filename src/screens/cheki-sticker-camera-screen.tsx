@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import {
@@ -31,6 +31,15 @@ import { saveImageToAlbum, shareImageFile } from '../utils/imageShare';
 
 type ScreenPhase = 'picker' | 'camera' | 'result';
 type BusyAction = 'capturing' | 'composing' | 'saving' | 'sharing' | null;
+
+function FullscreenRouteStage({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      {children}
+    </>
+  );
+}
 
 function IconButton({
   icon,
@@ -65,7 +74,7 @@ function IconButton({
   );
 }
 
-function UnsupportedScreen() {
+function UnsupportedWebScreen() {
   const { colors } = useAppTheme();
   return (
     <ScrollView
@@ -78,10 +87,10 @@ function UnsupportedScreen() {
       </View>
       <AppIcon name="camera" size={44} color={colors.textMuted} />
       <Text style={{ color: colors.heading, fontSize: 20, fontWeight: '800', textAlign: 'center' }}>
-        当前 Demo 仅支持 iOS
+        当前仅支持 iOS 与 Android
       </Text>
       <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
-        Android 版本会在确认 iOS 的拍摄和合成效果后再接入。
+        请在手机端打开拍立得贴纸相机。
       </Text>
     </ScrollView>
   );
@@ -179,6 +188,7 @@ function CameraStage({
             autofocus="on"
             facing="back"
             mode="picture"
+            ratio={process.env.EXPO_OS === 'android' ? '4:3' : undefined}
             responsiveOrientationWhenOrientationLocked={false}
             onCameraReady={onCameraReady}
             onMountError={(event) => onCameraError(event.message)}
@@ -488,7 +498,13 @@ export default function ChekiStickerCameraScreen() {
     }
   }, [busyAction, result]);
 
-  if (process.env.EXPO_OS !== 'ios') return <UnsupportedScreen />;
+  if (process.env.EXPO_OS === 'web') {
+    return (
+      <FullscreenRouteStage>
+        <UnsupportedWebScreen />
+      </FullscreenRouteStage>
+    );
+  }
 
   if (phase === 'picker' || stickers.length === 0) {
     return (
@@ -509,60 +525,68 @@ export default function ChekiStickerCameraScreen() {
 
   if (!cameraPermission) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050506' }}>
-        <ActivityIndicator color="#ffffff" />
-      </View>
+      <FullscreenRouteStage>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050506' }}>
+          <ActivityIndicator color="#ffffff" />
+        </View>
+      </FullscreenRouteStage>
     );
   }
 
   if (!cameraPermission.granted) {
     return (
-      <CameraPermissionScreen
-        canAskAgain={cameraPermission.canAskAgain}
-        onRequest={() => void requestOrOpenCameraSettings()}
-      />
+      <FullscreenRouteStage>
+        <CameraPermissionScreen
+          canAskAgain={cameraPermission.canAskAgain}
+          onRequest={() => void requestOrOpenCameraSettings()}
+        />
+      </FullscreenRouteStage>
     );
   }
 
   if (phase === 'result' && result) {
     return (
-      <ResultStage
-        result={result}
-        busyAction={busyAction}
-        saved={saved}
-        watermarkEnabled={watermarkEnabled}
-        onSave={() => void saveResult()}
-        onShare={() => void shareResult()}
-        onRetake={() => {
-          setWatermarkEnabled(true);
-          setCapturedPhoto(null);
-          setCameraReady(false);
-          setPhase('camera');
-        }}
-        onToggleWatermark={() => void toggleWatermark()}
-      />
+      <FullscreenRouteStage>
+        <ResultStage
+          result={result}
+          busyAction={busyAction}
+          saved={saved}
+          watermarkEnabled={watermarkEnabled}
+          onSave={() => void saveResult()}
+          onShare={() => void shareResult()}
+          onRetake={() => {
+            setWatermarkEnabled(true);
+            setCapturedPhoto(null);
+            setCameraReady(false);
+            setPhase('camera');
+          }}
+          onToggleWatermark={() => void toggleWatermark()}
+        />
+      </FullscreenRouteStage>
     );
   }
 
   return (
-    <CameraStage
-      stickers={stickers}
-      cameraRef={cameraRef}
-      cameraReady={cameraReady}
-      busyAction={busyAction}
-      onCameraReady={() => setCameraReady(true)}
-      onCameraError={(message) => showFailureAlert({
-        title: '相机启动失败',
-        reason: '相机无法正常启动。',
-        nextStep: '请关闭当前页面后重新打开贴纸相机。',
-        details: message,
-      })}
-      onCapture={() => void capture()}
-      onChangeSticker={() => {
-        setCameraReady(false);
-        setPickerReturnPhase('camera');
-        setPhase('picker');
-      }}
-    />
+    <FullscreenRouteStage>
+      <CameraStage
+        stickers={stickers}
+        cameraRef={cameraRef}
+        cameraReady={cameraReady}
+        busyAction={busyAction}
+        onCameraReady={() => setCameraReady(true)}
+        onCameraError={(message) => showFailureAlert({
+          title: '相机启动失败',
+          reason: '相机无法正常启动。',
+          nextStep: '请关闭当前页面后重新打开贴纸相机。',
+          details: message,
+        })}
+        onCapture={() => void capture()}
+        onChangeSticker={() => {
+          setCameraReady(false);
+          setPickerReturnPhase('camera');
+          setPhase('picker');
+        }}
+      />
+    </FullscreenRouteStage>
   );
 }

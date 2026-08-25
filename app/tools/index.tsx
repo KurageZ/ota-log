@@ -19,7 +19,7 @@ export default function ToolboxScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       >
-        {process.env.EXPO_OS === 'ios' ? (
+        {process.env.EXPO_OS !== 'web' ? (
           <View style={{ marginBottom: 16 }}>
             <SectionLabel label="影像" />
             <MenuCard>

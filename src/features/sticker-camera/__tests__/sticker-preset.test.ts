@@ -1,14 +1,43 @@
 import {
-  getPreviewMatchedResizeHeight,
+  resolveStickerCameraPhotoTransform,
   resolveStickerLayout,
   resolveStickerStackLayouts,
 } from '../sticker-preset';
 
 describe('sticker camera preset', () => {
-  test('does not crop a photo that Expo Camera already matched to the iOS preview', () => {
-    expect(getPreviewMatchedResizeHeight(4032, 3024)).toBe(1800);
-    expect(getPreviewMatchedResizeHeight(3024, 4032)).toBe(2400);
-    expect(getPreviewMatchedResizeHeight(900, 1200)).toBe(1200);
+  test('keeps a preview-matched portrait photo and caps its long edge', () => {
+    expect(resolveStickerCameraPhotoTransform(3024, 4032)).toEqual({
+      crop: null,
+      resizeHeight: 2400,
+    });
+    expect(resolveStickerCameraPhotoTransform(900, 1200)).toEqual({
+      crop: null,
+      resizeHeight: 1200,
+    });
+  });
+
+  test('center-crops a wider Android photo to the 3:4 preview', () => {
+    expect(resolveStickerCameraPhotoTransform(4000, 3000)).toEqual({
+      crop: {
+        originX: 875,
+        originY: 0,
+        width: 2250,
+        height: 3000,
+      },
+      resizeHeight: 2400,
+    });
+  });
+
+  test('center-crops a taller Android photo to the 3:4 preview', () => {
+    expect(resolveStickerCameraPhotoTransform(2000, 3200)).toEqual({
+      crop: {
+        originX: 0,
+        originY: 266,
+        width: 2000,
+        height: 2667,
+      },
+      resizeHeight: 2400,
+    });
   });
 
   test.each([
