@@ -969,7 +969,7 @@ function upgradeBackupDataV2ToCurrent(payload: VersionedImportPayload): Versione
   };
 }
 
-function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null {
+export function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null {
   if (!parsed || typeof parsed !== 'object') return null;
 
   const candidate = parsed as { version?: unknown; data?: unknown };
@@ -1034,6 +1034,7 @@ function normalizeImportPayload(parsed: unknown): VersionedImportPayload | null 
       };
       break;
     case 9:
+    case 10:
       normalized = {
         version: candidate.version,
         data: candidate.data as ImportDataShape,

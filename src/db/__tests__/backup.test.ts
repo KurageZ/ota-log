@@ -4,11 +4,13 @@ import { Alert } from 'react-native';
 import { SCHEMA_STATEMENTS } from '../schema';
 import { createAsyncSQLiteAdapter } from './fixtures/sqliteTestAdapter';
 import {
+  BACKUP_VERSION,
   buildBackupData,
   buildRestoredBackupData,
   backupVersionSupportsArtistType,
   exportFullBackup,
   importBackup,
+  normalizeImportPayload,
   normalizeLegacyBackupActivitySessions,
   restoreBackupData,
 } from '../../utils/backup';
@@ -77,6 +79,19 @@ describe('backup version artist type detection', () => {
   test('treats v9 and later backups as supporting artist types', () => {
     expect(backupVersionSupportsArtistType(9)).toBe(true);
     expect(backupVersionSupportsArtistType(10)).toBe(true);
+  });
+});
+
+describe('backup payload version compatibility', () => {
+  test('accepts backups produced by the current exporter', () => {
+    expect(normalizeImportPayload({
+      version: BACKUP_VERSION,
+      data: {},
+    })).toEqual({
+      version: BACKUP_VERSION,
+      data: {},
+      legacyArtistType: false,
+    });
   });
 });
 
