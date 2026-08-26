@@ -393,7 +393,7 @@ export default function ChekiStickerCameraScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const confirmStickers = useCallback(async (assets: StickerAsset[]) => {
+  const confirmStickers = useCallback((assets: StickerAsset[]) => {
     setStickers(assets);
     setResult(null);
     setCapturedPhoto(null);
@@ -404,7 +404,14 @@ export default function ChekiStickerCameraScreen() {
     setPhase('camera');
 
     if (!cameraPermission?.granted && cameraPermission?.canAskAgain !== false) {
-      await requestCameraPermission();
+      void requestCameraPermission().catch((error) => {
+        showFailureAlert({
+          title: '无法请求相机权限',
+          reason: '系统没有完成相机权限请求。',
+          nextStep: '请在当前权限页面重新尝试，或前往系统设置允许相机访问。',
+          details: error,
+        });
+      });
     }
   }, [cameraPermission?.canAskAgain, cameraPermission?.granted, requestCameraPermission]);
 

@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   FlatList,
   Platform,
+  Pressable,
   Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from 'expo-glass-effect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CHEKI_SPECS, type ChekiSpec } from '../domain/chekiSpec';
 import { useDB } from '../context/DBContext';
@@ -66,9 +73,21 @@ interface ChekiPickerScreenProps {
   maxSelection: number;
   minSelection?: number;
   title?: string;
+  presentation?: 'stack' | 'embedded';
+  showSelectionSummary?: boolean;
   showSelectAll?: boolean;
   onCancel: () => void;
   onConfirm: (items: ChekiPickerItem[]) => void | Promise<void>;
+}
+
+function canUseLiquidGlass(reduceTransparency: boolean) {
+  if (Platform.OS !== 'ios' || reduceTransparency) return false;
+
+  try {
+    return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+  } catch {
+    return false;
+  }
 }
 
 function HeaderTextAction({
@@ -104,11 +123,84 @@ function HeaderTextAction({
   );
 }
 
+function EmbeddedGlassTextAction({
+  label,
+  disabled,
+  loading = false,
+  onPress,
+  usesLiquidGlass,
+}: {
+  label: string;
+  disabled: boolean;
+  loading?: boolean;
+  onPress: () => void;
+  usesLiquidGlass: boolean;
+}) {
+  const { colors, isDark } = useAppTheme();
+  const control = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minWidth: 64,
+        height: 44,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: disabled ? 0.45 : pressed ? 0.66 : 1,
+      })}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : (
+        <Text style={{ color: colors.accent, fontSize: 15, fontWeight: label === '完成' ? '700' : '500' }}>
+          {label}
+        </Text>
+      )}
+    </Pressable>
+  );
+
+  if (usesLiquidGlass) {
+    return (
+      <GlassView
+        glassEffectStyle="clear"
+        colorScheme={isDark ? 'dark' : 'light'}
+        isInteractive
+        style={{ minWidth: 64, height: 44, borderRadius: 22, overflow: 'hidden' }}
+      >
+        {control}
+      </GlassView>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        minWidth: 64,
+        height: 44,
+        borderRadius: 22,
+        overflow: 'hidden',
+        backgroundColor: colors.card,
+        boxShadow: isDark
+          ? '0 2px 10px rgba(0,0,0,0.26)'
+          : '0 2px 10px rgba(0,0,0,0.08)',
+      }}
+    >
+      {control}
+    </View>
+  );
+}
+
 export function ChekiPickerScreen({
   initialSelectedIds,
   maxSelection,
   minSelection = 0,
   title = '选择拍立得',
+  presentation = 'stack',
+  showSelectionSummary = true,
   showSelectAll = false,
   onCancel,
   onConfirm,
@@ -131,6 +223,25 @@ export function ChekiPickerScreen({
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [reduceTransparency, setReduceTransparency] = useState(false);
+
+  useEffect(() => {
+    if (presentation !== 'embedded' || Platform.OS !== 'ios') return undefined;
+
+    let active = true;
+    void AccessibilityInfo.isReduceTransparencyEnabled().then((enabled) => {
+      if (active) setReduceTransparency(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceTransparencyChanged',
+      setReduceTransparency,
+    );
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [presentation]);
 
   const horizontalPadding = Math.max(16, (width - 720) / 2);
   const galleryContentWidth = Math.max(1, Math.min(width, 720) - 32);
@@ -393,6 +504,7 @@ export function ChekiPickerScreen({
     if (keyword.trim()) setKeyword('');
     else setFilters(cloneChekiItemFilters(EMPTY_CHEKI_ITEM_FILTERS));
   }, [keyword]);
+  const usesLiquidGlass = canUseLiquidGlass(reduceTransparency);
 
   const androidHeaderOptions = Platform.OS === 'ios' ? {} : {
     headerLeft: () => (
@@ -421,25 +533,28 @@ export function ChekiPickerScreen({
         filterExpanded={filterVisible}
         isDark={isDark}
       />
-      <View style={{
-        minHeight: 52,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingLeft: showSelectAll ? 12 : 0,
-        paddingRight: showSelectAll ? 4 : 0,
-        borderRadius: showSelectAll ? 12 : 0,
-        borderCurve: 'continuous',
-        backgroundColor: showSelectAll ? colors.cardMuted : 'transparent',
-      }}>
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="clip"
-          style={{ flex: 1, minWidth: 0, color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}
-        >
-          已选 {selectedIds.length}/{maxSelection}{hasAnyFilter ? ` · 当前 ${filteredCandidates.length} 张` : ''}
-        </Text>
-        {showSelectAll ? (
+      {showSelectionSummary || showSelectAll ? (
+        <View style={{
+          minHeight: 52,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingLeft: showSelectAll ? 12 : 0,
+          paddingRight: showSelectAll ? 4 : 0,
+          borderRadius: showSelectAll ? 12 : 0,
+          borderCurve: 'continuous',
+          backgroundColor: showSelectAll ? colors.cardMuted : 'transparent',
+        }}>
+          {showSelectionSummary ? (
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="clip"
+              style={{ flex: 1, minWidth: 0, color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}
+            >
+              已选 {selectedIds.length}/{maxSelection}{hasAnyFilter ? ` · 当前 ${filteredCandidates.length} 张` : ''}
+            </Text>
+          ) : <View style={{ flex: 1 }} />}
+          {showSelectAll ? (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               accessibilityRole="button"
@@ -481,13 +596,14 @@ export function ChekiPickerScreen({
               </Text>
             </TouchableOpacity>
           </View>
-        ) : null}
-      </View>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.screen }}>
+  const routeChrome = presentation === 'stack' ? (
+    <>
       <Stack.Screen
         options={{
           title,
@@ -499,6 +615,61 @@ export function ChekiPickerScreen({
         left={{ label: '取消', onPress: onCancel, disabled: submitting }}
         right={{ label: '完成', onPress: () => void confirm(), disabled: !canConfirm, variant: 'done' }}
       />
+    </>
+  ) : (
+    <View style={{ paddingTop: insets.top, backgroundColor: colors.screen }}>
+      <View
+        style={{
+          minHeight: 56,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          gap: 8,
+        }}
+      >
+        <View style={{ width: 72, alignItems: 'flex-start' }}>
+          {Platform.OS === 'ios' ? (
+            <EmbeddedGlassTextAction
+              label="取消"
+              disabled={submitting}
+              onPress={onCancel}
+              usesLiquidGlass={usesLiquidGlass}
+            />
+          ) : (
+            <HeaderTextAction label="取消" disabled={submitting} onPress={onCancel} />
+          )}
+        </View>
+        <Text
+          numberOfLines={1}
+          style={{ flex: 1, color: colors.heading, fontSize: 17, fontWeight: '700', textAlign: 'center' }}
+        >
+          {title}
+        </Text>
+        <View style={{ width: 72, alignItems: 'flex-end' }}>
+          {Platform.OS === 'ios' ? (
+            <EmbeddedGlassTextAction
+              label="完成"
+              disabled={!canConfirm}
+              loading={submitting}
+              onPress={() => void confirm()}
+              usesLiquidGlass={usesLiquidGlass}
+            />
+          ) : (
+            <HeaderTextAction
+              label="完成"
+              disabled={!canConfirm}
+              loading={submitting}
+              onPress={() => void confirm()}
+            />
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.screen }}>
+      {routeChrome}
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>

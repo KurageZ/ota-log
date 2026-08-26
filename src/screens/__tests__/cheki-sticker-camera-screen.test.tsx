@@ -19,7 +19,7 @@ jest.mock('expo-camera', () => {
     CameraView: ReactModule.forwardRef((props: object, _ref: unknown) => (
       ReactModule.createElement('CameraView', props)
     )),
-    useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
+    useCameraPermissions: jest.fn(() => [{ granted: true, canAskAgain: true }, jest.fn()]),
   };
 });
 
@@ -63,6 +63,11 @@ jest.mock('../../utils/imageShare', () => ({
 describe('ChekiStickerCameraScreen', () => {
   let renderer: ReactTestRenderer | undefined;
 
+  beforeEach(() => {
+    const { useCameraPermissions } = require('expo-camera');
+    useCameraPermissions.mockReturnValue([{ granted: true, canAskAgain: true }, jest.fn()]);
+  });
+
   afterEach(async () => {
     await act(async () => {
       renderer?.unmount();
@@ -91,5 +96,33 @@ describe('ChekiStickerCameraScreen', () => {
 
     expect(routeOptions).toContainEqual(expect.objectContaining({ headerShown: false }));
     expect(renderer!.root.findAllByType('CameraView' as never)).toHaveLength(1);
+  });
+
+  test('leaves the picker before an unresolved permission request finishes', async () => {
+    const { useCameraPermissions } = require('expo-camera');
+    const requestPermission = jest.fn(() => new Promise(() => {}));
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: true },
+      requestPermission,
+    ]);
+
+    await act(async () => {
+      renderer = create(<ChekiStickerCameraScreen />);
+    });
+
+    const picker = renderer!.root.findByType('StickerPicker' as never);
+    let confirmationResult: unknown;
+    await act(async () => {
+      confirmationResult = picker.props.onConfirm([{
+        id: 'cheki-1',
+        uri: 'file:///cheki-1.jpg',
+        width: 900,
+        height: 1200,
+      }]);
+    });
+
+    expect(confirmationResult).toBeUndefined();
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(renderer!.root.findAllByType('StickerPicker' as never)).toHaveLength(0);
   });
 });

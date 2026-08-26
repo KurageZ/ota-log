@@ -12,7 +12,6 @@ import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
-import { loadChekiPhotoWidgetPreferences } from '../../src/widgets/chekiPhotoWidgetPreferences';
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
@@ -20,7 +19,6 @@ export default function SettingsScreen() {
 
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
-  const [widgetArtistIds, setWidgetArtistIds] = useState<string[]>([]);
   const [isClearingAllData, setIsClearingAllData] = useState(false);
   const [isRemovingOrphanArtists, setIsRemovingOrphanArtists] = useState(false);
   const [storageTotalBytes, setStorageTotalBytes] = useState<number | null>(null);
@@ -32,16 +30,12 @@ export default function SettingsScreen() {
     } catch {
       setStorageTotalBytes(null);
     }
-    const [config, artists, photoArtistIds, widgetPreferences] = await Promise.all([
+    const [config, artists] = await Promise.all([
       db.userConfig.getConfig(),
       db.artists.findAll(),
-      db.cheki.findDistinctPhotoArtistIds(),
-      loadChekiPhotoWidgetPreferences(),
     ]);
-    const availableArtistIds = new Set(photoArtistIds);
     setUserConfig(config);
     setAllArtists(artists);
-    setWidgetArtistIds(widgetPreferences.artistIds.filter((artistId) => availableArtistIds.has(artistId)));
   }, [db]);
 
   useFocusEffect(
@@ -59,8 +53,6 @@ export default function SettingsScreen() {
     artist: oshiArtist,
     parentName: oshiArtist.parent_id ? artistNameMap[oshiArtist.parent_id] : null,
   }) : null;
-  const widgetArtists = allArtists.filter((artist) => widgetArtistIds.includes(artist.id));
-
   const handleClearAllData = async () => {
     if (isClearingAllData) return;
 
@@ -224,11 +216,7 @@ export default function SettingsScreen() {
               <MenuItem
                 icon="widget"
                 label="拍立得回忆"
-                subtitle={widgetArtists.length === 0
-                  ? '展示全部艺人的有图拍立得'
-                  : widgetArtists.length === 1
-                    ? `只展示 ${getArtistPrimaryName(widgetArtists[0])} 的有图拍立得`
-                    : `展示 ${getArtistPrimaryName(widgetArtists[0])} 等 ${widgetArtists.length} 位艺人的有图拍立得`}
+                subtitle="管理小组件分组与展示内容"
                 tint={settingsTints.widget}
                 isLast
                 onPress={() => router.push('/settings/widget')}
