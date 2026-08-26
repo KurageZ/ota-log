@@ -298,7 +298,10 @@ export function buildChekiViewerItems(
   artistMap: Map<string, Artist>,
   eventMap: Map<string, Event>,
 ): ChekiViewerItem[] {
-  return sortChekisDesc(chekis).map((cheki) => {
+  // 只做数据映射，保留调用方传入顺序：调用方数组就是界面当前展示顺序（缩略图/列表）。
+  // 不要在内部再次按 created_at 排序，否则同一记录内的多张拍立得会被二次倒序，
+  // 且电子切册的“最早在前”等用户选择的排序也会被覆盖。
+  return chekis.map((cheki) => {
     const shared = {
       itemId: cheki.id,
       date: cheki.date,

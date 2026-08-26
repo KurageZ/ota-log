@@ -128,6 +128,16 @@ describe('cheki view helpers', () => {
     ]);
   });
 
+  test('preserves the caller-provided order within the same record', () => {
+    const viewerItems = buildChekiViewerItems([
+      cheki({ id: '1', created_at: '2026-01-01T10:00:00.000Z' }),
+      cheki({ id: '2', created_at: '2026-01-01T10:00:00.000Z' }),
+      cheki({ id: '3', created_at: '2026-01-01T10:00:00.000Z' }),
+    ], new Map(), new Map());
+
+    expect(viewerItems.map((item) => item.id)).toEqual(['1', '2', '3']);
+  });
+
   test('chunks photo cheki rows by selected column count', () => {
     expect(chunkChekis(chekis, 3).map((row) => row.map((item) => item.id))).toEqual([
       ['old', 'new', 'created'],
