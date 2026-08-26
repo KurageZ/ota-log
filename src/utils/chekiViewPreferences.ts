@@ -6,6 +6,7 @@ export const CHEKI_VIEW_PREFERENCES_STORAGE_KEY = 'ota-log.cheki-view-preference
 export type ChekiBrowseMode = 'album' | 'record';
 export type ChekiAlbumGrouping = 'artist' | 'date' | 'none';
 export type ChekiSortOrder = 'desc' | 'asc';
+export type ChekiLandscapeRotation = 'original' | 'clockwise' | 'counterclockwise';
 
 export const CHEKI_BROWSE_MODE_LABELS: Record<ChekiBrowseMode, string> = {
   album: '相册',
@@ -19,6 +20,7 @@ export interface ChekiViewPreferences {
   albumSortOrder: ChekiSortOrder;
   recordSortOrder: ChekiSortOrder;
   density: ChekiGridDensity;
+  landscapeRotation: ChekiLandscapeRotation;
   showRecordThumbnails: boolean;
   albumModeHintDismissed: boolean;
 }
@@ -30,6 +32,7 @@ export const DEFAULT_CHEKI_VIEW_PREFERENCES: ChekiViewPreferences = {
   albumSortOrder: 'desc',
   recordSortOrder: 'desc',
   density: 'large',
+  landscapeRotation: 'original',
   showRecordThumbnails: true,
   albumModeHintDismissed: false,
 };
@@ -48,6 +51,10 @@ function isSortOrder(value: unknown): value is ChekiSortOrder {
 
 function isDensity(value: unknown): value is ChekiGridDensity {
   return value === 'large' || value === 'medium' || value === 'small';
+}
+
+function isLandscapeRotation(value: unknown): value is ChekiLandscapeRotation {
+  return value === 'original' || value === 'clockwise' || value === 'counterclockwise';
 }
 
 export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferences {
@@ -81,6 +88,9 @@ export function sanitizeChekiViewPreferences(value: unknown): ChekiViewPreferenc
     density: isDensity(raw.density)
       ? raw.density
       : DEFAULT_CHEKI_VIEW_PREFERENCES.density,
+    landscapeRotation: isLandscapeRotation(raw.landscapeRotation)
+      ? raw.landscapeRotation
+      : DEFAULT_CHEKI_VIEW_PREFERENCES.landscapeRotation,
     showRecordThumbnails: typeof raw.showRecordThumbnails === 'boolean'
       ? raw.showRecordThumbnails
       : DEFAULT_CHEKI_VIEW_PREFERENCES.showRecordThumbnails,

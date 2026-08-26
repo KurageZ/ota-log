@@ -30,6 +30,7 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
       density: 'small',
+      landscapeRotation: 'counterclockwise',
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     })).toEqual({
@@ -39,6 +40,7 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'desc',
       density: 'small',
+      landscapeRotation: 'counterclockwise',
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     });
@@ -59,6 +61,7 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc',
       recordSortOrder: 'asc',
       density: 'large',
+      landscapeRotation: 'original',
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     });
@@ -83,6 +86,12 @@ describe('chekiViewPreferences', () => {
     }).defaultBrowseMode).toBe('record');
   });
 
+  it('defaults an invalid or missing landscape rotation to the original image direction', () => {
+    expect(sanitizeChekiViewPreferences({ landscapeRotation: 'upside-down' }).landscapeRotation)
+      .toBe('original');
+    expect(sanitizeChekiViewPreferences({}).landscapeRotation).toBe('original');
+  });
+
   it('falls back to defaults when stored JSON is invalid', async () => {
     mockedAsyncStorage.getItem.mockResolvedValue('{bad json');
     await expect(loadChekiViewPreferences()).resolves.toEqual(DEFAULT_CHEKI_VIEW_PREFERENCES);
@@ -96,6 +105,7 @@ describe('chekiViewPreferences', () => {
       albumSortOrder: 'asc' as const,
       recordSortOrder: 'desc' as const,
       density: 'small' as const,
+      landscapeRotation: 'clockwise' as const,
       showRecordThumbnails: false,
       albumModeHintDismissed: true,
     };

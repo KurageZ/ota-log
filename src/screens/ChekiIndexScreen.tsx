@@ -59,6 +59,7 @@ import {
   ChekiBrowseMode,
   ChekiAlbumGrouping,
   ChekiViewPreferences,
+  type ChekiLandscapeRotation,
   DEFAULT_CHEKI_VIEW_PREFERENCES,
   loadChekiViewPreferences,
   saveChekiViewPreferences,
@@ -109,6 +110,7 @@ function ChekiThumbnailButton({
   colors,
   onOpen,
   displayMode,
+  landscapeRotation,
 }: {
   cheki: Cheki;
   viewerChekis: Cheki[];
@@ -117,10 +119,12 @@ function ChekiThumbnailButton({
   colors: ThemeColors;
   onOpen: (cheki: Cheki, chekis: Cheki[], origin: FullscreenImageTransitionOrigin | null) => void;
   displayMode: 'portrait' | 'original';
+  landscapeRotation: ChekiLandscapeRotation;
 }) {
   const thumbnailRef = useRef<View>(null);
   const thumbnailImageRef = useRef<Image>(null);
   const cancelPendingMeasurementRef = useRef<(() => void) | null>(null);
+  const [isRotated, setIsRotated] = useState(false);
 
   useEffect(() => () => {
     cancelPendingMeasurementRef.current?.();
@@ -128,6 +132,10 @@ function ChekiThumbnailButton({
 
   const handlePress = useCallback(() => {
     cancelPendingMeasurementRef.current?.();
+    if (isRotated) {
+      onOpen(cheki, viewerChekis, null);
+      return;
+    }
     const node = thumbnailImageRef.current ?? thumbnailRef.current;
     if (!node) {
       onOpen(cheki, viewerChekis, null);
@@ -142,7 +150,7 @@ function ChekiThumbnailButton({
         onOpen(cheki, viewerChekis, origin);
       },
     );
-  }, [cheki, onOpen, viewerChekis]);
+  }, [cheki, isRotated, onOpen, viewerChekis]);
 
   return (
     <View ref={thumbnailRef} collapsable={false}>
@@ -157,6 +165,9 @@ function ChekiThumbnailButton({
           colors={colors}
           imageRef={thumbnailImageRef}
           variant={displayMode}
+          spec={cheki.spec}
+          landscapeRotation={landscapeRotation}
+          onRotationChange={setIsRotated}
         />
       </TouchableOpacity>
     </View>
@@ -840,6 +851,10 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, density });
   }, [persistViewPreferences, viewPreferences]);
 
+  const handleChangeLandscapeRotation = useCallback((landscapeRotation: ChekiLandscapeRotation) => {
+    persistViewPreferences({ ...viewPreferences, landscapeRotation });
+  }, [persistViewPreferences, viewPreferences]);
+
   const handleChangeRecordThumbnails = useCallback((showRecordThumbnails: boolean) => {
     persistViewPreferences({ ...viewPreferences, showRecordThumbnails });
   }, [persistViewPreferences, viewPreferences]);
@@ -1076,6 +1091,7 @@ export default function ChekiLibraryScreen() {
             colors={colors}
             onOpen={openViewer}
             displayMode={albumDisplayMode}
+            landscapeRotation={viewPreferences.landscapeRotation}
           />
         ))}
       </View>
@@ -1091,6 +1107,7 @@ export default function ChekiLibraryScreen() {
     openViewer,
     oshiArtistId,
     albumDisplayMode,
+    viewPreferences.landscapeRotation,
     viewPreferences.albumGrouping,
     viewPreferences.showRecordThumbnails,
   ]);
@@ -1361,6 +1378,23 @@ export default function ChekiLibraryScreen() {
                     onChange={(value) => handleChangeAlbumDisplayMode(value as 'portrait' | 'original')}
                   />
                 </View>
+                {albumDisplayMode === 'portrait' ? (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
+                      横版拍立得方向
+                    </Text>
+                    <SegmentedOptions
+                      colors={colors}
+                      options={[
+                        { value: 'original', label: '保持原图' },
+                        { value: 'clockwise', label: '顺时针 90°' },
+                        { value: 'counterclockwise', label: '逆时针 90°' },
+                      ]}
+                      value={viewPreferences.landscapeRotation}
+                      onChange={(value) => handleChangeLandscapeRotation(value as ChekiLandscapeRotation)}
+                    />
+                  </View>
+                ) : null}
               </View>
             )}
           </View>
