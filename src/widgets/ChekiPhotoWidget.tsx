@@ -32,7 +32,12 @@ const ChekiPhotoWidgetView = (props: ChekiPhotoWidgetProps, environment: WidgetE
             : props.group6;
   const displayImageUri = environment.widgetFamily === 'systemMedium' ? group.imageUri : group.smallImageUri ?? group.imageUri;
   const hasContent = group.state === 'content' && !!displayImageUri;
-  const image = (uri: string) => <Image uiImage={uri} modifiers={[resizable(), aspectRatio({ ratio: 54 / 86, contentMode: 'fit' }), cornerRadius(8), shadow({ radius: 6, x: 0, y: 3, color: '#3D342740' }), frame({ maxWidth: 10000, maxHeight: 10000 }), widgetAccentedRenderingMode('fullColor')]} />;
+  const image = (uri: string) => {
+    const imageView = <Image uiImage={uri} modifiers={[resizable(), aspectRatio({ contentMode: 'fit' }), cornerRadius(8), shadow({ radius: 6, x: 0, y: 3, color: '#3D342740' }), frame({ maxWidth: 10000, maxHeight: 10000 }), widgetAccentedRenderingMode('fullColor')]} />;
+    return environment.widgetFamily === 'systemMedium'
+      ? <ZStack modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 })]}>{imageView}</ZStack>
+      : imageView;
+  };
   return <ZStack modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 }), containerBackground('#F4F0E8', 'widget'), widgetURL(hasContent ? 'otalog:///cheki' : group.emptyDeepLink), accessibilityLabel('拍立得回忆'), accessibilityHint(hasContent ? '打开电子切册' : '配置拍立得分组')]}>
     {hasContent ? <HStack spacing={6} modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 }), padding({ all: 8 })]}>
       {environment.widgetFamily === 'systemMedium' && group.leadingImageUri ? image(group.leadingImageUri) : null}
