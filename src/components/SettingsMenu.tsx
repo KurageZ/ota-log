@@ -46,6 +46,7 @@ export function SectionLabel({ label, style }: { label: string; style?: StylePro
         }}
       />
       <Text
+        accessibilityRole="header"
         style={{
           fontSize: 17,
           lineHeight: 35,
