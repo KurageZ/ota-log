@@ -1,6 +1,7 @@
 import { ScrollView, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SectionLabel } from '../src/components/SettingsMenu';
+import { MenuCard, MenuItem, SectionLabel } from '../src/components/SettingsMenu';
 import { useAppTheme } from '../src/theme/appTheme';
 import { APP_VERSION_LABEL } from '../src/utils/appInfo';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../src/utils/safeArea';
@@ -53,7 +54,7 @@ function FeatureRow({
 }
 
 export default function AboutScreen() {
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -123,6 +124,20 @@ export default function AboutScreen() {
               <FeatureRow key={item} text={item} accent={colors.accentText} textColor={colors.text} />
             ))}
           </View>
+        </View>
+
+        <View style={{ marginBottom: 20 }}>
+          <SectionLabel label="隐私与数据" />
+          <MenuCard>
+            <MenuItem
+              icon="locked"
+              label="隐私与数据"
+              subtitle="了解本地存储、权限用途与数据删除方式"
+              tint={colors.info}
+              isLast
+              onPress={() => router.push('/privacy')}
+            />
+          </MenuCard>
         </View>
 
       </ScrollView>

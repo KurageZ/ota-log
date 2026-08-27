@@ -61,6 +61,7 @@ function RootNavigator() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="about" options={{ title: '关于' }} />
+      <Stack.Screen name="privacy" options={{ title: '隐私与数据' }} />
       <Stack.Screen name="events/index" options={{ title: '所有活动' }} />
       <Stack.Screen
         name="events/compose"

@@ -36,23 +36,32 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "ota log 需要访问系统日历，用于将活动加入你的日程。"
+          "calendarPermission": "ota log 需要访问日历，用于将你选择的活动添加到系统日历。",
+          "remindersPermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "ota log 需要访问相机，用于拍摄带有拍立得贴纸的照片。",
+          "cameraPermission": "ota log 需要访问相机，用于拍摄拍立得照片和制作贴纸照片。",
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "ota log 需要访问照片，用于选择头像、艺人图片、活动资料图和拍立得照片。",
+          "cameraPermission": "ota log 需要访问相机，用于拍摄拍立得照片和制作贴纸照片。",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-media-library",
         {
-          "photosPermission": "ota log 需要访问照片，用于选择拍立得贴纸。",
-          "savePhotosPermission": "ota log 需要将生成的贴纸照片保存到你的相册。",
+          "photosPermission": "ota log 需要访问照片，用于选择头像、艺人图片、活动资料图和拍立得照片。",
+          "savePhotosPermission": "ota log 需要将你生成的分享图片和贴纸照片保存到相册。",
           "granularPermissions": [
             "photo"
           ]
