@@ -14,6 +14,10 @@ import { NextEventWidgetSync } from '../src/widgets/NextEventWidgetSync';
 
 const LUCIDE_FONT = require('@react-native-vector-icons/lucide/fonts/Lucide.ttf');
 
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Lucide: LUCIDE_FONT });
 
@@ -59,7 +63,7 @@ function RootNavigator() {
         statusBarAnimation: 'fade',
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '首页' }} />
       <Stack.Screen name="about" options={{ title: '关于' }} />
       <Stack.Screen name="privacy" options={{ title: '隐私与数据' }} />
       <Stack.Screen name="events/index" options={{ title: '所有活动' }} />
