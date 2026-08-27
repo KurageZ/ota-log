@@ -1,9 +1,10 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { Image, Modal, StyleSheet } from 'react-native';
+import { Image, Modal, StyleSheet, Text } from 'react-native';
 import { FullscreenImageViewer } from '../FullscreenImageViewer';
 
 const mockImageViewingLifecycle: string[] = [];
+let mockSafeAreaInsets = { top: 59, right: 0, bottom: 34, left: 0 };
 
 jest.mock('react-native-image-viewing', () => {
   const React = require('react');
@@ -41,7 +42,11 @@ jest.mock('react-native-image-viewing', () => {
 });
 
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  initialWindowMetrics: {
+    frame: { x: 0, y: 0, width: 393, height: 852 },
+    insets: { top: 59, right: 0, bottom: 34, left: 0 },
+  },
+  useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
 jest.mock('../../theme/appTheme', () => ({
@@ -68,6 +73,7 @@ describe('FullscreenImageViewer opening transition', () => {
 
   beforeEach(() => {
     mockImageViewingLifecycle.length = 0;
+    mockSafeAreaInsets = { top: 59, right: 0, bottom: 34, left: 0 };
     jest.spyOn(Image, 'getSizeWithHeaders').mockImplementation((_, __, success) => {
       success(540, 860);
       return undefined as never;
@@ -210,6 +216,30 @@ describe('FullscreenImageViewer opening transition', () => {
     expect(onDelete).toHaveBeenCalledWith({ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' });
   });
 
+  test('centers the image index against the full viewer width', () => {
+    act(() => {
+      renderer = create(
+        <FullscreenImageViewer
+          visible
+          items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+          selectedId="cheki-1"
+          onClose={jest.fn()}
+          onEdit={jest.fn()}
+          onToggleFavorite={jest.fn()}
+        />,
+      );
+    });
+
+    const [indexText] = renderer.root.findAllByType(Text);
+    expect(indexText).toBeTruthy();
+    expect(StyleSheet.flatten(indexText!.parent!.props.style)).toEqual(expect.objectContaining({
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    }));
+  });
+
   test('switches to an alternate image from the shared header action', () => {
     act(() => {
       renderer = create(
@@ -300,7 +330,35 @@ describe('FullscreenImageViewer opening transition', () => {
     });
 
     const footerControls = renderer.root.findByProps({ testID: 'image-viewer-footer-controls' });
-    expect(StyleSheet.flatten(footerControls.props.style).paddingBottom).toBe(8);
+    expect(StyleSheet.flatten(footerControls.props.style).paddingBottom).toBe(26);
+  });
+
+  test('keeps the collapsed details pill at the same height inside native tabs', () => {
+    const renderViewer = () => (
+      <FullscreenImageViewer
+        visible
+        items={[{ id: 'cheki-1', photoUri: 'file:///cheki-1.jpg' }]}
+        selectedId="cheki-1"
+        onClose={jest.fn()}
+        getDetailSummary={() => '2026年7月15日'}
+        renderDetails={() => null}
+      />
+    );
+
+    act(() => {
+      renderer = create(renderViewer());
+    });
+    const rootStackPadding = StyleSheet.flatten(
+      renderer.root.findByProps({ testID: 'image-viewer-footer-controls' }).props.style,
+    ).paddingBottom;
+
+    mockSafeAreaInsets = { top: 59, right: 0, bottom: 83, left: 0 };
+    act(() => renderer.update(renderViewer()));
+    const nativeTabsPadding = StyleSheet.flatten(
+      renderer.root.findByProps({ testID: 'image-viewer-footer-controls' }).props.style,
+    ).paddingBottom;
+
+    expect(nativeTabsPadding).toBe(rootStackPadding);
   });
 
   test('moves delete into a separate bottom action row when details expand', () => {

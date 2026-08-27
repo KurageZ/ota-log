@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import ImageViewing from 'react-native-image-viewing';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
 import { useReducedMotionEnabled } from '../utils/useReducedMotionEnabled';
@@ -292,11 +292,14 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
 
   const currentItem = displayItems[clampIndex(currentIndex)] ?? null;
   const hasDetails = Boolean(getDetailSummary && renderDetails);
+  const modalBottomInset = Platform.OS === 'ios'
+    ? initialWindowMetrics?.insets.bottom ?? insets.bottom
+    : insets.bottom;
   const expandedSheetHeight = Math.min(
     Math.max(300, screenHeight * 0.46),
     screenHeight
       - insets.top
-      - insets.bottom
+      - modalBottomInset
       - HEADER_HEIGHT
       - FOOTER_ACTION_GAP
       - FOOTER_ACTION_HEIGHT
@@ -306,8 +309,8 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
   const sheetBorderColor = 'rgba(255,255,255,0.10)';
   const detailLabelColor = 'rgba(255,255,255,0.66)';
   const footerBottomPadding = Platform.OS === 'ios'
-    ? Math.max(insets.bottom - 8, 8)
-    : insets.bottom + 12;
+    ? Math.max(modalBottomInset - 8, 8)
+    : modalBottomInset + 12;
   const initialTransitionOriginForModal = useMemo(() => (
     visible && initialTransitionOrigin
       ? normalizeSourceOriginForModal(initialTransitionOrigin)
@@ -569,6 +572,29 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
             opacity: showOpeningTransition ? 0 : headerAnimatedStyle.opacity,
           }}
         >
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: insets.top + 6,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '700',
+                fontVariant: ['tabular-nums'],
+                color: colors.heroEyebrow,
+              }}
+            >
+              {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
+            </Text>
+          </View>
           <HeaderButton
             icon="close"
             accessibilityLabel="关闭图片查看"
@@ -577,11 +603,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
             restBackgroundColor={colors.heroDecorWeak}
             pressedBackgroundColor={colors.heroDecor}
           />
-          <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 12 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.heroEyebrow }}>
-              {items.length > 0 ? imageIndex + 1 : 0} / {items.length}
-            </Text>
-          </View>
+          <View style={{ flex: 1 }} />
           {item && (nextAlternateItem || onToggleFavorite || onEdit) ? (
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {nextAlternateItem ? (
@@ -729,7 +751,7 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
                 nestedScrollEnabled
                 contentContainerStyle={{
                   paddingHorizontal: 16,
-                  paddingBottom: insets.bottom + 18,
+                  paddingBottom: modalBottomInset + 18,
                 }}
               >
                 {renderDetails(item)}
@@ -785,8 +807,8 @@ export function FullscreenImageViewer<T extends FullscreenImageItem>({
     footerBottomPadding,
     getDetailSummary,
     hasDetails,
-    insets.bottom,
     displayItems,
+    modalBottomInset,
     onDelete,
     renderDetails,
     sheetBackgroundColor,
