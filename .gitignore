@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 /build_apk.sh
+/release/
+/test-backups/
+/tmp/
 
 # private build inputs and legacy bundled artist output
 /assets/artists/
