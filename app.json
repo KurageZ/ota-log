@@ -133,6 +133,17 @@
                 ],
                 "contentMarginsDisabled": true
               }
+            },
+            {
+              "name": "CalendarWidget",
+              "displayName": "拍立得日历",
+              "description": "在桌面查看当月拍立得记录",
+              "ios": {
+                "supportedFamilies": [
+                  "systemLarge"
+                ],
+                "contentMarginsDisabled": true
+              }
             }
           ]
         }
