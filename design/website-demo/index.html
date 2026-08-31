@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="ota log 是一款本地优先的偶像演出与拍立得记录 App。"
+    />
+    <meta name="theme-color" content="#eef3f8" />
+    <link rel="icon" href="./icon.png" />
+    <title>ota log — 演出记录与电子切册</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --screen: #eef3f8;
+        --header: rgba(238, 243, 248, 0.92);
+        --card: #ffffff;
+        --card-alt: #e6edf5;
+        --card-muted: #f0f4f8;
+        --divider: rgba(16, 24, 40, 0.12);
+        --text: #101114;
+        --heading: #050609;
+        --text-secondary: #5d6470;
+        --text-muted: #8b919c;
+        --accent: #0b63f6;
+        --accent-strong: #074fbf;
+        --accent-soft: rgba(11, 99, 246, 0.1);
+        --on-accent: #ffffff;
+        --pink: #e62475;
+        --success: #10743f;
+        --shadow: 0 24px 70px rgba(24, 38, 57, 0.13);
+        --phone-shadow: 0 42px 90px rgba(21, 34, 50, 0.22);
+        --radius: 16px;
+        --page: min(1160px, calc(100vw - 48px));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--screen);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      ::selection {
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+
+      * {
+        scrollbar-color: var(--text-muted) transparent;
+        scrollbar-width: thin;
+      }
+
+      a,
+      button {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      a {
+        color: inherit;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 4px;
+      }
+
+      a:focus-visible,
+      button:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 4px;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .skip-link {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 100;
+        transform: translateY(-160%);
+        border-radius: 10px;
+        background: var(--heading);
+        color: var(--screen);
+        padding: 10px 14px;
+        text-decoration: none;
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        border-bottom: 1px solid var(--divider);
+        background: var(--header);
+        backdrop-filter: blur(18px) saturate(150%);
+      }
+
+      .nav {
+        width: var(--page);
+        min-height: 72px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--heading);
+        font-weight: 850;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        background: #ffffff;
+        object-fit: cover;
+        box-shadow: 0 5px 16px rgba(16, 24, 40, 0.1);
+      }
+
+      .brand small {
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .nav-links a {
+        color: var(--text-secondary);
+        text-decoration: none;
+      }
+
+      .nav-links a:hover {
+        color: var(--heading);
+      }
+
+      .nav-download {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 12px;
+        background: var(--heading);
+        color: var(--screen) !important;
+        padding: 0 18px;
+      }
+
+      main {
+        overflow: clip;
+      }
+
+      .hero {
+        width: var(--page);
+        min-height: calc(100svh - 72px);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1.02fr) minmax(390px, 0.98fr);
+        align-items: center;
+        gap: 64px;
+        padding: 72px 0 92px;
+      }
+
+      .hero-copy {
+        position: relative;
+        z-index: 2;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 10.5ch;
+        margin-bottom: 26px;
+        color: var(--heading);
+        font-size: clamp(3.25rem, 7vw, 5.75rem);
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        line-height: 0.98;
+        text-wrap: balance;
+      }
+
+      .hero-lead {
+        max-width: 38rem;
+        margin-bottom: 30px;
+        color: var(--text-secondary);
+        font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+        line-height: 1.75;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .button {
+        min-height: 52px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 14px;
+        padding: 0 22px;
+        cursor: pointer;
+        font-weight: 800;
+        text-decoration: none;
+        transition:
+          transform 180ms ease,
+          background 180ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+      }
+
+      .button-primary {
+        background: var(--accent);
+        color: var(--on-accent);
+        box-shadow: 0 12px 28px rgba(24, 38, 57, 0.16);
+      }
+
+      .button-primary:hover {
+        background: var(--accent-strong);
+      }
+
+      .button-secondary {
+        background: var(--card);
+        color: var(--heading);
+        box-shadow: 0 8px 24px rgba(24, 38, 57, 0.08);
+      }
+
+      .release-meta {
+        margin: 18px 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .trust-line {
+        margin: 44px 0 0;
+        padding-top: 22px;
+        border-top: 1px solid var(--divider);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 24px;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .trust-line span::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        display: inline-block;
+        margin-right: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        vertical-align: 1px;
+      }
+
+      .hero-visual {
+        min-height: 700px;
+        position: relative;
+        display: grid;
+        place-items: center;
+      }
+
+      .hero-visual::before {
+        content: "";
+        position: absolute;
+        width: 520px;
+        height: 520px;
+        border-radius: 50%;
+        background: var(--card-alt);
+      }
+
+      .phone {
+        width: 330px;
+        height: 674px;
+        position: relative;
+        z-index: 2;
+        border: 10px solid #11151b;
+        border-radius: 48px;
+        background: #11151b;
+        box-shadow: var(--phone-shadow);
+        animation: phone-arrive 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 9px;
+        left: 50%;
+        z-index: 3;
+        width: 92px;
+        height: 25px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background: #11151b;
+      }
+
+      .phone-screen {
+        height: 100%;
+        overflow: hidden;
+        border-radius: 38px;
+        background: var(--screen);
+        color: var(--text);
+      }
+
+      .phone-status {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 22px 0;
+        color: var(--heading);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .phone-content {
+        padding: 8px 16px 88px;
+      }
+
+      .phone-heading {
+        margin-bottom: 14px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+
+      .phone-heading strong {
+        color: var(--heading);
+        font-size: 23px;
+        letter-spacing: -0.03em;
+      }
+
+      .phone-heading span {
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .event-card {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+        border-radius: 18px;
+        background: var(--card);
+        padding: 17px;
+        box-shadow: 0 9px 28px rgba(24, 38, 57, 0.08);
+      }
+
+      .event-date {
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 850;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .event-card h3 {
+        max-width: 19ch;
+        margin: 6px 0 12px;
+        color: var(--heading);
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .event-card p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .event-status {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        padding: 4px 8px;
+        font-size: 9px;
+        font-weight: 850;
+      }
+
+      .oshi-note {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        color: var(--pink);
+        font-size: 9px;
+        font-weight: 900;
+      }
+
+      .phone-section-title {
+        margin: 18px 0 9px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--heading);
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .phone-section-title::before {
+        content: "";
+        width: 3px;
+        height: 14px;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+
+      .upcoming-list {
+        overflow: hidden;
+        border-radius: 15px;
+        background: var(--card);
+      }
+
+      .upcoming-row {
+        display: grid;
+        grid-template-columns: 38px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 58px;
+        padding: 8px 12px;
+      }
+
+      .upcoming-row + .upcoming-row {
+        border-top: 1px solid var(--divider);
+      }
+
+      .date-block {
+        color: var(--accent);
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.2;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .date-block b {
+        display: block;
+        color: var(--heading);
+        font-size: 18px;
+      }
+
+      .upcoming-name {
+        min-width: 0;
+      }
+
+      .upcoming-name strong,
+      .upcoming-name span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .upcoming-name strong {
+        color: var(--heading);
+        font-size: 11px;
+      }
+
+      .upcoming-name span {
+        color: var(--text-muted);
+        font-size: 9px;
+      }
+
+      .upcoming-city {
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        padding: 3px 6px;
+        font-size: 8px;
+        font-weight: 800;
+      }
+
+      .phone-tabs {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        z-index: 4;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        border: 1px solid var(--divider);
+        border-radius: 20px;
+        background: var(--card);
+        padding: 8px 4px 6px;
+        box-shadow: 0 8px 28px rgba(24, 38, 57, 0.1);
+        color: var(--text-muted);
+        font-size: 8px;
+        font-weight: 750;
+        text-align: center;
+      }
+
+      .phone-tabs b {
+        color: var(--accent);
+      }
+
+      .demo-label {
+        position: absolute;
+        right: 2px;
+        bottom: 65px;
+        z-index: 3;
+        border-radius: 999px;
+        background: var(--heading);
+        color: var(--screen);
+        padding: 7px 11px;
+        font-size: 11px;
+        font-weight: 800;
+        box-shadow: 0 10px 26px rgba(16, 24, 40, 0.16);
+      }
+
+      .section {
+        padding: 120px 0;
+      }
+
+      .section-inner {
+        width: var(--page);
+        margin: 0 auto;
+      }
+
+      .section h2 {
+        max-width: 13ch;
+        margin-bottom: 24px;
+        color: var(--heading);
+        font-size: clamp(2.35rem, 5vw, 4.5rem);
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        line-height: 1.03;
+        text-wrap: balance;
+      }
+
+      .section-intro {
+        max-width: 44rem;
+        margin-bottom: 64px;
+        color: var(--text-secondary);
+        font-size: 18px;
+      }
+
+      .workflow {
+        background: var(--card);
+      }
+
+      .workflow-line {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--divider);
+        border-bottom: 1px solid var(--divider);
+      }
+
+      .workflow-step {
+        position: relative;
+        min-height: 260px;
+        padding: 36px 34px 38px 0;
+      }
+
+      .workflow-step + .workflow-step {
+        border-left: 1px solid var(--divider);
+        padding-left: 34px;
+      }
+
+      .workflow-step span {
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .workflow-step h3 {
+        margin: 58px 0 12px;
+        color: var(--heading);
+        font-size: 24px;
+        letter-spacing: -0.025em;
+      }
+
+      .workflow-step p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 15px;
+      }
+
+      .features-layout {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
+        gap: 92px;
+        align-items: start;
+      }
+
+      .feature-heading {
+        position: sticky;
+        top: 124px;
+      }
+
+      .feature-heading p {
+        max-width: 31rem;
+        color: var(--text-secondary);
+        font-size: 17px;
+      }
+
+      .feature-list {
+        border-top: 1px solid var(--divider);
+      }
+
+      .feature-row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 28px;
+        padding: 34px 0;
+        border-bottom: 1px solid var(--divider);
+      }
+
+      .feature-row h3 {
+        margin: 0;
+        color: var(--heading);
+        font-size: 19px;
+        letter-spacing: -0.02em;
+      }
+
+      .feature-row p {
+        margin: 0;
+        color: var(--text-secondary);
+      }
+
+      .product-strip {
+        margin-top: 84px;
+        display: grid;
+        grid-template-columns: 0.9fr 1.2fr 0.9fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .mini-screen {
+        min-height: 350px;
+        overflow: hidden;
+        border-radius: var(--radius);
+        background: var(--card);
+        padding: 24px;
+        box-shadow: 0 16px 44px rgba(24, 38, 57, 0.08);
+      }
+
+      .mini-screen:nth-child(2) {
+        min-height: 410px;
+        transform: translateY(-30px);
+      }
+
+      .screen-meta {
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .screen-meta strong {
+        color: var(--heading);
+        font-size: 14px;
+      }
+
+      .screen-meta span {
+        color: var(--text-muted);
+        font-size: 10px;
+        font-weight: 750;
+      }
+
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 7px;
+      }
+
+      .calendar-grid span {
+        aspect-ratio: 1;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .calendar-grid .marked {
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-weight: 900;
+      }
+
+      .cheki-stack {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+
+      .cheki {
+        min-height: 122px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        border-radius: 8px;
+        background: var(--card-alt);
+        padding: 9px;
+      }
+
+      .cheki::before {
+        content: "";
+        flex: 1;
+        border-radius: 5px;
+        background: var(--text-muted);
+        opacity: 0.18;
+      }
+
+      .cheki span {
+        margin-top: 7px;
+        color: var(--text-secondary);
+        font-size: 9px;
+        font-weight: 700;
+      }
+
+      .stat-block {
+        padding: 17px 0;
+        border-bottom: 1px solid var(--divider);
+      }
+
+      .stat-block:first-of-type {
+        padding-top: 0;
+      }
+
+      .stat-block span {
+        display: block;
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .stat-block strong {
+        color: var(--heading);
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .privacy {
+        background: #11151b;
+        color: #f4f7fb;
+      }
+
+      .privacy-grid {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 96px;
+        align-items: end;
+      }
+
+      .privacy h2 {
+        color: #ffffff;
+      }
+
+      .privacy-copy {
+        max-width: 38rem;
+        margin-bottom: 0;
+        color: #aeb8c7;
+        font-size: 18px;
+      }
+
+      .privacy-facts {
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+      }
+
+      .privacy-fact {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        align-items: center;
+        min-height: 74px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+      }
+
+      .privacy-fact strong {
+        font-size: 16px;
+      }
+
+      .privacy-fact span {
+        color: #8fc3ff;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: right;
+      }
+
+      .download {
+        background: var(--card);
+      }
+
+      .download-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 48px;
+        margin-bottom: 68px;
+      }
+
+      .download-head h2 {
+        margin: 0;
+      }
+
+      .download-head p {
+        max-width: 31rem;
+        margin: 0;
+        color: var(--text-secondary);
+      }
+
+      .download-list {
+        border-top: 1px solid var(--divider);
+      }
+
+      .download-row {
+        display: grid;
+        grid-template-columns: 160px 1fr auto;
+        gap: 40px;
+        align-items: center;
+        min-height: 158px;
+        border-bottom: 1px solid var(--divider);
+      }
+
+      .platform-name {
+        color: var(--heading);
+        font-size: 25px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+      }
+
+      .platform-copy strong,
+      .platform-copy span {
+        display: block;
+      }
+
+      .platform-copy strong {
+        margin-bottom: 5px;
+        color: var(--heading);
+        font-size: 16px;
+      }
+
+      .platform-copy span {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .download-button {
+        min-width: 188px;
+      }
+
+      .download-note {
+        max-width: 52rem;
+        margin: 28px 0 0;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+
+      footer {
+        background: var(--card);
+        padding: 32px 0 48px;
+      }
+
+      .footer-inner {
+        width: var(--page);
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 22px;
+      }
+
+      .footer-links a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        color: var(--text-secondary);
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        z-index: 100;
+        max-width: calc(100vw - 32px);
+        transform: translate(-50%, 24px);
+        border-radius: 12px;
+        background: var(--heading);
+        color: var(--screen);
+        padding: 12px 16px;
+        opacity: 0;
+        pointer-events: none;
+        box-shadow: var(--shadow);
+        font-size: 14px;
+        font-weight: 750;
+        transition:
+          opacity 180ms ease,
+          transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .toast.is-visible {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+
+      @keyframes phone-arrive {
+        from {
+          transform: translateY(28px) scale(0.97);
+          opacity: 0;
+          filter: blur(8px);
+        }
+        to {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+          filter: blur(0);
+        }
+      }
+
+      @media (max-width: 940px) {
+        :root {
+          --page: min(100% - 40px, 760px);
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+          gap: 56px;
+          padding-top: 88px;
+        }
+
+        .hero-copy {
+          max-width: 720px;
+        }
+
+        .hero-visual {
+          min-height: 700px;
+        }
+
+        .features-layout,
+        .privacy-grid {
+          grid-template-columns: 1fr;
+          gap: 56px;
+        }
+
+        .feature-heading {
+          position: static;
+        }
+
+        .product-strip {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .mini-screen:nth-child(2) {
+          transform: none;
+        }
+
+        .mini-screen:last-child {
+          grid-column: 1 / -1;
+          min-height: auto;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+        }
+
+        .download-head {
+          align-items: start;
+          flex-direction: column;
+        }
+
+        .download-row {
+          grid-template-columns: 130px 1fr;
+        }
+
+        .download-button {
+          grid-column: 2;
+          justify-self: start;
+          margin-bottom: 26px;
+        }
+      }
+
+      @media (max-width: 680px) {
+        :root {
+          --page: calc(100vw - 32px);
+        }
+
+        .nav {
+          min-height: 64px;
+        }
+
+        .brand small,
+        .nav-links a:not(.nav-download) {
+          display: none;
+        }
+
+        .nav-download {
+          min-height: 44px;
+          padding: 0 14px;
+          font-size: 13px;
+        }
+
+        .hero {
+          min-height: auto;
+          padding: 74px 0 78px;
+        }
+
+        h1 {
+          font-size: clamp(3.05rem, 15vw, 4.75rem);
+        }
+
+        .hero-actions {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        .trust-line {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .hero-visual {
+          min-height: 620px;
+          transform: scale(0.9);
+          margin: -32px 0 -52px;
+        }
+
+        .hero-visual::before {
+          width: 430px;
+          height: 430px;
+        }
+
+        .section {
+          padding: 88px 0;
+        }
+
+        .section h2 {
+          font-size: clamp(2.45rem, 13vw, 3.7rem);
+        }
+
+        .section-intro {
+          margin-bottom: 44px;
+        }
+
+        .workflow-line {
+          grid-template-columns: 1fr;
+        }
+
+        .workflow-step {
+          min-height: auto;
+          padding: 30px 0;
+        }
+
+        .workflow-step + .workflow-step {
+          border-top: 1px solid var(--divider);
+          border-left: 0;
+          padding-left: 0;
+        }
+
+        .workflow-step h3 {
+          margin-top: 28px;
+        }
+
+        .feature-row {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .product-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .mini-screen:last-child {
+          grid-column: auto;
+          display: block;
+        }
+
+        .stat-block {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+        }
+
+        .privacy-grid {
+          gap: 42px;
+        }
+
+        .privacy-fact {
+          align-items: start;
+          grid-template-columns: 1fr;
+          gap: 4px;
+          padding: 18px 0;
+        }
+
+        .privacy-fact span {
+          text-align: left;
+        }
+
+        .download-row {
+          grid-template-columns: 1fr;
+          gap: 12px;
+          padding: 28px 0 32px;
+        }
+
+        .download-button {
+          grid-column: auto;
+          width: 100%;
+          margin: 10px 0 0;
+        }
+
+        .footer-inner {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --screen: #090d13;
+          --header: rgba(9, 13, 19, 0.9);
+          --card: #171e28;
+          --card-alt: #202a38;
+          --card-muted: #111821;
+          --divider: rgba(255, 255, 255, 0.11);
+          --text: #f4f7fb;
+          --heading: #ffffff;
+          --text-secondary: #aeb8c7;
+          --text-muted: #6f7a89;
+          --accent: #58a4ff;
+          --accent-strong: #8fc3ff;
+          --accent-soft: rgba(88, 164, 255, 0.16);
+          --on-accent: #061323;
+          --success: #5fd28b;
+          --shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+          --phone-shadow: 0 42px 90px rgba(0, 0, 0, 0.48);
+        }
+
+        .site-header {
+          background: var(--header);
+        }
+
+        .brand img {
+          background: #ffffff;
+        }
+
+        .phone,
+        .phone::before {
+          background: #020305;
+          border-color: #020305;
+        }
+
+        .privacy {
+          background: #05070a;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      THESIS: A quiet personal ledger for live-event memories; it refuses the neon idol collage and generic SaaS card grid.
+      OWN-WORLD: ota log's mist-blue surface, white records, dark ink, blue actions, and one restrained pink brand note.
+      STORY: A new visitor understands the app, sees its record flow, trusts local-first storage, and chooses a platform.
+      FIRST VIEWPORT: Compact navigation, large left-aligned promise and download actions, with one oversized working phone interface on the right.
+      FORM: A single-page product narrative pinned by the user; seed key user-pinned-mono-home-20260828.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <a class="skip-link" href="#main">跳到主要内容</a>
+
+    <header class="site-header">
+      <nav class="nav" aria-label="主导航">
+        <a class="brand" href="#top" aria-label="ota log 首页">
+          <img src="./icon.png" alt="" />
+          <span>ota log</span>
+          <small>演出记录与电子切册</small>
+        </a>
+        <div class="nav-links">
+          <a href="#features">功能</a>
+          <a href="#privacy">本地优先</a>
+          <a class="nav-download" href="#download">获取 App</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <h1>记录演出，整理拍立得</h1>
+          <p class="hero-lead">
+            ota log 是一款为偶像演出爱好者准备的本地记录 App。把活动、艺人、拍立得和回顾数据放在一起，重要的经历由你自己保管。
+          </p>
+          <div class="hero-actions" aria-label="下载选项">
+            <a class="button button-primary" href="#download">通过 TestFlight 获取</a>
+            <a class="button button-secondary" href="#download">下载 Android APK</a>
+          </div>
+          <p class="release-meta">
+            <span>v2.0.0</span>
+            <span>iOS 测试版</span>
+            <span>Android 独立安装包</span>
+          </p>
+          <div class="trust-line" aria-label="产品特点">
+            <span>无需注册</span>
+            <span>核心数据保存在设备</span>
+            <span>支持完整备份与恢复</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="ota log 首页界面示意">
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="phone-status"><span>9:41</span><span>5G · 100%</span></div>
+              <div class="phone-content">
+                <div class="phone-heading"><strong>首页</strong><span>新建活动</span></div>
+                <article class="event-card">
+                  <span class="event-date">下一场 · 2026-09-06 周日</span>
+                  <span class="oshi-note">单推优先</span>
+                  <h3>周末定期公演 Vol. 18</h3>
+                  <p>18:30 · 上海 MAO Livehouse</p>
+                  <span class="event-status">计划中</span>
+                </article>
+                <div class="phone-section-title">未来活动</div>
+                <div class="upcoming-list">
+                  <div class="upcoming-row">
+                    <div class="date-block">SEP<b>12</b></div>
+                    <div class="upcoming-name"><strong>秋日联合演出</strong><span>13:00 · 新宿</span></div>
+                    <span class="upcoming-city">东京</span>
+                  </div>
+                  <div class="upcoming-row">
+                    <div class="date-block">SEP<b>19</b></div>
+                    <div class="upcoming-name"><strong>周年特别公演</strong><span>19:30 · 育音堂</span></div>
+                    <span class="upcoming-city">上海</span>
+                  </div>
+                </div>
+                <div class="phone-section-title">本月记录</div>
+                <article class="event-card">
+                  <span class="event-date">2026-08</span>
+                  <h3>4 场活动 · 17 张拍立得</h3>
+                  <p>总花费与常去场地已自动汇总</p>
+                </article>
+              </div>
+              <div class="phone-tabs">
+                <b>首页</b><span>日历</span><span>切册</span><span>统计</span><span>我的</span>
+              </div>
+            </div>
+          </div>
+          <span class="demo-label">界面示意</span>
+        </div>
+      </section>
+
+      <section class="section workflow" aria-labelledby="workflow-title">
+        <div class="section-inner">
+          <h2 id="workflow-title">记录一场演出</h2>
+          <p class="section-intro">
+            演出不是一条孤立的日程。ota log 让计划、现场留下的拍立得和日后的回顾自然连在一起。
+          </p>
+          <div class="workflow-line">
+            <article class="workflow-step">
+              <span>01</span>
+              <h3>安排活动</h3>
+              <p>保存日期、场地、出演者、多场次和时间表，也可以从公告内容辅助整理。</p>
+            </article>
+            <article class="workflow-step">
+              <span>02</span>
+              <h3>记录现场</h3>
+              <p>为活动补充评分和备注，把每张拍立得关联到对应艺人、活动、规格和价格。</p>
+            </article>
+            <article class="workflow-step">
+              <span>03</span>
+              <h3>回顾记录</h3>
+              <p>在日历、电子切册和统计中重新找到当时的记录，理解自己的活动轨迹。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features" aria-labelledby="features-title">
+        <div class="section-inner">
+          <div class="features-layout">
+            <div class="feature-heading">
+              <h2 id="features-title">主要功能</h2>
+              <p>常用信息集中在首页，需要整理时再进入更完整的活动、艺人、切册与统计视图。</p>
+            </div>
+            <div class="feature-list">
+              <article class="feature-row">
+                <h3>活动与日历</h3>
+                <p>管理活动状态、场次、时间表和出演者，在首页看到下一场，在日历里查看完整安排。</p>
+              </article>
+              <article class="feature-row">
+                <h3>艺人与单推</h3>
+                <p>维护个人、团体和所属关系；设置单推后，在活动、电子切册和统计中优先展示。</p>
+              </article>
+              <article class="feature-row">
+                <h3>电子切册</h3>
+                <p>支持有图或无图记录、批量录入、相册与记录视图，并可按日期、艺人和活动筛选。</p>
+              </article>
+              <article class="feature-row">
+                <h3>统计与回顾</h3>
+                <p>汇总活动次数、花费、常去场地和拍立得数据，首页与统计内容都可以按习惯调整。</p>
+              </article>
+              <article class="feature-row">
+                <h3>扩展工具</h3>
+                <p>包含拍立得贴纸相机、外部数据导入、重要日期，以及 iOS 桌面小组件等实用入口。</p>
+              </article>
+            </div>
+          </div>
+
+          <div class="product-strip" aria-label="功能界面示意">
+            <article class="mini-screen">
+              <div class="screen-meta"><strong>日历</strong><span>界面示意</span></div>
+              <div class="calendar-grid" aria-hidden="true">
+                <span>1</span><span>2</span><span>3</span><span>4</span><span class="marked">5</span><span>6</span><span>7</span>
+                <span>8</span><span>9</span><span>10</span><span class="marked">11</span><span>12</span><span>13</span><span>14</span>
+                <span>15</span><span>16</span><span>17</span><span>18</span><span class="marked">19</span><span>20</span><span>21</span>
+                <span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span>
+                <span>29</span><span class="marked">30</span><span>31</span><span></span><span></span><span></span><span></span>
+              </div>
+            </article>
+            <article class="mini-screen">
+              <div class="screen-meta"><strong>电子切册</strong><span>界面示意</span></div>
+              <div class="cheki-stack" aria-hidden="true">
+                <div class="cheki"><span>2026-08-02 · Aki</span></div>
+                <div class="cheki"><span>2026-08-02 · Mio</span></div>
+                <div class="cheki"><span>2026-08-16 · Aki</span></div>
+                <div class="cheki"><span>2026-08-23 · Rina</span></div>
+              </div>
+            </article>
+            <article class="mini-screen">
+              <div class="screen-meta"><strong>年度统计</strong><span>界面示意</span></div>
+              <div class="stat-block"><span>已参加活动</span><strong>32</strong></div>
+              <div class="stat-block"><span>拍立得记录</span><strong>186</strong></div>
+              <div class="stat-block"><span>常去场地</span><strong>12</strong></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section privacy" id="privacy" aria-labelledby="privacy-title">
+        <div class="section-inner privacy-grid">
+          <div>
+            <h2 id="privacy-title">本地存储与数据备份</h2>
+            <p class="privacy-copy">
+              核心数据保存在当前设备的应用私有存储中。ota log 不要求注册账号，没有广告或使用行为分析，也支持完整备份、导出与恢复。
+            </p>
+          </div>
+          <div class="privacy-facts">
+            <div class="privacy-fact"><strong>账号</strong><span>无需注册</span></div>
+            <div class="privacy-fact"><strong>核心记录</strong><span>设备本地存储</span></div>
+            <div class="privacy-fact"><strong>相机、照片与日历</strong><span>使用对应功能时请求</span></div>
+            <div class="privacy-fact"><strong>数据迁移</strong><span>完整备份与恢复</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section download" id="download" aria-labelledby="download-title">
+        <div class="section-inner">
+          <div class="download-head">
+            <h2 id="download-title">下载 ota log</h2>
+            <p>首版官网将同时提供 iOS TestFlight 和 Android APK。下面的按钮目前用于演示，正式链接接入后无需改变页面结构。</p>
+          </div>
+          <div class="download-list">
+            <article class="download-row">
+              <div class="platform-name">iOS</div>
+              <div class="platform-copy">
+                <strong>TestFlight 测试版</strong>
+                <span>v2.0.0 · 公开邀请链接待接入</span>
+              </div>
+              <button class="button button-primary download-button" type="button" data-demo-download="TestFlight">
+                获取测试版
+              </button>
+            </article>
+            <article class="download-row">
+              <div class="platform-name">Android</div>
+              <div class="platform-copy">
+                <strong>独立 APK 安装包</strong>
+                <span>版本号、文件大小与 SHA-256 将随正式文件显示</span>
+              </div>
+              <button class="button button-secondary download-button" type="button" data-demo-download="Android APK">
+                下载 APK
+              </button>
+            </article>
+          </div>
+          <p class="download-note">
+            Demo 不包含真实下载地址，也不会触发文件下载。正式站点需要在发布时同步版本号、更新时间、APK 文件大小和校验值。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <span>© <span id="year">2026</span> ota log</span>
+        <div class="footer-links">
+          <a href="#privacy">隐私与数据</a>
+          <a href="#download">下载 App</a>
+        </div>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      const toast = document.querySelector("#toast");
+      const year = document.querySelector("#year");
+      let toastTimer;
+
+      year.textContent = String(new Date().getFullYear());
+
+      document.querySelectorAll("[data-demo-download]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const platform = button.dataset.demoDownload;
+          toast.textContent = `${platform} 下载链接将在正式上线前接入。`;
+          toast.classList.add("is-visible");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2800);
+        });
+      });
+    </script>
+  </body>
+</html>
