@@ -234,7 +234,15 @@ export function getTrendLabelIndices(
   return new Set([0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round((length - 1) * ratio)));
 }
 
-export function getTrendValueLabelIndices(counts: number[], minimumGap = 2): Set<number> {
+export interface TrendValueLabelIndexOptions {
+  suppressCollisions?: boolean;
+}
+
+export function getTrendValueLabelIndices(
+  counts: number[],
+  minimumGap = 2,
+  options: TrendValueLabelIndexOptions = {},
+): Set<number> {
   const gap = Math.max(1, Math.round(minimumGap));
   const selected: number[] = [];
 
@@ -244,7 +252,7 @@ export function getTrendValueLabelIndices(counts: number[], minimumGap = 2): Set
     if (
       previousIndex != null
       && index - previousIndex < gap
-      && counts[previousIndex] === count
+      && (options.suppressCollisions || counts[previousIndex] === count)
     ) return;
     selected.push(index);
   });

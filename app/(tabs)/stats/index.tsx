@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import SegmentedControl from '@expo/ui/community/segmented-control';
 import {
@@ -61,6 +61,10 @@ import { buildActivityHeatmapValues, type DailyCount } from '../../../src/utils/
 
 const RANKING_PREVIEW_LIMIT = 10;
 const PERFECT_EVENT_PREVIEW_LIMIT = 5;
+const STATS_PAGE_HORIZONTAL_PADDING = 16;
+const STATS_SURFACE_CARD_PADDING = 16;
+const TREND_CHART_HORIZONTAL_INSET = (STATS_PAGE_HORIZONTAL_PADDING + STATS_SURFACE_CARD_PADDING) * 2;
+const TREND_VALUE_LABEL_WIDTH = 24;
 const PERIOD_PRESETS: Array<{ preset: StatsPeriodPreset; label: string }> = [
   { preset: 'week', label: '周' },
   { preset: 'month', label: '月' },
@@ -229,7 +233,7 @@ function SurfaceCard({
       style={{
         backgroundColor: colors.card,
         borderRadius: 18,
-        padding: 16,
+        padding: STATS_SURFACE_CARD_PADDING,
         marginBottom: 12,
         ...style,
       }}
@@ -256,6 +260,7 @@ function TrendBarChart({
   showAllLabels?: boolean;
   showBarValues?: boolean;
 }) {
+  const { width: screenWidth, fontScale } = useWindowDimensions();
   const maxCount = Math.max(...counts, 1);
   const barColor = activeColor ?? colors.accent;
   const visibleLabelIndices = getTrendLabelIndices(labels.length, counts, {
@@ -263,9 +268,25 @@ function TrendBarChart({
     showAll: showAllLabels,
   });
   const dense = counts.length > 12;
-  const visibleValueIndices = getTrendValueLabelIndices(counts, dense ? 2 : 1);
+  const valueLabelWidth = dense && showBarValues
+    ? Math.ceil(TREND_VALUE_LABEL_WIDTH * Math.max(1, fontScale))
+    : TREND_VALUE_LABEL_WIDTH;
+  const valueLabelLineHeight = Math.ceil(12 * Math.max(1, fontScale));
+  const chartContentWidth = Math.max(0, screenWidth - TREND_CHART_HORIZONTAL_INSET);
+  const denseSlotWidth = counts.length > 0
+    ? (chartContentWidth - Math.max(0, counts.length - 1)) / counts.length
+    : 0;
+  const denseValueLabelGap = dense && showBarValues && denseSlotWidth > 0
+    ? Math.max(1, Math.ceil(valueLabelWidth / denseSlotWidth))
+    : 1;
+  const visibleValueIndices = getTrendValueLabelIndices(counts, dense ? denseValueLabelGap : 1, {
+    suppressCollisions: dense && showBarValues,
+  });
   const axisLabelWidth = dense ? 18 : 20;
-  const chartHeight = dense && showBarValues ? 88 : dense ? 68 : 88;
+  const chartHeight = Math.max(
+    dense ? (showBarValues ? 88 : 68) : 88,
+    valueLabelLineHeight + 6 + 60,
+  );
 
   const getAxisLabel = (label: string) => {
     if (prioritizeDataLabels && label.includes('/')) {
@@ -285,11 +306,16 @@ function TrendBarChart({
                 <Text
                   numberOfLines={1}
                   style={{
+                    width: valueLabelWidth,
+                    minWidth: valueLabelWidth,
+                    flexShrink: 0,
                     fontSize: dense ? 9 : 10,
-                    lineHeight: 12,
+                    lineHeight: valueLabelLineHeight,
                     fontWeight: '700',
                     color: count > 0 ? colors.textSecondary : colors.textMuted,
                     marginBottom: 6,
+                    textAlign: 'center',
+                    fontVariant: ['tabular-nums'],
                   }}
                 >
                   {count > 0 && visibleValueIndices.has(index) ? count : ''}
@@ -1394,7 +1420,7 @@ export default function StatsScreen() {
           style={{ flex: 1, backgroundColor: colors.screen }}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: contentBottomPadding }}
+          contentContainerStyle={{ padding: STATS_PAGE_HORIZONTAL_PADDING, paddingTop: 6, paddingBottom: contentBottomPadding }}
           {...tabBarScroll}
         >
           {statsContent}
@@ -1427,7 +1453,7 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         scrollIndicatorInsets={{ bottom: contentBottomPadding }}
-        contentContainerStyle={{ padding: 16, paddingTop: androidHeader.contentTopPadding, paddingBottom: contentBottomPadding }}
+        contentContainerStyle={{ padding: STATS_PAGE_HORIZONTAL_PADDING, paddingTop: androidHeader.contentTopPadding, paddingBottom: contentBottomPadding }}
         {...tabBarScroll}
       >
         <AndroidLargeTabTitle

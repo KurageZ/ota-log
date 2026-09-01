@@ -97,6 +97,11 @@ describe('statsDateRange', () => {
     expect([...getTrendValueLabelIndices([2, 2, 2], 1)]).toEqual([0, 1, 2]);
   });
 
+  test('can suppress nearby different values when labels would collide', () => {
+    expect([...getTrendValueLabelIndices([100, 200, 300, 400], 3, { suppressCollisions: true })]).toEqual([0, 3]);
+    expect([...getTrendValueLabelIndices([100, 200, 300], 1, { suppressCollisions: true })]).toEqual([0, 1, 2]);
+  });
+
   test('creates and shifts natural week, month, and year ranges', () => {
     const january = createStatsRangeForDate('month', new Date(2026, 0, 15));
     expect(shiftStatsDateRange(january, -1)).toEqual({
