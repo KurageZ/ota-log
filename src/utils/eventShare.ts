@@ -81,7 +81,7 @@ export function buildEventShareAction(
     return {
       menuLabel: '复制活动链接',
       toastLabel: '活动链接已复制',
-      text: `${event.title.trim()}\n${url}`,
+      text: url,
     };
   }
 
@@ -98,4 +98,3 @@ export function buildEventShareAction(
     text: `${event.title.trim()}\n${sessionText}`,
   };
 }
-

@@ -37,12 +37,12 @@ function session(overrides: Partial<EventSession> = {}): EventSession {
 }
 
 describe('event sharing text', () => {
-  test('copies the event title together with a public URL', () => {
+  test('copies only the public URL', () => {
     expect(buildEventShareAction({ ...event, url: ' https://example.com/live ' }, []))
       .toEqual({
         menuLabel: '复制活动链接',
         toastLabel: '活动链接已复制',
-        text: '测试活动\nhttps://example.com/live',
+        text: 'https://example.com/live',
       });
   });
 
