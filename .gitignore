@@ -53,3 +53,17 @@ yarn-error.*
 # temp
 /tmp
 /.impeccable/review/
+
+# App Store screenshot assets and generated output (keep scripts and templates)
+/marketing/app-store/*/assets/
+/marketing/app-store/*/raw/
+/marketing/app-store/*/export/
+/marketing/app-store/*/ready/
+/marketing/app-store/*/qa/
+/marketing/app-store/*/preview-*.jpg
+/marketing/app-store/*/preview-*.png
+/marketing/app-store/*/*.zip
+/marketing/app-store/*/iphone.yaml
+/marketing/app-store/*/iphone-6.5.yaml
+/marketing/app-store/*/ipad.yaml
+/marketing/app-store/*/__pycache__/

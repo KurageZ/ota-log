@@ -142,6 +142,14 @@ npx eas-cli@latest build --platform android --profile preview --local
 
 iOS Preview 使用 Ad Hoc provisioning profile，只能安装到其中已登记 UDID 的设备；Android Preview 产物为可直接安装的 APK。完整发版步骤见 [docs/workflows/release.md](docs/workflows/release.md)。
 
+## App Store 截图
+
+商店截图使用独立的 iPhone / iPad 模拟器采集真实 App 界面，再通过本地 HTML 模板生成营销排版。演示数据必须是虚构内容，原始截图、导出图片、预览和 ZIP 只在本地保存，不提交 Git。
+
+开始前必须以 App Store Connect 当前显示的设备栏位和 [Apple 官方截图规格](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/) 为准确认尺寸。不同栏位的图片不能混用；例如 `1320 × 2868` 属于 iPhone 6.9 英寸，要求 `1284 × 2778` 的 iPhone 6.5 英寸栏位需要单独导出。项目启用了 iPad 支持，因此还需准备 iPad 截图。
+
+完整的模拟器隔离、演示数据、采集、排版、校验、打包和常见失败处理见 [App Store 截图工作流](docs/workflows/app-store-screenshots.md)。
+
 ## 关于 `ios/` 和 `android/`
 
 根级 `ios/` 与 `android/` 目录在这个仓库里默认不跟踪，视为本地生成产物。缺失或需要从当前配置重新生成时，按上面「生成本地原生工程」的步骤执行 `APP_VARIANT=development npx expo prebuild --clean`；Preview / 正式版的原生工程由 EAS Build 在云端按 `eas.json` 生成，不需要本地 prebuild。
@@ -180,6 +188,7 @@ npx expo-doctor
 - 数据结构设计：[docs/data/activity-data-model-design.md](docs/data/activity-data-model-design.md)
 - 测试工作流：[docs/workflows/testing.md](docs/workflows/testing.md)
 - 发版工作流：[docs/workflows/release.md](docs/workflows/release.md)
+- App Store 截图工作流：[docs/workflows/app-store-screenshots.md](docs/workflows/app-store-screenshots.md)
 
 ## 当前状态
 

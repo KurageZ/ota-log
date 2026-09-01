@@ -43,6 +43,7 @@
 - 电子切册筛选与规格重构 QA：`progress/cheki-filter-refactor-qa.md`
 - 测试验证工作流：`workflows/testing.md`
 - 发版工作流：`workflows/release.md`
+- App Store 截图工作流：`workflows/app-store-screenshots.md`
 - 私有艺人构建工作流：`workflows/private-artist-build.md`
 
 ## 维护规则

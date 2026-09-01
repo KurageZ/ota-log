@@ -22,6 +22,7 @@
 - 当前进度：`docs/progress/now.md`
 - 测试验证工作流：`docs/workflows/testing.md`
 - 发版工作流：`docs/workflows/release.md`
+- App Store 截图工作流：`docs/workflows/app-store-screenshots.md`
 
 本次文档结构调整：将长期上下文集中到 `docs/`；完整 UI/UX 设计文档已从根目录迁入 `docs/product/ui-ux.md`，根目录 `design.md` 只作为兼容软链接；`AGENTS.md` 只保留 agent 每次都需要的规则、命令和入口。
 
@@ -69,5 +70,6 @@
 - 需要多段正文时，优先使用多个 `-m` 参数，例如：`git commit -m "fix: ..." -m "第一段" -m "第二段"`。
 - 提交或 amend 后，使用 `git show --no-patch --format=raw HEAD` 复核 commit message，确认正文是实际换行而不是字面量 `\n`。
 - 发版按 `docs/workflows/release.md` 执行，并同步 `package.json`、`app.json`、`CHANGELOG.md`、`app/about.tsx`。
+- 生成 App Store 截图前必须阅读 `docs/workflows/app-store-screenshots.md`：使用隔离的 `ota-log Store ` 模拟器和虚构演示数据，先核对实际上传栏位尺寸，再采集、排版、自动校验和逐张检查。不得写入用户日常模拟器，不得提交原始截图、生成图片、QA 数据或 ZIP；未经用户明确授权不得上传 App Store Connect。
 - 提交前检查 `AGENTS.md` 和 `docs/` 是否需要同步更新。
 - 工作区可能有用户未提交改动；只处理本任务相关文件，不回退无关改动。
