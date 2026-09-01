@@ -116,7 +116,6 @@ function RootNavigator() {
           gestureEnabled: false,
         }}
       />
-      <Stack.Screen name="tools/ultima-stamp-planner" options={{ title: '集章规划' }} />
       <Stack.Screen name="tools/weibo-following" options={{ title: '微博关注导入' }} />
     </Stack>
   );
