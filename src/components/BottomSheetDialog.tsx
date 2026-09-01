@@ -187,7 +187,7 @@ export function BottomSheetDialog({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           enableFooterMarginAdjustment={Boolean(footer)}
-          contentContainerStyle={contentContainerStyle}
+          contentContainerStyle={[{ paddingHorizontal: 16 }, contentContainerStyle]}
         >
           <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}
@@ -197,7 +197,7 @@ export function BottomSheetDialog({
       ) : (
         <BottomSheetView
           enableFooterMarginAdjustment={Boolean(footer)}
-          style={contentContainerStyle}
+          style={[{ paddingHorizontal: 16 }, contentContainerStyle]}
         >
           <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}

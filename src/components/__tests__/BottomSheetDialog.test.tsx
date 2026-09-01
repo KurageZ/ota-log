@@ -6,6 +6,7 @@ import { BottomSheetDialog } from '../BottomSheetDialog';
 const mockPresent = jest.fn();
 let latestScrollableFooterAdjustment: boolean | undefined;
 let latestViewFooterAdjustment: boolean | undefined;
+let latestScrollableContentContainerStyle: unknown;
 
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = require('react');
@@ -34,11 +35,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
     BottomSheetScrollView: ({
       children,
       enableFooterMarginAdjustment,
+      contentContainerStyle,
     }: {
       children?: ReactNode;
       enableFooterMarginAdjustment?: boolean;
+      contentContainerStyle?: unknown;
     }) => {
       latestScrollableFooterAdjustment = enableFooterMarginAdjustment;
+      latestScrollableContentContainerStyle = contentContainerStyle;
       return <ScrollView>{children}</ScrollView>;
     },
     BottomSheetView: ({
@@ -81,6 +85,7 @@ describe('BottomSheetDialog', () => {
     mockPresent.mockClear();
     latestScrollableFooterAdjustment = undefined;
     latestViewFooterAdjustment = undefined;
+    latestScrollableContentContainerStyle = undefined;
   });
 
   afterEach(() => {
@@ -105,6 +110,20 @@ describe('BottomSheetDialog', () => {
 
     expect(latestScrollableFooterAdjustment).toBe(true);
     expect(renderer.root.findByProps({ accessibilityLabel: '底部操作' })).toBeTruthy();
+  });
+
+  test('keeps dynamically sized scrollable content away from the screen edges by default', () => {
+    act(() => {
+      renderer = create(
+        <BottomSheetDialog visible title="确认" onClose={jest.fn()} scrollable>
+          <Text>内容</Text>
+        </BottomSheetDialog>
+      );
+    });
+
+    expect(latestScrollableContentContainerStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ paddingHorizontal: 16 })]),
+    );
   });
 
   test('reserves footer height for dynamically sized non-scrollable content', () => {
