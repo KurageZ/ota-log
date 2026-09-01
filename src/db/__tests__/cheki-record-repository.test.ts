@@ -95,6 +95,19 @@ describe('ChekiRecordRepository', () => {
       .toEqual(['file:///added.jpg']);
   });
 
+  test('updates the unit price of retained items without changing the default for new items', async () => {
+    const record = await repository.createRecord({ quantity: 1, unit_price: 10 });
+
+    await repository.updateRecordWithItemChanges(
+      record.id,
+      { quantity: 2 },
+      { existingUnitPrice: 20, defaultUnitPrice: 30 },
+    );
+
+    const updated = await repository.findRecordById(record.id);
+    expect(updated?.items.map((item) => item.unit_price)).toEqual([20, 30]);
+  });
+
   test('rolls back quantity and items when adding an image fails', async () => {
     const record = await repository.createRecord({ quantity: 1, unit_price: 10 });
     const adapter = createAsyncSQLiteAdapter(raw);

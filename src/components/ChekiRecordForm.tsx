@@ -117,6 +117,7 @@ export function ChekiRecordForm({
   const initialSnapshotRef = useRef('');
   const allowNavigationRef = useRef(false);
   const priceTouchedRef = useRef(false);
+  const priceEditedRef = useRef(false);
   const lastPriceRequestRef = useRef(0);
   const initialPriceAppliedRef = useRef(false);
 
@@ -538,7 +539,9 @@ export function ChekiRecordForm({
     ? 0
     : Math.max(0, parsedQuantity - retainedExistingItemCount);
   const calculatedTotal = parsedQuantity != null && parsedUnitPrice != null
-    ? retainedTotalPrice + newItemCount * parsedUnitPrice
+    ? mode === 'edit' && priceEditedRef.current
+      ? parsedQuantity * parsedUnitPrice
+      : retainedTotalPrice + newItemCount * parsedUnitPrice
     : null;
   const unitPriceValid = parsedUnitPrice != null;
   const dateValid = date === '' || /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -586,6 +589,9 @@ export function ChekiRecordForm({
           {
             add: newItems,
             removeItemIds: pendingRemovedItemIds,
+            existingUnitPrice: mode === 'edit' && priceEditedRef.current
+              ? parsedUnitPrice ?? 0
+              : undefined,
             defaultUnitPrice: parsedUnitPrice ?? 0,
             defaultSpec: DEFAULT_CHEKI_SPEC,
           },
@@ -995,6 +1001,7 @@ export function ChekiRecordForm({
               value={unitPrice}
               onChangeText={(value) => {
                 priceTouchedRef.current = true;
+                priceEditedRef.current = true;
                 setUnitPrice(value.replace(/\D/g, ''));
               }}
               placeholder="0"

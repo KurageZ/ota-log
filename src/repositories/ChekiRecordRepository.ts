@@ -41,6 +41,7 @@ export interface CreateChekiRecordWithItemsInput extends CreateChekiRecordInput 
 export interface ChekiRecordItemChanges {
   add?: AddChekiItemInput[];
   removeItemIds?: string[];
+  existingUnitPrice?: number;
   defaultUnitPrice?: number;
   defaultSpec?: ChekiSpec;
 }
@@ -261,6 +262,7 @@ export class ChekiRecordRepository {
   ): Promise<void> {
     const itemsToPopulate = changes.add ?? [];
     const removeItemIds = [...new Set(changes.removeItemIds ?? [])];
+    assertUnitPrice(changes.existingUnitPrice);
     assertUnitPrice(changes.defaultUnitPrice);
     await this.db.withTransactionAsync(async () => {
       const currentRecord = await this.db.getFirstAsync<ChekiRecord>(
@@ -299,6 +301,13 @@ export class ChekiRecordRepository {
       }
 
       await this.updateRecord(id, { ...input, quantity: targetQuantity });
+
+      if (changes.existingUnitPrice != null) {
+        await this.db.runAsync(
+          'UPDATE cheki_items SET unit_price = ?, updated_at = ? WHERE record_id = ?',
+          [changes.existingUnitPrice, toISODateTime(), id],
+        );
+      }
 
       while (remainingItems.length < targetQuantity) {
         remainingItems.push(await this.insertItem(id, {
