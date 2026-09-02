@@ -14,7 +14,6 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
   const countdown = getCountdownCopy(event.event_date, event.event_time);
   const oshiName = oshiArtist?.short_name || oshiArtist?.name || '你的单推';
   const metaParts = [
-    formatShortDate(event.event_date),
     formatEventTimes(event.open_time, event.start_time) || '全天',
     event.venue,
   ]
@@ -71,17 +70,19 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
           >
             {countdown.value}
           </Text>
-          <Text
-            style={{
-              color: colors.heroSubtext,
-              fontSize: 10.5,
-              lineHeight: 13,
-              fontWeight: '700',
-              marginTop: 2,
-            }}
-          >
-            {countdown.label}
-          </Text>
+          {countdown.label ? (
+            <Text
+              style={{
+                color: colors.heroSubtext,
+                fontSize: 10.5,
+                lineHeight: 13,
+                fontWeight: '700',
+                marginTop: 2,
+              }}
+            >
+              {countdown.label}
+            </Text>
+          ) : null}
         </View>
 
         <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
@@ -175,11 +176,6 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
   );
 }
 
-function formatShortDate(isoDate: string) {
-  const [, month, day] = isoDate.split('-');
-  return `${month}-${day}`;
-}
-
 function getCountdownCopy(eventDate: string, eventTime: string | null) {
   const days = daysUntil(eventDate);
 
@@ -188,7 +184,7 @@ function getCountdownCopy(eventDate: string, eventTime: string | null) {
   }
 
   if (days <= 0) {
-    return { value: '今天', label: '别忘了去现场' };
+    return { value: '今天', label: null };
   }
 
   if (days === 1) {

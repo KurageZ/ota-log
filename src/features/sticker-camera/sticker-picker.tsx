@@ -54,7 +54,7 @@ export function StickerPicker({
     } catch (error) {
       showFailureAlert({
         title: '无法使用所选拍立得',
-        reason: '读取拍立得正面照片时遇到问题。',
+        reason: '读取拍立得照片时遇到问题。',
         nextStep: '请取消异常项目或重新进入选择器后再试。',
         details: error,
       });

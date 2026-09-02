@@ -721,9 +721,9 @@ export function ChekiPickerScreen({
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
               <AppIcon name="images" size={40} color={colors.textMuted} />
-              <Text style={{ color: colors.heading, fontSize: 18, fontWeight: '800' }}>还没有正面照片</Text>
+              <Text style={{ color: colors.heading, fontSize: 18, fontWeight: '800' }}>还没有拍立得照片</Text>
               <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 20, textAlign: 'center' }}>
-                请先在电子切册中为拍立得添加正面照片。
+                请先在电子切册中为拍立得添加照片。
               </Text>
             </View>
           )}
