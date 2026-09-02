@@ -50,6 +50,7 @@ import {
 } from '../../../src/components/HomePinnedInfoHero';
 import { toISODate } from '../../../src/utils/date';
 import { synchronizeCurrentEvent } from '../../../src/utils/currentEvent';
+import { createHomeMonthStatsRoute } from '../../../src/utils/homeNavigation';
 
 type UpcomingItem = {
   event: Event;
@@ -427,15 +428,7 @@ export default function HomeScreen() {
     router.push('/settings/home');
   }, [router]);
   const handleMonthOverviewPress = useCallback(() => {
-    const now = new Date();
-
-    router.push({
-      pathname: '/stats',
-      params: {
-        year: String(now.getFullYear()),
-        month: String(now.getMonth() + 1),
-      },
-    });
+    router.push(createHomeMonthStatsRoute());
   }, [router]);
 
   const renderPinnedInfo = useCallback(() => {
