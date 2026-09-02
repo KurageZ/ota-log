@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [Unreleased]
 
+## [2.0.0-beta.5] - 2026-09-01
+
+### Added
+- 新增拍立得日历小组件，支持按日期浏览拍立得记录
+- 新增网站首页演示与 App Store 截图采集工作流
+
+### Changed
+- 优化下一场活动小组件的布局
+
+### Fixed
+- 修复统计图表数值标签可能被裁切的问题
+- 修复分享活动时可能复制非活动链接内容的问题
+- 修复编辑拍立得价格后未持久化的问题
+
 ## [2.0.0-beta.4] - 2026-08-27
 
 ### Added
