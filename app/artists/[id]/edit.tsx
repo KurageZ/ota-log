@@ -19,6 +19,7 @@ import { fetchWeiboUser, cleanOfficialSuffix } from '../../../src/utils/weibo/fe
 import { loadWeiboCookie } from '../../../src/utils/weibo/cookieStore';
 import { downloadWeiboFile } from '../../../src/utils/weibo/downloadFile';
 import { showDeleteFailedAlert, showFailureAlert, showSaveFailedAlert } from '../../../src/utils/failureAlert';
+import { hapticDeleteSuccess, hapticSaveSuccess } from '../../../src/utils/haptics';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
@@ -333,6 +334,7 @@ export default function EditArtistScreen() {
           end_date: membership.end_date,
         })));
       }
+      hapticSaveSuccess();
       router.back();
     } catch (e) {
       showSaveFailedAlert(e);
@@ -349,6 +351,7 @@ export default function EditArtistScreen() {
         onPress: async () => {
           try {
             await db.artists.delete(id);
+            hapticDeleteSuccess();
             router.back();
           } catch (e) {
             showDeleteFailedAlert(e);

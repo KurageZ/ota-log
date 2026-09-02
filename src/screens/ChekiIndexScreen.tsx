@@ -29,7 +29,11 @@ import {
 } from '../components/ChekiAlbumThumbnail';
 import { showDeleteFailedAlert } from '../utils/failureAlert';
 import { useReducedMotionEnabled } from '../utils/useReducedMotionEnabled';
-import { hapticError, hapticFavoriteToggle } from '../utils/haptics';
+import {
+  hapticDeleteSuccess,
+  hapticError,
+  hapticFavoriteToggle,
+} from '../utils/haptics';
 import { ThemeColors, useAppTheme } from '../theme/appTheme';
 import { ChekiRecordListItem } from '../components/ChekiRecordListItem';
 import { EventSectionHeader } from '../components/EventSectionHeader';
@@ -904,6 +908,7 @@ export default function ChekiLibraryScreen() {
         onPress: async () => {
           try {
             await db.chekiRecords.deleteItem(chekiId);
+            hapticDeleteSuccess();
             setViewerState(null);
             load();
           } catch {

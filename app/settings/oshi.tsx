@@ -9,6 +9,7 @@ import { Artist } from '../../src/types/models';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { ArtistSearchPicker } from '../../src/components/ArtistSearchPicker';
 import { showSaveFailedAlert } from '../../src/utils/failureAlert';
+import { hapticSaveSuccess } from '../../src/utils/haptics';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
@@ -42,6 +43,7 @@ export default function OshiSettingsScreen() {
     try {
       setSaving(true);
       await db.userConfig.updateConfig({ oshi_artist_id: selectedArtistId });
+      hapticSaveSuccess();
       router.back();
     } catch (error) {
       showSaveFailedAlert(error);

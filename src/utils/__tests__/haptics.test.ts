@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
   hapticCopySuccess,
+  hapticDeleteSuccess,
   hapticDragEnd,
   hapticDragReorder,
   hapticDragStart,
@@ -110,6 +111,12 @@ describe('haptics', () => {
       expect(impactAsync).toHaveBeenCalledWith('light');
     });
 
+    test('delete success uses a medium impact', () => {
+      hapticDeleteSuccess();
+      expect(impactAsync).toHaveBeenCalledWith('medium');
+      expect(performAndroidHapticsAsync).not.toHaveBeenCalled();
+    });
+
     test('warning and error use the matching notification types', () => {
       hapticWarning();
       expect(notificationAsync).toHaveBeenLastCalledWith('warning');
@@ -173,6 +180,12 @@ describe('haptics', () => {
       expect(performAndroidHapticsAsync).toHaveBeenCalledWith('confirm');
     });
 
+    test('delete success uses the system confirmation feedback', () => {
+      hapticDeleteSuccess();
+      expect(performAndroidHapticsAsync).toHaveBeenCalledWith('confirm');
+      expect(impactAsync).not.toHaveBeenCalled();
+    });
+
     test('warning and error use the system rejection feedback', () => {
       hapticWarning();
       expect(performAndroidHapticsAsync).toHaveBeenLastCalledWith('reject');
@@ -194,6 +207,7 @@ describe('haptics', () => {
       hapticFavoriteToggle(true);
       hapticToggle(true);
       hapticSaveSuccess();
+      hapticDeleteSuccess();
       hapticWarning();
       hapticError();
 

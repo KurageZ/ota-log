@@ -8,6 +8,7 @@ import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { useDB } from '../../src/context/DBContext';
 import { copyToDocuments } from '../../src/utils/copyToDocuments';
 import { showOperationFailedAlert, showSaveFailedAlert } from '../../src/utils/failureAlert';
+import { hapticSaveSuccess } from '../../src/utils/haptics';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
@@ -63,6 +64,7 @@ export default function ProfileSettingsScreen() {
         name: name.trim(),
         avatar_uri: avatarUri,
       });
+      hapticSaveSuccess();
       router.back();
     } catch (error) {
       showSaveFailedAlert(error);

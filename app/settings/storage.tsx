@@ -8,6 +8,7 @@ import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { cleanupUnreferencedLocalMedia, scanUnreferencedLocalMedia } from '../../src/utils/localMedia';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { hapticDeleteSuccess, hapticError } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   type StorageCategoryId,
@@ -180,6 +181,11 @@ export default function StorageSettingsScreen() {
             onPress: async () => {
               try {
                 const result = await cleanupUnreferencedLocalMedia(db.rawDb);
+                if (result.failed > 0) {
+                  hapticError();
+                } else {
+                  hapticDeleteSuccess();
+                }
                 Alert.alert(
                   '清理完成',
                   `已删除 ${result.deleted} 个文件，释放 ${formatBytes(result.bytesFreed)}。${result.failed > 0 ? `失败 ${result.failed} 个。` : ''}`,

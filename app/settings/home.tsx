@@ -25,7 +25,7 @@ import type { HydratedDateItem } from '../../src/repositories/DateItemRepository
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { toISODate } from '../../src/utils/date';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
-import { hapticDragEnd, hapticDragReorder, hapticDragStart, hapticError } from '../../src/utils/haptics';
+import { hapticDragEnd, hapticDragReorder, hapticDragStart } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   DEFAULT_RECENT_COMPLETED_DISPLAY_LIMIT,
@@ -220,7 +220,6 @@ export default function HomeSettingsScreen() {
         cards: sanitized,
       });
     } catch (error) {
-      hapticError();
       showOperationFailedAlert(
         '无法保存首页设置。',
         '请稍后再试一次；如果问题持续出现，可以重启应用后再调整。',

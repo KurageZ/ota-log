@@ -18,6 +18,7 @@ import { fetchWeiboUser, cleanOfficialSuffix } from '../../src/utils/weibo/fetch
 import { loadWeiboCookie } from '../../src/utils/weibo/cookieStore';
 import { downloadWeiboFile } from '../../src/utils/weibo/downloadFile';
 import { showFailureAlert, showSaveFailedAlert } from '../../src/utils/failureAlert';
+import { hapticSaveSuccess } from '../../src/utils/haptics';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { extractArtistBackgroundColor } from '../../src/utils/artistBackdrop';
@@ -238,6 +239,7 @@ export default function NewArtistScreen() {
           })),
         );
       }
+      hapticSaveSuccess();
       router.back();
     } catch (e) {
       showSaveFailedAlert(e);

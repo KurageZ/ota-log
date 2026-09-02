@@ -111,6 +111,18 @@ export function hapticSaveSuccess(): void {
 }
 
 /**
+ * A destructive action (record, photo, cleanup) actually completed.
+ * iOS: medium impact. Android: system confirmation feedback.
+ */
+export function hapticDeleteSuccess(): void {
+  if (Platform.OS === 'ios') {
+    runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+  } else if (Platform.OS === 'android') {
+    runHaptic(() => Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm));
+  }
+}
+
+/**
  * A warning-level failure occurred. Use the system warning/rejection feedback,
  * never a heavy impact as a substitute.
  * iOS: warning notification. Android: system rejection feedback.

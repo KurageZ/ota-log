@@ -66,6 +66,7 @@ export function showArtistCreateFailedAlert(details?: unknown) {
 }
 
 export function showDeleteFailedAlert(details?: unknown) {
+  hapticError();
   showFailureAlert({
     title: '删除失败',
     reason: '删除失败',
@@ -75,6 +76,7 @@ export function showDeleteFailedAlert(details?: unknown) {
 }
 
 export function showOperationFailedAlert(reason: string, nextStep: string, details?: unknown) {
+  hapticError();
   showFailureAlert({
     title: '操作失败',
     reason,

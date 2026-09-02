@@ -35,7 +35,12 @@ import {
   showFailureAlert,
   showOperationFailedAlert,
 } from '../../src/utils/failureAlert';
-import { hapticCopySuccess, hapticError, hapticFavoriteToggle } from '../../src/utils/haptics';
+import {
+  hapticCopySuccess,
+  hapticDeleteSuccess,
+  hapticError,
+  hapticFavoriteToggle,
+} from '../../src/utils/haptics';
 import { getOshiMatchSource } from '../../src/utils/oshiMatch';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
@@ -605,8 +610,13 @@ export default function EventDetailScreen() {
       {
         text: '删除', style: 'destructive',
         onPress: async () => {
-          await db.events.delete(id!);
-          router.back();
+          try {
+            await db.events.delete(id!);
+            hapticDeleteSuccess();
+            router.back();
+          } catch {
+            showDeleteFailedAlert();
+          }
         },
       },
     ]);
@@ -797,6 +807,7 @@ export default function EventDetailScreen() {
         onPress: async () => {
           try {
             await db.photos.delete(photo.id);
+            hapticDeleteSuccess();
             const deletedIndex = infoPhotos.findIndex((item) => item.id === photo.id);
             const remainingPhotos = infoPhotos.filter((item) => item.id !== photo.id);
             setInfoPhotos(remainingPhotos);
@@ -821,6 +832,7 @@ export default function EventDetailScreen() {
         onPress: async () => {
           try {
             await db.cheki.delete(chekiId);
+            hapticDeleteSuccess();
             setViewerSelectedId(null);
             load();
           } catch {

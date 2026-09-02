@@ -9,6 +9,7 @@ import { formatBytes, getStorageTotalBytes } from '../../src/utils/storageUsage'
 import { findOrphanArtistIds, removeOrphanArtists } from '../../src/db/maintenance';
 import { resetAppForDevelopment } from '../../src/utils/developerReset';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
+import { hapticDeleteSuccess } from '../../src/utils/haptics';
 import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
@@ -109,6 +110,7 @@ export default function SettingsScreen() {
               try {
                 const removedCount = await removeOrphanArtists(db.rawDb);
                 await reloadSettingsContext();
+                if (removedCount > 0) hapticDeleteSuccess();
                 Alert.alert('清理完成', `已移除 ${removedCount} 位孤立艺人。`);
               } catch (error) {
                 showOperationFailedAlert(

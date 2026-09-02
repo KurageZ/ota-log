@@ -55,7 +55,11 @@ import { buildChekiViewerItems, getChekiManualCount } from '../../../src/utils/c
 import { buildEventMonthSections } from '../../../src/utils/eventSections';
 import { sortArtistsWithOshi } from '../../../src/utils/filter';
 import { showDeleteFailedAlert } from '../../../src/utils/failureAlert';
-import { hapticError, hapticFavoriteToggle } from '../../../src/utils/haptics';
+import {
+  hapticDeleteSuccess,
+  hapticError,
+  hapticFavoriteToggle,
+} from '../../../src/utils/haptics';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
 import { toISODate } from '../../../src/utils/date';
 
@@ -269,6 +273,7 @@ export default function ArtistDetailScreen() {
         onPress: async () => {
           try {
             await db.cheki.delete(chekiId);
+            hapticDeleteSuccess();
             setViewerSelectedId(null);
             await load();
           } catch {

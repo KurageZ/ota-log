@@ -20,6 +20,12 @@ import { useAppTheme } from '../../../../src/theme/appTheme';
 import { formatChineseDateWithWeekday } from '../../../../src/utils/date';
 import { getArtistPrimaryName } from '../../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../../src/utils/avatarSource';
+import { showDeleteFailedAlert } from '../../../../src/utils/failureAlert';
+import {
+  hapticDeleteSuccess,
+  hapticError,
+  hapticFavoriteToggle,
+} from '../../../../src/utils/haptics';
 import { AppIcon } from '../../../../src/components/AppIcon';
 import {
   CHEKI_SQUARE_GRID_GAP,
@@ -129,11 +135,12 @@ export default function ChekiRecordDetailScreen() {
           onPress: async () => {
             try {
               await db.chekiRecords.deleteItem(itemId);
+              hapticDeleteSuccess();
               setSelectedItemId(null);
               if (record?.quantity === 1) router.back();
               else await load();
             } catch {
-              Alert.alert('删除失败', '暂时无法删除这张拍立得，请稍后重试。');
+              showDeleteFailedAlert();
             }
           },
         },
@@ -144,6 +151,7 @@ export default function ChekiRecordDetailScreen() {
   const handleToggleFavorite = useCallback(async (viewerItem: ChekiViewerItem) => {
     const itemId = viewerItem.itemId ?? viewerItem.id;
     const nextFavorite = !viewerItem.isFavorite;
+    hapticFavoriteToggle(nextFavorite);
     setRecord((current) => current ? {
       ...current,
       items: current.items.map((item) => item.id === itemId
@@ -153,6 +161,7 @@ export default function ChekiRecordDetailScreen() {
     try {
       await db.chekiRecords.setItemFavorite(itemId, nextFavorite);
     } catch {
+      hapticError();
       await load();
       Alert.alert('收藏失败', '暂时无法更新收藏状态，请稍后重试。');
     }
@@ -172,9 +181,10 @@ export default function ChekiRecordDetailScreen() {
           onPress: async () => {
             try {
               await db.chekiRecords.deleteRecord(record.id);
+              hapticDeleteSuccess();
               router.back();
             } catch {
-              Alert.alert('删除失败', '暂时无法删除这条记录，请稍后重试。');
+              showDeleteFailedAlert();
             }
           },
         },

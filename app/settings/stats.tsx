@@ -16,7 +16,7 @@ import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
-import { hapticDragEnd, hapticDragReorder, hapticDragStart, hapticError } from '../../src/utils/haptics';
+import { hapticDragEnd, hapticDragReorder, hapticDragStart } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import {
   DEFAULT_STATS_PERIOD_PRESET,
@@ -140,7 +140,6 @@ export default function StatsSettingsScreen() {
       if (saveId === latestSaveIdRef.current) {
         setSections(lastSavedSectionsRef.current);
       }
-      hapticError();
       showOperationFailedAlert(
         '无法保存统计设置。',
         '本次更改未保存，请再试一次。',

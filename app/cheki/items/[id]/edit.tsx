@@ -30,9 +30,11 @@ import { useAppTheme } from '../../../../src/theme/appTheme';
 import { copyToDocuments } from '../../../../src/utils/copyToDocuments';
 import {
   showCameraPermissionAlert,
+  showDeleteFailedAlert,
   showPhotoLibraryPermissionAlert,
   showSaveFailedAlert,
 } from '../../../../src/utils/failureAlert';
+import { hapticDeleteSuccess, hapticSaveSuccess } from '../../../../src/utils/haptics';
 import { deleteLocalFileIfUnreferenced } from '../../../../src/utils/localMedia';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 import { withAlpha } from '../../../../src/utils/color';
@@ -255,6 +257,7 @@ export default function EditChekiItemScreen() {
       for (const uri of [frontUri, backUri]) {
         if (uri) pendingImportedUrisRef.current.delete(uri);
       }
+      hapticSaveSuccess();
       allowNavigationRef.current = true;
       router.back();
     } catch {
@@ -278,11 +281,12 @@ export default function EditChekiItemScreen() {
             try {
               const record = await db.chekiRecords.findRecordById(item.record_id);
               await db.chekiRecords.deleteItem(item.id);
+              hapticDeleteSuccess();
               allowNavigationRef.current = true;
               await cleanupPendingImports();
               router.replace(record?.quantity === 1 ? '/cheki' : `/cheki/records/${item.record_id}`);
             } catch {
-              Alert.alert('删除失败', '暂时无法删除这张拍立得，请稍后重试。');
+              showDeleteFailedAlert();
             }
           },
         },

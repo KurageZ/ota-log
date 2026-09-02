@@ -16,6 +16,7 @@ import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getDateItemPresetKind } from '../../src/utils/dateItemDisplay';
 import { showDeleteFailedAlert, showSaveFailedAlert } from '../../src/utils/failureAlert';
+import { hapticDeleteSuccess } from '../../src/utils/haptics';
 import { withAlpha } from '../../src/utils/color';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import { formatEventTimes } from '../../src/components/EventPrimitives';
@@ -67,6 +68,7 @@ export default function DateItemDetailScreen() {
           onPress: async () => {
             try {
               await db.dateItems.delete(id);
+              hapticDeleteSuccess();
               router.replace('/date-items');
             } catch (error) {
               showDeleteFailedAlert(error);
