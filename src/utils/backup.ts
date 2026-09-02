@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import { unzip } from 'react-native-zip-archive';
 import { Repositories } from '../context/DBContext';
 import { copyToDocuments } from './copyToDocuments';
+import { collectReferencedLocalMediaUris, deleteUnreferencedLocalFiles } from './localMedia';
 import { materializePresetArtistAvatars } from './presetArtistMedia';
 import { migrateLegacyChekiData } from '../db/legacyChekiMigration';
 import { generateId } from './uuid';
@@ -471,6 +472,9 @@ function buildEventDatesById(events: Row[], sessions: Row[]): Map<string, string
 }
 
 export async function restoreBackupData(db: Repositories, data: ImportDataShape): Promise<void> {
+  // Snapshot before the wipe: once the restored rows are committed, files that
+  // were referenced only by the previous data are superseded and can be removed.
+  const supersededLocalMediaUris = await collectReferencedLocalMediaUris(db.rawDb);
   const {
     artists = [],
     artist_basic_affiliations,
@@ -938,6 +942,14 @@ export async function restoreBackupData(db: Repositories, data: ImportDataShape)
     });
   } finally {
     await db.rawDb.execAsync('PRAGMA foreign_keys = ON');
+  }
+
+  // Best-effort cleanup after a successful restore. A cleanup failure must not
+  // fail the restore; leftovers stay visible to the manual cleanup feature.
+  try {
+    await deleteUnreferencedLocalFiles(db.rawDb, supersededLocalMediaUris);
+  } catch {
+    // Ignore cleanup errors.
   }
 }
 

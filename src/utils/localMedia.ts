@@ -188,6 +188,28 @@ export async function collectReferencedLocalMediaUris(db: SQLiteDatabase): Promi
   return new Set(rows.map((row) => row.uri).filter(isAppDocumentUri));
 }
 
+/**
+ * Best-effort deletion of candidate files that are no longer referenced by the
+ * database. Used after a full-backup restore replaces all rows: files that were
+ * referenced before the restore but not after it are superseded copies that
+ * would otherwise linger as orphaned media.
+ */
+export async function deleteUnreferencedLocalFiles(
+  db: SQLiteDatabase,
+  candidateUris: Iterable<string>,
+): Promise<number> {
+  const referencedUris = await collectReferencedLocalMediaUris(db);
+  let deleted = 0;
+
+  for (const uri of candidateUris) {
+    if (!isAppDocumentUri(uri) || referencedUris.has(uri)) continue;
+    const result = await safeDeleteFile(uri);
+    if (result.deleted) deleted += 1;
+  }
+
+  return deleted;
+}
+
 export async function cleanupUnreferencedLocalMedia(
   db: SQLiteDatabase,
 ): Promise<LocalMediaCleanupResult> {
