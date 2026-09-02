@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, Stack } from 'expo-router';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import {
@@ -515,18 +516,20 @@ export default function ChekiStickerCameraScreen() {
 
   if (phase === 'picker' || stickers.length === 0) {
     return (
-      <StickerPicker
-        initialSelection={stickers}
-        onCancel={() => {
-          if (pickerReturnPhase) {
-            setPhase(pickerReturnPhase);
-            setPickerReturnPhase(null);
-            return;
-          }
-          router.back();
-        }}
-        onConfirm={confirmStickers}
-      />
+      <BottomSheetModalProvider>
+        <StickerPicker
+          initialSelection={stickers}
+          onCancel={() => {
+            if (pickerReturnPhase) {
+              setPhase(pickerReturnPhase);
+              setPickerReturnPhase(null);
+              return;
+            }
+            router.back();
+          }}
+          onConfirm={confirmStickers}
+        />
+      </BottomSheetModalProvider>
     );
   }
 

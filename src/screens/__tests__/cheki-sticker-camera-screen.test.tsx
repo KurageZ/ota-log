@@ -23,6 +23,15 @@ jest.mock('expo-camera', () => {
   };
 });
 
+jest.mock('@gorhom/bottom-sheet', () => {
+  const ReactModule = require('react');
+  return {
+    BottomSheetModalProvider: ({ children }: { children: React.ReactNode }) => (
+      ReactModule.createElement('BottomSheetModalProvider', null, children)
+    ),
+  };
+});
+
 jest.mock('react-native-safe-area-context', () => {
   const ReactModule = require('react');
   const { View } = require('react-native');
@@ -96,6 +105,16 @@ describe('ChekiStickerCameraScreen', () => {
 
     expect(routeOptions).toContainEqual(expect.objectContaining({ headerShown: false }));
     expect(renderer!.root.findAllByType('CameraView' as never)).toHaveLength(1);
+  });
+
+  test('hosts picker bottom sheets inside the full-screen modal route', async () => {
+    await act(async () => {
+      renderer = create(<ChekiStickerCameraScreen />);
+    });
+
+    const provider = renderer!.root.findByType('BottomSheetModalProvider' as never);
+
+    expect(provider.findAllByType('StickerPicker' as never)).toHaveLength(1);
   });
 
   test('leaves the picker before an unresolved permission request finishes', async () => {
