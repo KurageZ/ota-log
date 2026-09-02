@@ -145,7 +145,6 @@ export function ChekiRecordForm({
   const [photoHintDismissed, setPhotoHintDismissed] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const existingItemCount = record?.items.length ?? 0;
   const pendingRemovedItemIdSet = useMemo(
     () => new Set(pendingRemovedItemIds),
     [pendingRemovedItemIds],
@@ -158,8 +157,7 @@ export function ChekiRecordForm({
   const retainedEmptyItemCount = retainedExistingItems.filter((item) => item.images.length === 0).length;
   const retainedImageItemCount = retainedExistingItemCount - retainedEmptyItemCount;
   const parsedQuantity = parseQuantity(quantity);
-  const requiredItemCount = retainedExistingItemCount
-    + Math.max(0, pendingPhotos.length - retainedEmptyItemCount);
+  const requiredItemCount = retainedImageItemCount + pendingPhotos.length;
   const itemsWithImagesCount = retainedImageItemCount + pendingPhotos.length;
   const hasAddedPhotos = itemsWithImagesCount > 0;
   const isHandlingPhotos = photoPickerPending || photoImportProgress != null;
