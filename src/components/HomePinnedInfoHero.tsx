@@ -6,7 +6,6 @@ import { AppIcon } from './AppIcon';
 import { resolveAvatarSource } from '../utils/avatarSource';
 import { HomeFeaturedArtistData, HomeMonthOverviewData } from './HomeDashboardCards';
 import { daysUntil } from '../utils/date';
-import { formatEventTimes } from './EventPrimitives';
 
 export function HomePinnedNextEventEmptyHero({ onCreatePress }: { onCreatePress: () => void }) {
   const { colors, isDark } = useAppTheme();
@@ -128,7 +127,7 @@ export function HomePinnedArtistHero({
 
   const artistName = artist.short_name || artist.name;
   const nextEvent = data.nextEvent;
-  const nextEventMeta = nextEvent ? formatEventMeta(nextEvent) : '暂无计划中的活动';
+  const nextEventMeta = nextEvent ? nextEvent.title : '暂无计划中的活动';
 
   return (
     <TouchableOpacity
@@ -332,21 +331,6 @@ function HeroMetric({ value, label }: { value: string; label: string }) {
       </Text>
     </View>
   );
-}
-
-function formatShortDate(isoDate: string) {
-  const [, month, day] = isoDate.split('-');
-  return `${month}-${day}`;
-}
-
-function formatEventMeta(event: Event) {
-  const parts = [
-    formatShortDate(event.event_date),
-    formatEventTimes(event.open_time, event.start_time) || '全天',
-    event.venue,
-  ]
-    .filter(Boolean);
-  return parts.join(' · ') || '时间地点待确认';
 }
 
 function getCountdownLabel(event: Event) {

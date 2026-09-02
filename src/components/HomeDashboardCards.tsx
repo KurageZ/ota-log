@@ -11,7 +11,6 @@ import { AnimatedPressable } from './AnimatedPressable';
 import { getDateItemPresetKind } from '../utils/dateItemDisplay';
 import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { PresetDateItemTitle } from './PresetDateItemTitle';
-import { formatEventTimes } from './EventPrimitives';
 
 export interface HomeFeaturedArtistData {
   artist: Artist | null;
@@ -322,7 +321,7 @@ export function HomeFeaturedArtistsCard({
         if (!artist) return null;
         const artistName = artist.short_name || artist.name;
         const metaLabel = data.nextEvent
-          ? `下一场：${formatEventMeta(data.nextEvent)}`
+          ? `下一场：${data.nextEvent.title}`
           : data.recentEvent
             ? `最近一次见面：${formatShortDate(data.recentEvent.event_date)}`
             : '暂无计划中的活动';
@@ -547,16 +546,6 @@ function StatTile({ value, label }: { value: string; label: string }) {
 function formatShortDate(isoDate: string) {
   const [, month, day] = isoDate.split('-');
   return `${month}-${day}`;
-}
-
-function formatEventMeta(event: Event) {
-  const parts = [
-    formatShortDate(event.event_date),
-    formatEventTimes(event.open_time, event.start_time) || '全天',
-    event.venue,
-  ]
-    .filter(Boolean);
-  return parts.join(' · ') || '时间地点待确认';
 }
 
 function getCountdownLabel(eventDate: string) {

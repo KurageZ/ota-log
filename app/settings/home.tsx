@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect } from 'expo-router';
@@ -78,6 +79,7 @@ function isToggleableCard(card: HomeCardConfig): card is Extract<HomeCardConfig,
 export default function HomeSettingsScreen() {
   const db = useDB();
   const { colors, isDark } = useAppTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const [pinnedInfo, setPinnedInfo] = useState<HomePinnedInfoConfig>(() => createDefaultHomePinnedInfo());
   const [cards, setCards] = useState<HomeCardConfig[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
@@ -199,6 +201,7 @@ export default function HomeSettingsScreen() {
   const modalSelectedArtists = isPinnedArtistSelector
     ? (selectedPinnedArtist ? [selectedPinnedArtist] : [])
     : selectedFeaturedArtists;
+  const artistPickerMaxHeight = Math.max(260, Math.min(420, Math.floor(windowHeight * 0.72) - 150));
 
   useEffect(() => {
     sortableItemsRef.current = sortableItems;
@@ -717,7 +720,9 @@ export default function HomeSettingsScreen() {
           searchValue={artistSearch}
           onSearchChange={setArtistSearch}
           placeholder="搜索艺人"
-          maxHeight={220}
+          // Use the sheet's available height while keeping the picker usable
+          // on smaller phones.
+          maxHeight={artistPickerMaxHeight}
           selectedLabel={isPinnedArtistSelector ? '已选置顶艺人' : '已选关注艺人'}
           maxVisibleSelected={isPinnedArtistSelector ? 1 : MAX_FEATURED_ARTISTS_PER_HOME_CARD}
           onSelectArtist={isPinnedArtistSelector ? handleSelectPinnedArtist : handleToggleFeaturedArtist}
