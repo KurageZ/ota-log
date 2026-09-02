@@ -109,6 +109,7 @@ export default function ArtistDetailScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { colors, isDark, chekiDisplayMode } = useAppTheme();
+  const isIOS = Platform.OS === 'ios';
 
   const [loading, setLoading] = useState(true);
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -131,6 +132,7 @@ export default function ArtistDetailScreen() {
   const scrollY = useSharedValue(0);
   const eventsScrollY = useSharedValue(0);
   const chekiScrollY = useSharedValue(0);
+  const hasBackground = Boolean(artist?.background_uri);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -308,8 +310,7 @@ export default function ArtistDetailScreen() {
     router.replace('/artists');
   };
 
-  const compactHeaderHeight = insets.top + 52;
-  const hasBackground = Boolean(artist?.background_uri);
+  const compactHeaderHeight = isIOS ? 0 : insets.top + 52;
   const usesLiquidGlass = hasBackground && canUseLiquidGlass(reduceTransparency);
   const heroHeight = hasBackground
     ? Math.round(Math.min(
@@ -364,7 +365,22 @@ export default function ArtistDetailScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: loadingBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen
+          options={isIOS
+            ? {
+                title: '',
+                headerShown: true,
+                headerLargeTitleEnabled: false,
+                headerTransparent: true,
+                headerLargeTitleShadowVisible: false,
+                headerShadowVisible: false,
+                headerBackButtonDisplayMode: 'minimal',
+                headerStyle: { backgroundColor: 'transparent' },
+                headerTitleStyle: { color: colors.heading },
+                headerTintColor: colors.accent,
+              }
+            : { headerShown: false }}
+        />
         <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
@@ -768,20 +784,42 @@ export default function ArtistDetailScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: pageBackgroundColor }}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <View
+      style={isIOS
+        ? { display: 'contents' }
+        : { flex: 1, backgroundColor: pageBackgroundColor }}
+    >
+      <Stack.Screen
+        options={isIOS
+          ? {
+              title: '',
+              headerShown: true,
+              headerLargeTitleEnabled: false,
+              headerTransparent: true,
+              headerLargeTitleShadowVisible: false,
+              headerShadowVisible: false,
+              headerBackButtonDisplayMode: 'minimal',
+              headerStyle: { backgroundColor: hasBackground ? 'transparent' : pageBackgroundColor },
+              headerLargeStyle: { backgroundColor: 'transparent' },
+              headerTitleStyle: { color: hasBackground ? backdropText : colors.heading },
+              headerLargeTitleStyle: { color: hasBackground ? backdropText : colors.heading },
+              headerTintColor: colors.accent,
+            }
+          : { headerShown: false }}
+      />
 
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: compactHeaderHeight,
-          zIndex: 20,
-        }}
-      >
+      {!isIOS ? (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: compactHeaderHeight,
+            zIndex: 20,
+          }}
+        >
         <Animated.View
           pointerEvents="none"
           style={[
@@ -851,13 +889,16 @@ export default function ArtistDetailScreen() {
             usesLiquidGlass={usesLiquidGlass}
           />
         </View>
-      </View>
+        </View>
+      ) : null}
 
       <View
         pointerEvents={activeTab === 'cheki' ? 'auto' : 'none'}
         accessibilityElementsHidden={activeTab !== 'cheki'}
         importantForAccessibility={activeTab === 'cheki' ? 'auto' : 'no-hide-descendants'}
-        style={[StyleSheet.absoluteFill, { opacity: activeTab === 'cheki' ? 1 : 0 }]}
+        style={isIOS
+          ? { display: activeTab === 'cheki' ? 'contents' : 'none' }
+          : [StyleSheet.absoluteFill, { opacity: activeTab === 'cheki' ? 1 : 0 }]}
       >
         <Animated.FlatList
           data={artistChekiItems}
@@ -866,9 +907,11 @@ export default function ArtistDetailScreen() {
           onScroll={chekiScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior={isIOS && !hasBackground ? 'automatic' : 'never'}
+          style={{ flex: 1, backgroundColor: pageBackgroundColor }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           ListHeaderComponent={hasBackground ? (
-            <>
+            <View>
               <View style={{ backgroundColor: pageBackgroundColor }}>
                 <ImageBackground
                   source={{ uri: artist.background_uri! }}
@@ -1046,7 +1089,7 @@ export default function ArtistDetailScreen() {
                   {renderChekiSummary(actionPillText)}
                 </View>
               </View>
-            </>
+            </View>
           ) : (
             <>
               <View
@@ -1195,16 +1238,20 @@ export default function ArtistDetailScreen() {
         pointerEvents={activeTab === 'events' ? 'auto' : 'none'}
         accessibilityElementsHidden={activeTab !== 'events'}
         importantForAccessibility={activeTab === 'events' ? 'auto' : 'no-hide-descendants'}
-        style={[StyleSheet.absoluteFill, { opacity: activeTab === 'events' ? 1 : 0 }]}
+        style={isIOS
+          ? { display: activeTab === 'events' ? 'contents' : 'none' }
+          : [StyleSheet.absoluteFill, { opacity: activeTab === 'events' ? 1 : 0 }]}
       >
         <Animated.ScrollView
           onScroll={eventsScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior={isIOS && !hasBackground ? 'automatic' : 'never'}
+          style={{ flex: 1, backgroundColor: pageBackgroundColor }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         >
           {hasBackground ? (
-            <>
+            <View>
               <View style={{ backgroundColor: pageBackgroundColor }}>
                 <ImageBackground
                   source={{ uri: artist.background_uri! }}
@@ -1409,7 +1456,7 @@ export default function ArtistDetailScreen() {
                   </View>
                 </View>
               </View>
-            </>
+            </View>
           ) : (
             <>
               <View
@@ -1569,6 +1616,14 @@ export default function ArtistDetailScreen() {
           )}
         </Animated.ScrollView>
       </View>
+
+      {isIOS ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button onPress={() => router.push(`/artists/${artist.id}/edit`)}>
+            编辑
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      ) : null}
 
       <ChekiViewerModal
         visible={viewerSelectedId !== null}

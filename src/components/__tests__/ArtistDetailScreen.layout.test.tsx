@@ -54,7 +54,10 @@ const mockDb = {
 jest.mock('expo-router', () => {
   const ReactModule = require('react');
   return {
-    Stack: { Screen: () => null },
+    Stack: {
+      Screen: () => null,
+      Toolbar: Object.assign(() => null, { Button: () => null }),
+    },
     router: { back: jest.fn(), canGoBack: () => true, push: jest.fn(), replace: jest.fn() },
     useLocalSearchParams: () => ({ id: 'artist-1' }),
     useFocusEffect: (callback: () => void | (() => void)) => {
