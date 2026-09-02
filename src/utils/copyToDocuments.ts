@@ -9,17 +9,14 @@ const IMAGE_HEADER_READ_BYTES = 1024 * 1024;
 interface CopyToDocumentsOptions {
   filenamePrefix?: string;
   maxDimension?: number;
-  maxBytes?: number;
   cropAspectRatio?: number;
+  forceJpeg?: boolean;
   sourceSize?: { width: number; height: number } | null;
 }
 
 function randomSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
-
-const JPEG_QUALITY_STEPS = [0.88, 0.8, 0.72, 0.64, 0.56, 0.48, 0.4, 0.32];
-const MIN_COMPRESSION_DIMENSION = 960;
 
 function getSourceExtension(sourceUri: string): string {
   const raw = sourceUri.split('?')[0];
@@ -191,36 +188,6 @@ async function copyFileToDocuments(sourceUri: string, filename: string): Promise
   return dest.uri;
 }
 
-function getFileByteSize(uri: string): number {
-  const size = new File(uri).size;
-  return typeof size === 'number' ? size : 0;
-}
-
-function buildCompressionDimensions(
-  size: { width: number; height: number } | null,
-  initialMaxDimension: number,
-): number[] {
-  if (!size) return [initialMaxDimension];
-
-  const largestSide = Math.max(size.width, size.height);
-  const first = Math.min(largestSide, initialMaxDimension);
-  const candidates = [first, 2200, 2000, 1800, 1600, 1440, 1280, 1080, MIN_COMPRESSION_DIMENSION];
-
-  const unique: number[] = [];
-  for (const candidate of candidates) {
-    const value = Math.max(MIN_COMPRESSION_DIMENSION, Math.round(candidate));
-    if (value > largestSide) continue;
-    if (unique.includes(value)) continue;
-    unique.push(value);
-  }
-
-  if (unique.length === 0) {
-    unique.push(Math.min(largestSide, initialMaxDimension));
-  }
-
-  return unique;
-}
-
 function deleteTemporaryFile(uri: string): void {
   try {
     new File(uri).delete();
@@ -229,82 +196,39 @@ function deleteTemporaryFile(uri: string): void {
   }
 }
 
-async function compressToTargetSize(
-  sourceUri: string,
-  filenamePrefix: string,
-  maxDimension: number,
-  maxBytes: number,
-  cropAspectRatio?: number,
-  sourceSize?: { width: number; height: number } | null,
-): Promise<string> {
-  const size = sourceSize ?? await getImageSize(sourceUri);
-  const cropAction = getCenteredCropAction(size, cropAspectRatio);
-  const manipulatedSize = getManipulatedSize(size, cropAction);
-  const dimensionCandidates = buildCompressionDimensions(manipulatedSize, maxDimension);
-
-  for (const dimension of dimensionCandidates) {
-    const resizeAction = getResizeAction(manipulatedSize, dimension);
-
-    for (const quality of JPEG_QUALITY_STEPS) {
-      const result = await manipulateAsync(
-        sourceUri,
-        [cropAction, resizeAction].filter((action): action is NonNullable<typeof action> => action != null),
-        { compress: quality, format: SaveFormat.JPEG },
-      );
-
-      const resultSize = getFileByteSize(result.uri);
-      if (resultSize > 0 && resultSize <= maxBytes) {
-        const copiedUri = await copyFileToDocuments(result.uri, buildFilename(filenamePrefix, 'jpg'));
-        deleteTemporaryFile(result.uri);
-        return copiedUri;
-      }
-
-      deleteTemporaryFile(result.uri);
-    }
-  }
-
-  throw new Error(`Image exceeds ${maxBytes} bytes after compression`);
-}
-
 export async function copyToDocuments(
   sourceUri: string,
   options: CopyToDocumentsOptions = {},
 ): Promise<string> {
   const filenamePrefix = options.filenamePrefix ?? 'photo';
   const maxDimension = options.maxDimension ?? DEFAULT_MAX_IMAGE_DIMENSION;
-  const maxBytes = options.maxBytes;
   const cropAspectRatio = options.cropAspectRatio;
+  const forceJpeg = options.forceJpeg ?? false;
   const sourceSize = options.sourceSize ?? null;
   const sourceExt = getSourceExtension(sourceUri);
-  if (typeof maxBytes === 'number') {
-    return compressToTargetSize(
-      sourceUri,
-      filenamePrefix,
-      maxDimension,
-      maxBytes,
-      cropAspectRatio,
-      sourceSize,
-    );
-  }
 
   const size = sourceSize ?? await getImageSize(sourceUri);
   const cropAction = getCenteredCropAction(size, cropAspectRatio);
   const manipulatedSize = getManipulatedSize(size, cropAction);
   const resizeAction = getResizeAction(manipulatedSize, maxDimension);
-  if (!cropAction && !resizeAction) {
+  const actions = [cropAction, resizeAction].filter(
+    (action): action is NonNullable<typeof action> => action != null,
+  );
+  if (actions.length === 0 && !forceJpeg) {
     return copyFileToDocuments(sourceUri, buildFilename(filenamePrefix, sourceExt));
   }
 
   try {
     const result = await manipulateAsync(
       sourceUri,
-      [cropAction, resizeAction].filter((action): action is NonNullable<typeof action> => action != null),
+      actions,
       { compress: DEFAULT_JPEG_QUALITY, format: SaveFormat.JPEG },
     );
     const copiedUri = await copyFileToDocuments(result.uri, buildFilename(filenamePrefix, 'jpg'));
     deleteTemporaryFile(result.uri);
     return copiedUri;
-  } catch {
+  } catch (error) {
+    if (forceJpeg) throw error;
     return copyFileToDocuments(sourceUri, buildFilename(filenamePrefix, sourceExt));
   }
 }

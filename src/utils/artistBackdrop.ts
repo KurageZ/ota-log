@@ -80,11 +80,11 @@ function pickDominantColor(result: Awaited<ReturnType<typeof getColors>>): strin
   if ('dominant' in result && typeof result.dominant === 'string') {
     return result.dominant;
   }
-  if ('primary' in result && typeof result.primary === 'string') {
-    return result.primary;
-  }
   if ('background' in result && typeof result.background === 'string') {
     return result.background;
+  }
+  if ('primary' in result && typeof result.primary === 'string') {
+    return result.primary;
   }
   if ('detail' in result && typeof result.detail === 'string') {
     return result.detail;

@@ -25,7 +25,7 @@ import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import { ArtistTypeSelector } from '../../src/components/ArtistTypeSelector';
 import { formatDateInput, isValidISODate, normalizeDateInput } from '../../src/utils/date';
 
-const MAX_ARTIST_BACKGROUND_BYTES = 5 * 1024 * 1024;
+const ARTIST_BACKGROUND_MAX_DIMENSION = 2000;
 const ARTIST_BACKGROUND_ASPECT_RATIO = 4 / 5;
 
 type DraftMembership = {
@@ -177,7 +177,8 @@ export default function NewArtistScreen() {
         const permanentUri = await copyToDocuments(result.assets[0].uri, {
           filenamePrefix: 'artist_bg',
           cropAspectRatio: ARTIST_BACKGROUND_ASPECT_RATIO,
-          maxBytes: MAX_ARTIST_BACKGROUND_BYTES,
+          maxDimension: ARTIST_BACKGROUND_MAX_DIMENSION,
+          forceJpeg: true,
         });
         const extractedColor = await extractArtistBackgroundColor(permanentUri);
         setBackgroundPickedUri(permanentUri);
@@ -185,8 +186,8 @@ export default function NewArtistScreen() {
       } catch (error) {
         showFailureAlert({
           title: '背景图处理失败',
-          reason: '背景图压缩后仍然超过 5MB，或图片文件无法处理。',
-          nextStep: '请换一张更小的图片后再试一次。',
+          reason: '图片文件无法处理，请换一张图片后再试一次。',
+          nextStep: '如果问题持续出现，请更换图片来源。',
           details: error,
         });
       }
