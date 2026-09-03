@@ -53,6 +53,7 @@ export type AppIconName =
   | 'images'
   | 'info'
   | 'link'
+  | 'liveActivity'
   | 'login'
   | 'locked'
   | 'maintenance'
@@ -156,6 +157,7 @@ const ICONS: Record<AppIconName, IconDefinition> = {
   images: { icon: 'images' },
   info: { icon: 'info' },
   link: { icon: 'link-2' },
+  liveActivity: { icon: 'activity' },
   login: { icon: 'log-in' },
   locked: { icon: 'lock' },
   maintenance: { icon: 'images' },

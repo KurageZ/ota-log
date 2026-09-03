@@ -64,6 +64,7 @@ import {
 import { createEventSharePoster } from '../../src/features/event-share/create-event-share-poster';
 import { ImageResultPreview } from '../../src/components/ImageResultPreview';
 import { saveImageToAlbum, shareImageFile } from '../../src/utils/imageShare';
+import { EventLiveActivityRow } from '../../src/components/EventLiveActivityRow';
 
 const INFO_PH = 160;
 const CHEKI_PREVIEW_LIMIT = 9;
@@ -1169,6 +1170,13 @@ export default function EventDetailScreen() {
               ) : null}
             </View>
           ) : null}
+          <EventLiveActivityRow
+            event={event}
+            sessions={sessions}
+            timetables={timetables}
+            artists={allArtists}
+            eventImageUri={infoPhotos[0]?.local_uri}
+          />
         </Card>
 
         {/* 多场活动的时间与地点 */}

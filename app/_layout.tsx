@@ -12,6 +12,7 @@ import { AppNavigationThemeProvider } from '../src/navigation/app-navigation-the
 import { ChekiPhotoWidgetSync } from '../src/widgets/ChekiPhotoWidgetSync';
 import { NextEventWidgetSync } from '../src/widgets/NextEventWidgetSync';
 import { CalendarWidgetSync } from '../src/widgets/CalendarWidgetSync';
+import { EventLiveActivitySync } from '../src/features/event-live-activity/EventLiveActivitySync';
 
 const LUCIDE_FONT = require('@react-native-vector-icons/lucide/fonts/Lucide.ttf');
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
               <ChekiPhotoWidgetSync />
               <NextEventWidgetSync />
               <CalendarWidgetSync />
+              <EventLiveActivitySync />
               <OnboardingGuideProvider>
                 <AppNavigationThemeProvider>
                   <RootNavigator />
