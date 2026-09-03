@@ -1,6 +1,6 @@
 # App Store 截图工作流
 
-本文档是 ota log 生成 Apple App Store 截图的长期流程。它适用于首次上架和后续版本更新；某次生成所使用的设备、数据、文案、哈希与导出结果应记录在对应的 `marketing/app-store/YYYY-MM-DD/README.md` 中。
+本文档是 ota log 生成 Apple App Store 截图的长期流程。它适用于首次上架和后续版本更新；某次生成所使用的设备、数据、文案、哈希与导出结果应记录在对应的 `publishing/app-store/screenshots/YYYY-MM-DD/README.md` 中。
 
 ## 目标与产物
 
@@ -30,7 +30,7 @@
 每次生成使用独立日期目录：
 
 ```text
-marketing/app-store/YYYY-MM-DD/
+publishing/app-store/screenshots/YYYY-MM-DD/
 ├── README.md              本次生成记录与复现说明
 ├── assets/                演示照片和图标副本（忽略）
 ├── raw/                   原始模拟器截图（忽略）
@@ -85,7 +85,7 @@ marketing/app-store/YYYY-MM-DD/
 
 ### 5. 采集原始截图
 
-当前一次性工具位于最近的 `marketing/app-store/<日期>/`。进入运行目录后，可按设备调用采集脚本：
+当前一次性工具位于最近的 `publishing/app-store/screenshots/<日期>/`。进入运行目录后，可按设备调用采集脚本：
 
 ```sh
 rtk proxy /private/tmp/ota-store-tools/bin/python capture.py iphone

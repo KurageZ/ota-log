@@ -189,6 +189,7 @@ npx expo-doctor
 - 测试工作流：[docs/workflows/testing.md](docs/workflows/testing.md)
 - 发版工作流：[docs/workflows/release.md](docs/workflows/release.md)
 - App Store 截图工作流：[docs/workflows/app-store-screenshots.md](docs/workflows/app-store-screenshots.md)
+- 对外发布材料：[publishing/README.md](publishing/README.md)
 
 ## 当前状态
 

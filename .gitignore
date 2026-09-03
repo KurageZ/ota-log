@@ -55,15 +55,15 @@ yarn-error.*
 /.impeccable/review/
 
 # App Store screenshot assets and generated output (keep scripts and templates)
-/marketing/app-store/*/assets/
-/marketing/app-store/*/raw/
-/marketing/app-store/*/export/
-/marketing/app-store/*/ready/
-/marketing/app-store/*/qa/
-/marketing/app-store/*/preview-*.jpg
-/marketing/app-store/*/preview-*.png
-/marketing/app-store/*/*.zip
-/marketing/app-store/*/iphone.yaml
-/marketing/app-store/*/iphone-6.5.yaml
-/marketing/app-store/*/ipad.yaml
-/marketing/app-store/*/__pycache__/
+/publishing/app-store/screenshots/*/assets/
+/publishing/app-store/screenshots/*/raw/
+/publishing/app-store/screenshots/*/export/
+/publishing/app-store/screenshots/*/ready/
+/publishing/app-store/screenshots/*/qa/
+/publishing/app-store/screenshots/*/preview-*.jpg
+/publishing/app-store/screenshots/*/preview-*.png
+/publishing/app-store/screenshots/*/*.zip
+/publishing/app-store/screenshots/*/iphone.yaml
+/publishing/app-store/screenshots/*/iphone-6.5.yaml
+/publishing/app-store/screenshots/*/ipad.yaml
+/publishing/app-store/screenshots/*/__pycache__/

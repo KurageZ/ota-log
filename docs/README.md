@@ -16,7 +16,7 @@
 | `decisions/` | 重要决策记录，说明背景、备选方案和后果 | 做出难回滚或影响多模块的取舍时 |
 | `tech/` | 技术栈、依赖约束、本地环境说明 | 升级 Expo/RN、改构建链、调整关键依赖时 |
 | `progress/` | 当前焦点、TODO、roadmap、关键节点 | 切换阶段、收敛计划、完成里程碑时 |
-| `marketing/` | 官网、应用商店与公开产品文案的原始素材 | 商店元数据、官网内容或公开下载信息变化时 |
+| [`../publishing/`](../publishing/README.md) | 官网、应用商店与公开产品文案的发布源材料 | 商店元数据、官网内容或公开下载信息变化时 |
 | `workflows/` | 项目专属工作流，如测试、验证、demo、发版 | 命令、验收标准或常见失败路径变化时 |
 
 ## 当前入口
@@ -37,8 +37,8 @@
 - 决策记录模板：`decisions/0000-template.md`
 - 艺人类型与团体履历决策：`decisions/0001-artist-types-and-memberships.md`
 - 当前进度：`progress/now.md`
-- App Store Connect 简体中文元数据：`marketing/app-store-connect.zh-Hans.md`
-- 官网首页 Demo 与预览说明：[`design/website-demo/README.md`](../design/website-demo/README.md)
+- App Store Connect 简体中文元数据：[`publishing/app-store/metadata/zh-Hans.md`](../publishing/app-store/metadata/zh-Hans.md)
+- 官网首页与预览说明：[`publishing/website/README.md`](../publishing/website/README.md)
 - 拍立得新版 UI 验收清单：`progress/cheki-v2-ui-checklist.md`
 - 电子切册筛选与规格重构 QA：`progress/cheki-filter-refactor-qa.md`
 - 测试验证工作流：`workflows/testing.md`

@@ -23,6 +23,7 @@
 - 测试验证工作流：`docs/workflows/testing.md`
 - 发版工作流：`docs/workflows/release.md`
 - App Store 截图工作流：`docs/workflows/app-store-screenshots.md`
+- 对外发布材料：`publishing/README.md`
 
 本次文档结构调整：将长期上下文集中到 `docs/`；完整 UI/UX 设计文档已从根目录迁入 `docs/product/ui-ux.md`，根目录 `design.md` 只作为兼容软链接；`AGENTS.md` 只保留 agent 每次都需要的规则、命令和入口。
 
