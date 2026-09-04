@@ -1,10 +1,12 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
-import { MenuCard, MenuIconTile, MenuRowSeparator, SectionLabel } from '../components/SettingsMenu';
+import { MenuCard, MenuIconTile, MenuItem, MenuRowSeparator, SectionLabel } from '../components/SettingsMenu';
 import { useAppTheme } from '../theme/appTheme';
 import { APP_VERSION_LABEL } from '../utils/appInfo';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../utils/safeArea';
+
+const PRIVACY_POLICY_URL = 'https://kuragez.github.io/ota-log/privacy/';
 
 type PrivacyInfoItem = {
   icon: AppIconName;
@@ -155,6 +157,20 @@ export default function PrivacyScreen() {
           <PrivacyTextCard>
             你可以在 App 内删除对应的活动、艺人、拍立得和其他记录，并可在系统设置中撤回相机、照片或日历权限。卸载 App 会删除其应用私有存储；你主动导出的备份文件需要在保存位置单独删除。
           </PrivacyTextCard>
+        </View>
+
+        <View style={{ marginBottom: 20 }}>
+          <SectionLabel label="完整政策" />
+          <MenuCard>
+            <MenuItem
+              icon="externalLink"
+              label="查看完整隐私政策"
+              subtitle="在浏览器中打开"
+              tint={colors.info}
+              isLast
+              onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+            />
+          </MenuCard>
         </View>
 
         <Text
