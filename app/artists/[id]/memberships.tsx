@@ -7,6 +7,7 @@ import { Artist, ArtistGroupMembershipWithArtist } from '../../../src/types/mode
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { OshiAvatar } from '../../../src/components/Oshi';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
+import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { AppIcon } from '../../../src/components/AppIcon';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../src/utils/safeArea';
 import { toISODate } from '../../../src/utils/date';
@@ -124,7 +125,7 @@ export default function ArtistMembershipHistoryScreen() {
                   borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.divider,
                 }}
               >
-                <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={40} isOshi={false} />
+                <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={40} isOshi={false} name={getArtistPrimaryName(membership.artist)} />
                 <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                     <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 15, fontWeight: '700' }}>

@@ -101,6 +101,7 @@ export function ChekiManualEntryList({
                       source={artist ? resolveAvatarSource(artist.avatar_uri) : null}
                       size={32}
                       isOshi={isOshi}
+                      name={artist ? artistName : undefined}
                     />
                   </View>
                 ) : null}

@@ -244,7 +244,7 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
               {oshiArtist ? (
                 <View style={{ marginRight: 12 }}>
-                  <OshiAvatar source={resolveAvatarSource(oshiArtist.avatar_uri)} size={40} isOshi />
+                  <OshiAvatar source={resolveAvatarSource(oshiArtist.avatar_uri)} size={40} isOshi name={getArtistPrimaryName(oshiArtist)} />
                 </View>
               ) : (
                 <View

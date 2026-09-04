@@ -5,6 +5,7 @@ import { daysUntil } from '../utils/date';
 import { useAppTheme } from '../theme/appTheme';
 import { OshiAvatar, OshiBadge } from './Oshi';
 import { resolveAvatarSource } from '../utils/avatarSource';
+import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { formatEventTimes } from './EventPrimitives';
 
 export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
@@ -12,7 +13,7 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
   const { colors, isDark } = useAppTheme();
   const { event, isOshiMatch, oshiArtist } = item;
   const countdown = getCountdownCopy(event.event_date, event.event_time);
-  const oshiName = oshiArtist?.short_name || oshiArtist?.name || '你的单推';
+  const oshiName = oshiArtist ? getArtistPrimaryName(oshiArtist) : '你的单推';
   const metaParts = [
     formatEventTimes(event.open_time, event.start_time) || '全天',
     event.venue,
@@ -141,6 +142,7 @@ export function HomeUpcomingHero({ item }: { item: HeroBannerItem }) {
               source={resolveAvatarSource(oshiArtist.avatar_uri)}
               size={32}
               isOshi
+              name={oshiName}
             />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>

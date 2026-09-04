@@ -1,8 +1,8 @@
-import { Image, Text, TouchableOpacity, View } from 'react-native';
-import { AppIcon } from './AppIcon';
+import { Text, TouchableOpacity, View } from 'react-native';
 import type { ThemeColors } from '../theme/appTheme';
 import { resolveAvatarSource } from '../utils/avatarSource';
 import { formatSharePercentage } from '../utils/artistShare';
+import { OshiAvatar } from './Oshi';
 
 export interface ArtistRankingItem {
   id: string | null;
@@ -60,23 +60,7 @@ export function ArtistRankingList({
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 999,
-                  backgroundColor: colors.oshiAvatarBg,
-                  overflow: 'hidden',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {avatarSource ? (
-                  <Image source={avatarSource} style={{ width: 38, height: 38, borderRadius: 999 }} />
-                ) : (
-                  <AppIcon name="artist" size={17} color={colors.accent} />
-                )}
-              </View>
+              <OshiAvatar source={avatarSource} size={38} isOshi={false} name={item.id ? item.name : undefined} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, fontWeight: '800', color: colors.text }}>

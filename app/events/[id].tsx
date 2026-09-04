@@ -903,7 +903,7 @@ export default function EventDetailScreen() {
   const oshiMatchSource = oshiArtistId
     ? getOshiMatchSource(artists, oshiArtistId, oshiArtist, oshiIsAttributed)
     : null;
-  const oshiArtistName = oshiArtist?.short_name || oshiArtist?.name || null;
+  const oshiArtistName = oshiArtist ? getArtistPrimaryName(oshiArtist) : null;
   const myRecordsSection = (
     <>
       <SectionTitle label="我的记录" />
@@ -1330,7 +1330,7 @@ export default function EventDetailScreen() {
                         </View>
                         {artist ? (
                           <View style={{ width: 28, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
-                            <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={28} isOshi={artist.id === oshiArtistId} />
+                            <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={28} isOshi={artist.id === oshiArtistId} name={getArtistPrimaryName(artist)} />
                           </View>
                         ) : displayName ? (
                           <View style={{ width: 28, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
@@ -1396,7 +1396,7 @@ export default function EventDetailScreen() {
                     }}
                   >
                     <View style={{ marginRight: 12 }}>
-                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={36} isOshi={isOshi} />
+                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={36} isOshi={isOshi} name={getArtistPrimaryName(artist)} />
                     </View>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
                       <Text numberOfLines={1} style={{

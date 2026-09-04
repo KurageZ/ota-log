@@ -60,7 +60,7 @@ export const ArtistOptionRow = memo(function ArtistOptionRow({
       }}
     >
       <View style={{ marginRight: 10 }}>
-        <OshiAvatar source={avatarSrc} size={28} isOshi={isOshi} />
+        <OshiAvatar source={avatarSrc} size={28} isOshi={isOshi} name={display.title} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>

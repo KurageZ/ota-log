@@ -60,6 +60,7 @@ export function PresetDateItemTitle({
               source={resolveAvatarSource(artist.avatar_uri)}
               size={avatarSize}
               isOshi={false}
+              name={artistName}
             />
             <Text numberOfLines={1} style={[textStyle, { flex: 1, minWidth: 0 }]}>
               {artistName}
@@ -76,6 +77,7 @@ export function PresetDateItemTitle({
             source={resolveAvatarSource(artist.avatar_uri)}
             size={avatarSize}
             isOshi={false}
+            name={artistName}
           />
           <Text numberOfLines={1} style={[textStyle, { flexShrink: 1, minWidth: 0 }]}>
             {artistName}

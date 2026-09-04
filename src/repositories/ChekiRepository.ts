@@ -236,12 +236,15 @@ export class ChekiRepository {
       avatar_uri: string | null;
       count: number;
     }>(
-      `SELECT r.artist_id, a.name AS artist_name, a.avatar_uri, SUM(r.quantity) AS count
+      `SELECT r.artist_id,
+              COALESCE(NULLIF(TRIM(a.short_name), ''), a.name) AS artist_name,
+              a.avatar_uri,
+              SUM(r.quantity) AS count
        FROM cheki_records r
        LEFT JOIN artists a ON a.id = r.artist_id
        WHERE ${period.sql}
-       GROUP BY r.artist_id, a.name, a.avatar_uri
-       ORDER BY count DESC, MAX(COALESCE(r.date, r.created_at)) DESC, a.name ASC
+       GROUP BY r.artist_id, a.name, a.short_name, a.avatar_uri
+       ORDER BY count DESC, MAX(COALESCE(r.date, r.created_at)) DESC, artist_name ASC
        ${limit == null ? '' : 'LIMIT ?'}`,
       limit == null ? period.params : [...period.params, limit],
     );

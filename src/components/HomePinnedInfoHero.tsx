@@ -4,6 +4,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { OshiAvatar, OshiBadge } from './Oshi';
 import { AppIcon } from './AppIcon';
 import { resolveAvatarSource } from '../utils/avatarSource';
+import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { HomeFeaturedArtistData, HomeMonthOverviewData } from './HomeDashboardCards';
 import { daysUntil } from '../utils/date';
 
@@ -125,7 +126,7 @@ export function HomePinnedArtistHero({
     );
   }
 
-  const artistName = artist.short_name || artist.name;
+  const artistName = getArtistPrimaryName(artist);
   const nextEvent = data.nextEvent;
   const nextEventMeta = nextEvent ? nextEvent.title : '暂无计划中的活动';
 
@@ -154,6 +155,7 @@ export function HomePinnedArtistHero({
           source={resolveAvatarSource(artist.avatar_uri)}
           size={72}
           isOshi={data.isOshi}
+          name={artistName}
         />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ color: colors.heroEyebrow, fontSize: 10, lineHeight: 12, fontWeight: '800', letterSpacing: 0.8 }}>

@@ -242,6 +242,7 @@ export function ChekiStackPreviewCard({
                     source={resolveAvatarSource(artist.avatarUri)}
                     size={MANUAL_AVATAR_SIZE}
                     isOshi={artist.isOshi ?? false}
+                    name={artist.name}
                   />
                 </View>
               )) : (

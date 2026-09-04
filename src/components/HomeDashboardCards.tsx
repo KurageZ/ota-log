@@ -228,6 +228,7 @@ function HomeImportantDateRow({
                 source={resolveAvatarSource(artist.avatar_uri)}
                 size={20}
                 isOshi={false}
+                name={getArtistPrimaryName(artist)}
               />
             ))}
             <Text numberOfLines={1} style={{ flex: 1, fontSize: 11, lineHeight: 14, fontWeight: '600', color: colors.textMuted }}>
@@ -319,7 +320,7 @@ export function HomeFeaturedArtistsCard({
       {visibleItems.map((data, index) => {
         const artist = data.artist;
         if (!artist) return null;
-        const artistName = artist.short_name || artist.name;
+        const artistName = getArtistPrimaryName(artist);
         const metaLabel = data.nextEvent
           ? `下一场：${data.nextEvent.title}`
           : data.recentEvent
@@ -346,6 +347,7 @@ export function HomeFeaturedArtistsCard({
               source={resolveAvatarSource(artist.avatar_uri)}
               size={40}
               isOshi={data.isOshi}
+              name={artistName}
             />
             <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>

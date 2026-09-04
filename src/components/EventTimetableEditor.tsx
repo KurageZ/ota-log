@@ -248,7 +248,7 @@ export function EventTimetableEditor({
                         justifyContent: 'center',
                       }}
                     >
-                      <OshiAvatar source={resolveAvatarSource(matchedArtist.avatar_uri)} size={22} isOshi={false} />
+                      <OshiAvatar source={resolveAvatarSource(matchedArtist.avatar_uri)} size={22} isOshi={false} name={getArtistPrimaryName(matchedArtist)} />
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -298,7 +298,7 @@ export function EventTimetableEditor({
                         borderBottomColor: colors.inputBorder,
                       }}
                     >
-                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={20} isOshi={false} />
+                      <OshiAvatar source={resolveAvatarSource(artist.avatar_uri)} size={20} isOshi={false} name={getArtistPrimaryName(artist)} />
                       <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
                         {getArtistPrimaryName(artist)}
                       </Text>

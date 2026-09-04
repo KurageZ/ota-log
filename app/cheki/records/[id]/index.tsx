@@ -291,6 +291,7 @@ export default function ChekiRecordDetailScreen() {
               source={artist ? resolveAvatarSource(artist.avatar_uri) : null}
               size={ARTIST_AVATAR_SIZE}
               isOshi={isOshi}
+              name={artist ? artistName : undefined}
             />
             <View style={{ flex: 1, marginLeft: ARTIST_TITLE_GAP, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
               <Text

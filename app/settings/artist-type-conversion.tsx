@@ -18,6 +18,7 @@ import { AppIcon } from '../../src/components/AppIcon';
 import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
 import { MenuCard, MenuIconTile } from '../../src/components/SettingsMenu';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
+import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import { showSaveFailedAlert } from '../../src/utils/failureAlert';
 import {
@@ -226,7 +227,7 @@ export default function ArtistTypeConversionScreen() {
           source={resolveAvatarSource(artist.avatar_uri)}
           size={28}
           isOshi={false}
-          fallbackText={artist.name.slice(0, 1)}
+          name={getArtistPrimaryName(artist)}
         />
         <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
           <Text numberOfLines={1} style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
@@ -278,7 +279,7 @@ export default function ArtistTypeConversionScreen() {
             source={resolveAvatarSource(artist.avatar_uri)}
             size={28}
             isOshi={false}
-            fallbackText={artist.name.slice(0, 1)}
+            name={getArtistPrimaryName(artist)}
           />
         ))}
         <View style={{ marginLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -336,7 +337,7 @@ export default function ArtistTypeConversionScreen() {
             source={resolveAvatarSource(primary.avatar_uri)}
             size={38}
             isOshi={false}
-            fallbackText={primary.name.slice(0, 1)}
+            name={getArtistPrimaryName(primary)}
           />
           <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
             <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14.5, fontWeight: '700' }}>
@@ -446,7 +447,7 @@ export default function ArtistTypeConversionScreen() {
             source={resolveAvatarSource(primary.avatar_uri)}
             size={34}
             isOshi={false}
-            fallbackText={primary.name.slice(0, 1)}
+            name={getArtistPrimaryName(primary)}
           />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
@@ -483,7 +484,7 @@ export default function ArtistTypeConversionScreen() {
               source={resolveAvatarSource(artist.avatar_uri)}
               size={24}
               isOshi={false}
-              fallbackText={artist.name.slice(0, 1)}
+              name={getArtistPrimaryName(artist)}
             />
             <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, marginLeft: 8, color: colors.text, fontSize: 13 }}>
               {artist.name}

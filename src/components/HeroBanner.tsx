@@ -5,6 +5,7 @@ import { Artist, Event } from '../types/models';
 import { daysUntil, formatDate } from '../utils/date';
 import { OshiAvatar, OshiBadge } from './Oshi';
 import { resolveAvatarSource } from '../utils/avatarSource';
+import { getArtistPrimaryName } from '../utils/artistDisplay';
 import { useAppTheme } from '../theme/appTheme';
 import { OshiMatchSource } from '../utils/oshiMatch';
 import { formatEventTimes } from './EventPrimitives';
@@ -37,7 +38,7 @@ export function HeroBanner({ item }: Props) {
     formatEventTimes(event.open_time, event.start_time),
     event.venue,
   ].filter(Boolean).join(' · ');
-  const oshiName = oshiArtist?.short_name || oshiArtist?.name || '你的单推';
+  const oshiName = oshiArtist ? getArtistPrimaryName(oshiArtist) : '你的单推';
 
   return (
     <TouchableOpacity
@@ -95,7 +96,7 @@ export function HeroBanner({ item }: Props) {
       {isOshiMatch && oshiArtist ? (
         <View style={[oshiCalloutStyle, { backgroundColor: colors.heroCalloutBg, borderColor: colors.heroCalloutBorder }]}>
           <View style={{ marginRight: 10 }}>
-            <OshiAvatar source={resolveAvatarSource(oshiArtist.avatar_uri)} size={34} isOshi />
+            <OshiAvatar source={resolveAvatarSource(oshiArtist.avatar_uri)} size={34} isOshi name={oshiName} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[oshiCalloutTitle, { color: colors.heroText }]}>这场活动有你推参加哦</Text>

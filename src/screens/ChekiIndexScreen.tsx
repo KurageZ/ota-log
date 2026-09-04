@@ -1049,7 +1049,7 @@ export default function ChekiLibraryScreen() {
           style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 10, gap: 8 }}
         >
           <View>
-            <OshiAvatar source={groupAvatarSrc} size={isOshi ? 36 : 32} isOshi={isOshi} />
+            <OshiAvatar source={groupAvatarSrc} size={isOshi ? 36 : 32} isOshi={isOshi} name={display?.title} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 }}>

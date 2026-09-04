@@ -272,6 +272,14 @@ describe('Cheki repositories', () => {
     expect(listener).toHaveBeenCalledTimes(4);
   });
 
+  test('artist ranking prefers a trimmed short name', async () => {
+    rawDb.prepare('UPDATE artists SET short_name = ? WHERE id = ?').run('  A1  ', 'artist-1');
+
+    const ranking = await chekiRepository.groupByArtistYear(2026, undefined, 10);
+
+    expect(ranking.find((item) => item.artistId === 'artist-1')?.name).toBe('A1');
+  });
+
   test('deletes one album item and decrements its aggregate record quantity', async () => {
     rawDb.prepare('UPDATE cheki_records SET quantity = 2 WHERE id = ?').run('record-cheki-1');
     rawDb.prepare(`INSERT INTO cheki_items
@@ -1048,7 +1056,7 @@ describe('Cheki repositories', () => {
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('group-1', 'Group One', null, 'group', 'file:///group-1.jpg', null, 0, '2026-01-01T00:00:00.000Z');
+    ).run('group-1', 'Group One', '  G1  ', 'group', 'file:///group-1.jpg', null, 0, '2026-01-01T00:00:00.000Z');
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1097,11 +1105,11 @@ describe('Cheki repositories', () => {
 
     await expect(eventRepository.groupRootArtistsByCompletedEvents(2026, undefined, 10)).resolves.toEqual([
       { artistId: 'group-2', name: 'Group Two', avatarUri: null, count: 2 },
-      { artistId: 'group-1', name: 'Group One', avatarUri: 'file:///group-1.jpg', count: 1 },
+      { artistId: 'group-1', name: 'G1', avatarUri: 'file:///group-1.jpg', count: 1 },
       { artistId: 'artist-1', name: 'Artist One', avatarUri: 'file:///artist-1-avatar.jpg', count: 1 },
     ]);
     await expect(eventRepository.groupRootArtistsByCompletedEvents(2026, 4, 10)).resolves.toEqual([
-      { artistId: 'group-1', name: 'Group One', avatarUri: 'file:///group-1.jpg', count: 1 },
+      { artistId: 'group-1', name: 'G1', avatarUri: 'file:///group-1.jpg', count: 1 },
       { artistId: 'group-2', name: 'Group Two', avatarUri: null, count: 1 },
     ]);
     await expect(eventRepository.groupRootArtistsByCompletedEvents(2026, undefined, 1)).resolves.toEqual([
@@ -1111,6 +1119,7 @@ describe('Cheki repositories', () => {
 
   test('rating ranking uses direct group appearances and counts an event once', async () => {
     rawDb.prepare('UPDATE events SET review_score = 5 WHERE id = ?').run('event-1');
+    rawDb.prepare('UPDATE artists SET short_name = ? WHERE id = ?').run('  A1  ', 'artist-1');
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, url, is_favorite, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1151,7 +1160,7 @@ describe('Cheki repositories', () => {
     expect(ranking).toEqual([
       expect.objectContaining({
         artistId: 'artist-1',
-        name: 'Artist One',
+        name: 'A1',
         avatarUri: 'file:///artist-1-avatar.jpg',
         averageScore: 4.5,
         ratedCount: 2,

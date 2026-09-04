@@ -405,7 +405,7 @@ export default function ArtistsScreen() {
 
                   {/* Avatar */}
                   <View style={{ marginRight: 12 }}>
-                    <OshiAvatar source={avatarSrc} size={40} isOshi={isOshi} />
+                    <OshiAvatar source={avatarSrc} size={40} isOshi={isOshi} name={display.title} />
                   </View>
 
                   {/* Info */}

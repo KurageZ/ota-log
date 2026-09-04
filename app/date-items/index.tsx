@@ -127,6 +127,7 @@ function DateItemCard({ item }: { item: HydratedDateItem }) {
                   source={resolveAvatarSource(artist.avatar_uri)}
                   size={22}
                   isOshi={false}
+                  name={getArtistPrimaryName(artist)}
                 />
               ))}
               <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: colors.textMuted }}>

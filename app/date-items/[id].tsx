@@ -327,6 +327,7 @@ export default function DateItemDetailScreen() {
                       source={resolveAvatarSource(artist.avatar_uri)}
                       size={32}
                       isOshi={false}
+                      name={getArtistPrimaryName(artist)}
                     />
                   ))}
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: '700' }}>

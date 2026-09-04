@@ -665,6 +665,7 @@ export const DateItemForm = forwardRef<DateItemFormHandle, {
                   source={resolveAvatarSource(selectedPresetArtist.avatar_uri)}
                   size={36}
                   isOshi={selectedPresetArtist.id === oshiArtistId}
+                  name={getArtistPrimaryName(selectedPresetArtist)}
                 />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: colors.accent }}>

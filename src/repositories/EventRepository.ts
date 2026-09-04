@@ -386,7 +386,7 @@ export class EventRepository {
     const rows = await this.db.getAllAsync<RootArtistEventCountRow>(
       `SELECT
          a.id AS artist_id,
-         a.name AS artist_name,
+         COALESCE(NULLIF(TRIM(a.short_name), ''), a.name) AS artist_name,
          a.avatar_uri AS avatar_uri,
          COUNT(DISTINCT e.id) AS count
        FROM artists a
@@ -395,8 +395,8 @@ export class EventRepository {
        WHERE a.artist_type = 'group'
          AND e.status = 'completed'
          ${period.sql}
-       GROUP BY a.id, a.name, a.avatar_uri
-       ORDER BY count DESC, MAX(e.event_date) DESC, a.name ASC
+       GROUP BY a.id, a.name, a.short_name, a.avatar_uri
+       ORDER BY count DESC, MAX(e.event_date) DESC, artist_name ASC
        ${limit == null ? '' : 'LIMIT ?'}`,
       limit == null ? period.params : [...period.params, limit]
     );
@@ -582,15 +582,15 @@ export class EventRepository {
        )
        SELECT
          root.id AS artist_id,
-         root.name AS artist_name,
+         COALESCE(NULLIF(TRIM(root.short_name), ''), root.name) AS artist_name,
          root.avatar_uri,
          AVG(group_events.review_score) AS average_score,
          COUNT(*) AS rated_count,
          MAX(group_events.event_date) AS last_event_date
        FROM group_events
        JOIN artists root ON root.id = group_events.root_id
-       GROUP BY root.id, root.name, root.avatar_uri
-       ORDER BY root.name ASC`,
+       GROUP BY root.id, root.name, root.short_name, root.avatar_uri
+       ORDER BY artist_name ASC`,
       period.params,
     );
 

@@ -1,5 +1,5 @@
 import { Artist } from '../../types/models';
-import { getArtistDisplayText, getArtistPrimaryName } from '../artistDisplay';
+import { getArtistAvatarFallback, getArtistDisplayText, getArtistPrimaryName } from '../artistDisplay';
 
 function artist(input: Partial<Artist> & Pick<Artist, 'id' | 'name'>): Artist {
   return {
@@ -48,5 +48,26 @@ describe('artist display text', () => {
         parentName: 'Group Name',
       })
     ).toEqual({ title: 'Short', subtitle: null });
+  });
+});
+
+describe('getArtistAvatarFallback', () => {
+  test.each([
+    ['  星野爱  ', '星'],
+    ['Alice', 'A'],
+    ['=LOVE', '='],
+    ['☆Alice', '☆'],
+    ['👩‍🎤 Artist', '👩‍🎤'],
+    ['👩🏽‍🎤 Artist', '👩🏽‍🎤'],
+    ['🇯🇵 Group', '🇯🇵'],
+    ['e\u0301clair', 'e\u0301'],
+    ['क्षिति', 'क्षि'],
+    ['한글', '한'],
+  ])('returns the first visible grapheme from %p', (name, expected) => {
+    expect(getArtistAvatarFallback(name)).toBe(expected);
+  });
+
+  test.each([null, undefined, '', '   '])('returns null for an empty name (%p)', (name) => {
+    expect(getArtistAvatarFallback(name)).toBeNull();
   });
 });

@@ -137,6 +137,7 @@ export function ChekiArtistShareChart({
                   source={resolveAvatarSource(segment.avatarUri)}
                   size={28}
                   isOshi={segment.isOshi === true}
+                  name={segment.name}
                 />
                 <View
                   style={{

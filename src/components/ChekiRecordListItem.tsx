@@ -130,6 +130,7 @@ export function ChekiRecordListItem({
             source={artist ? resolveAvatarSource(artist.avatar_uri) : null}
             size={isOshi ? 44 : 42}
             isOshi={isOshi}
+            name={display?.title}
           />
         )}
 

@@ -1,3 +1,5 @@
+import { splitGraphemes } from 'unicode-segmenter/grapheme';
+
 import { Artist } from '../types/models';
 
 export type ArtistDisplayMode = 'compact' | 'management';
@@ -15,6 +17,13 @@ export interface ArtistDisplayText {
 
 export function getArtistPrimaryName(artist: Artist): string {
   return artist.short_name?.trim() || artist.name;
+}
+
+export function getArtistAvatarFallback(name: string | null | undefined): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+
+  return splitGraphemes(trimmed).next().value ?? null;
 }
 
 export function getArtistDisplayText({

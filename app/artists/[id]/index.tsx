@@ -50,6 +50,7 @@ import { useDB } from '../../../src/context/DBContext';
 import { useAppTheme } from '../../../src/theme/appTheme';
 import { Artist, ArtistGroupMembershipWithArtist, Cheki, ChekiManualEntry, Event } from '../../../src/types/models';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
+import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { deriveArtistBackdropPalette, extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
 import { buildChekiViewerItems, getChekiManualCount } from '../../../src/utils/cheki';
 import { buildEventMonthSections } from '../../../src/utils/eventSections';
@@ -565,7 +566,7 @@ export default function ArtistDetailScreen() {
               paddingVertical: 10,
             }}
           >
-            <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} />
+            <OshiAvatar source={resolveAvatarSource(membership.artist.avatar_uri)} size={36} isOshi={false} name={getArtistPrimaryName(membership.artist)} />
             <View style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                 <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 14, fontWeight: '700' }}>
@@ -636,6 +637,7 @@ export default function ArtistDetailScreen() {
                         source={resolveAvatarSource(related.avatar_uri)}
                         size={56}
                         isOshi={related.id === oshiArtistId}
+                        name={getArtistPrimaryName(related)}
                       />
                       <Text
                         numberOfLines={1}
@@ -1070,7 +1072,7 @@ export default function ArtistDetailScreen() {
                               }}
                             >
                               <View style={{ marginRight: 12 }}>
-                                <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} />
+                                <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} name={getArtistPrimaryName(member)} />
                               </View>
                               <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -1106,7 +1108,7 @@ export default function ArtistDetailScreen() {
                 }}
               >
                 <View style={{ marginBottom: 16 }}>
-                  <OshiAvatar source={avatarSrc} size={86} isOshi={isOshi} />
+                  <OshiAvatar source={avatarSrc} size={86} isOshi={isOshi} name={compactTitle} />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
                   <Text
@@ -1192,7 +1194,7 @@ export default function ArtistDetailScreen() {
                             }}
                           >
                             <View style={{ marginRight: 12 }}>
-                              <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} />
+                              <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} name={getArtistPrimaryName(member)} />
                             </View>
                             <View style={{ flex: 1 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -1410,7 +1412,7 @@ export default function ArtistDetailScreen() {
                               }}
                             >
                               <View style={{ marginRight: 12 }}>
-                                <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} />
+                                <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} name={getArtistPrimaryName(member)} />
                               </View>
                               <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -1473,7 +1475,7 @@ export default function ArtistDetailScreen() {
                 }}
               >
                 <View style={{ marginBottom: 16 }}>
-                  <OshiAvatar source={avatarSrc} size={86} isOshi={isOshi} />
+                  <OshiAvatar source={avatarSrc} size={86} isOshi={isOshi} name={compactTitle} />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
                   <Text
@@ -1559,7 +1561,7 @@ export default function ArtistDetailScreen() {
                             }}
                           >
                             <View style={{ marginRight: 12 }}>
-                              <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} />
+                              <OshiAvatar source={memberAvatarSrc} size={36} isOshi={memberIsOshi} name={getArtistPrimaryName(member)} />
                             </View>
                             <View style={{ flex: 1 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>

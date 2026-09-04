@@ -1,8 +1,54 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, ImageSourcePropType, LayoutChangeEvent, Text, View, ViewStyle } from 'react-native';
+import { Animated, ColorValue, Easing, Image, ImageSourcePropType, LayoutChangeEvent, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppIcon } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
+import { getArtistAvatarFallback } from '../utils/artistDisplay';
+
+function AvatarContent({
+  source,
+  size,
+  radius,
+  fallbackText,
+  fallbackFontSize,
+  textColor,
+  iconSize,
+  imageLoadFailed,
+  onImageError,
+}: {
+  source: ImageSourcePropType | null;
+  size: number;
+  radius: number;
+  fallbackText: string | null;
+  fallbackFontSize: number;
+  textColor: ColorValue;
+  iconSize: number;
+  imageLoadFailed: boolean;
+  onImageError: () => void;
+}) {
+  if (source && !imageLoadFailed) {
+    return (
+      <Image
+        source={source}
+        onError={onImageError}
+        style={{ width: size, height: size, borderRadius: radius }}
+      />
+    );
+  }
+
+  if (fallbackText) {
+    return (
+      <Text
+        numberOfLines={1}
+        style={{ fontSize: fallbackFontSize, lineHeight: size, fontWeight: '700', color: textColor }}
+      >
+        {fallbackText}
+      </Text>
+    );
+  }
+
+  return <AppIcon name="artist" size={iconSize} color={textColor} />;
+}
 
 export function OshiBadge({ inverted = false }: { inverted?: boolean }) {
   const { colors } = useAppTheme();
@@ -128,20 +174,27 @@ export function OshiAvatar({
   source,
   size,
   isOshi,
-  fallbackText,
+  name,
 }: {
   source: ImageSourcePropType | null;
   size: number;
   isOshi: boolean;
-  /** 缺少头像时用文字替代默认图标，例如艺人名首字 */
-  fallbackText?: string;
+  /** 关联艺人的显示名；缺少头像或图片加载失败时显示首个字素 */
+  name?: string | null;
 }) {
   const { colors } = useAppTheme();
   const ringWidth = isOshi ? Math.max(2, Math.round(size * 0.05)) : 0;
   const innerSize = isOshi ? size - ringWidth * 2 : size;
   const radius = size / 2;
   const fallbackFontSize = Math.max(11, Math.round(size * 0.38));
+  const fallbackText = getArtistAvatarFallback(name);
+  const sourceKey = source == null ? null : JSON.stringify(source);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const rotateValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [sourceKey]);
 
   useEffect(() => {
     if (!isOshi) return undefined;
@@ -170,19 +223,17 @@ export function OshiAvatar({
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        {source
-          ? <Image source={source} style={{ width: size, height: size, borderRadius: radius }} />
-          : fallbackText
-            ? (
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: fallbackFontSize, lineHeight: size, fontWeight: '700', color: colors.textSecondary }}
-              >
-                {fallbackText}
-              </Text>
-            )
-            : <AppIcon name="artist" size={Math.round(size * 0.45)} color={colors.textSecondary} />
-        }
+        <AvatarContent
+          source={source}
+          size={size}
+          radius={radius}
+          fallbackText={fallbackText}
+          fallbackFontSize={fallbackFontSize}
+          textColor={colors.textSecondary}
+          iconSize={Math.round(size * 0.45)}
+          imageLoadFailed={imageLoadFailed}
+          onImageError={() => setImageLoadFailed(true)}
+        />
       </View>
     );
   }
@@ -220,19 +271,17 @@ export function OshiAvatar({
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        {source
-          ? <Image source={source} style={{ width: innerSize, height: innerSize, borderRadius: innerSize / 2 }} />
-          : fallbackText
-            ? (
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: fallbackFontSize, lineHeight: innerSize, fontWeight: '700', color: colors.textSecondary }}
-              >
-                {fallbackText}
-              </Text>
-            )
-            : <AppIcon name="artist" size={Math.round(size * 0.38)} color={colors.textSecondary} />
-        }
+        <AvatarContent
+          source={source}
+          size={innerSize}
+          radius={innerSize / 2}
+          fallbackText={fallbackText}
+          fallbackFontSize={fallbackFontSize}
+          textColor={colors.textSecondary}
+          iconSize={Math.round(size * 0.38)}
+          imageLoadFailed={imageLoadFailed}
+          onImageError={() => setImageLoadFailed(true)}
+        />
       </View>
       <View style={{
         position: 'absolute',

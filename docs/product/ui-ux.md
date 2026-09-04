@@ -463,7 +463,7 @@ Section 是页面级分组。Section 标题放在卡片外，左侧使用 3x16 a
 
 `OshiAvatar`：
 
-- 普通头像：圆形 `oshiAvatarBg` 底，显示图片或 fallback。
+- 普通头像：圆形 `oshiAvatarBg` 底；有关联艺人时显示图片，缺少头像或图片加载失败时显示主显示名（简称优先）的首个字素，名称中的符号和 emoji 均按原样参与首字选择；未关联艺人时使用通用艺人图标。
 - 单推头像：外层旋转 `oshiGradient` 渐变环，内层圆形头像。
 - 右上角是单推心形标记：必须表达红色实心 heart 的语义。Lucide 字体包没有实心 heart 时，允许在 `AppIcon` 映射层保留 custom 例外，不要用普通线框心作为最终视觉替代。
 

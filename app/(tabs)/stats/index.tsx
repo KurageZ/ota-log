@@ -25,6 +25,7 @@ import {
 } from '../../../src/components/StatsRangePicker';
 import { useDB } from '../../../src/context/DBContext';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
+import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { Artist, Event, UserConfig } from '../../../src/types/models';
 import type { ChekiArtistRankingItem } from '../../../src/repositories/ChekiRepository';
 import type {
@@ -389,7 +390,7 @@ function OshiCardTitle({
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <OshiAvatar source={avatarSource} size={34} isOshi />
+      <OshiAvatar source={avatarSource} size={34} isOshi name={getArtistPrimaryName(artist)} />
       <View
         style={{
           flex: 1,
@@ -456,7 +457,7 @@ function GroupRatingList({
             gap: 10,
           }}
         >
-          <OshiAvatar source={resolveAvatarSource(item.avatarUri)} size={38} isOshi={false} />
+          <OshiAvatar source={resolveAvatarSource(item.avatarUri)} size={38} isOshi={false} name={item.name} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
               {item.name}
