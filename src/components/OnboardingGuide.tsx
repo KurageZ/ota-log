@@ -17,6 +17,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { withAlpha } from '../utils/color';
 
 const STORAGE_KEY = 'ota-log.onboarding-guide-seen.v2';
+const INTERACTION_UNLOCK_DELAY_MS = 300;
 
 type GuidePageKey = 'homeEvents' | 'artists' | 'cheki' | 'dataStats' | 'features';
 
@@ -489,13 +490,23 @@ function OnboardingGuideOverlay({
   const { colors, isDark, isHydrated } = useAppTheme();
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [isAutoVisible, setIsAutoVisible] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
     if (!isHydrated) return;
     let isActive = true;
+
+    if (__DEV__) {
+      setIsAutoVisible(true);
+      setIsChecking(false);
+      return () => {
+        isActive = false;
+      };
+    }
 
     AsyncStorage.getItem(STORAGE_KEY)
       .then((value) => {
@@ -516,19 +527,43 @@ function OnboardingGuideOverlay({
     };
   }, [isHydrated]);
 
+  useEffect(() => () => {
+    if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (!manualVisible && !isAutoVisible) return;
     setPageIndex(0);
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   }, [isAutoVisible, manualVisible, width]);
 
+  const handleModalShow = () => {
+    setIsInteractive(false);
+    if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+
+    unlockTimerRef.current = setTimeout(() => {
+      unlockTimerRef.current = null;
+      setIsInteractive(true);
+    }, INTERACTION_UNLOCK_DELAY_MS);
+  };
+
   const completeGuide = async () => {
+    if (!isInteractive) return;
+
+    setIsInteractive(false);
+    if (unlockTimerRef.current) {
+      clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = null;
+    }
+
     if (manualVisible) {
       onManualClose();
       return;
     }
 
     setIsAutoVisible(false);
+    if (__DEV__) return;
+
     try {
       await AsyncStorage.setItem(STORAGE_KEY, 'true');
     } catch {
@@ -537,8 +572,9 @@ function OnboardingGuideOverlay({
   };
 
   const goNext = () => {
+    if (!isInteractive) return;
     if (pageIndex >= GUIDE_PAGES.length - 1) {
-      completeGuide();
+      void completeGuide();
       return;
     }
     const nextIndex = pageIndex + 1;
@@ -563,7 +599,8 @@ function OnboardingGuideOverlay({
       visible={isVisible}
       animationType="fade"
       presentationStyle="overFullScreen"
-      onRequestClose={manualVisible ? onManualClose : completeGuide}
+      onShow={handleModalShow}
+      onRequestClose={() => { void completeGuide(); }}
     >
       <SafeAreaProvider>
         <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -575,9 +612,11 @@ function OnboardingGuideOverlay({
                   <Text style={{ marginTop: 3, fontSize: 18, fontWeight: '900', color: colors.heading }}>你的偶活记录本</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={completeGuide}
+                  disabled={!isInteractive}
+                  onPress={() => { void completeGuide(); }}
                   accessibilityRole="button"
                   accessibilityLabel="跳过引导"
+                  accessibilityState={{ disabled: !isInteractive }}
                   hitSlop={12}
                   style={{ paddingVertical: 4, paddingLeft: 12 }}
                 >
@@ -590,6 +629,7 @@ function OnboardingGuideOverlay({
               ref={scrollRef}
               horizontal
               pagingEnabled
+              scrollEnabled={isInteractive}
               showsHorizontalScrollIndicator={false}
               bounces={false}
               onMomentumScrollEnd={handleMomentumEnd}
@@ -644,10 +684,12 @@ function OnboardingGuideOverlay({
                 ))}
               </View>
               <TouchableOpacity
+                disabled={!isInteractive}
                 onPress={goNext}
                 activeOpacity={0.72}
                 accessibilityRole="button"
                 accessibilityLabel={isLastPage ? '开始使用' : '下一步'}
+                accessibilityState={{ disabled: !isInteractive }}
                 style={{ height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent }}
               >
                 <Text style={{ fontSize: 16, fontWeight: '900', color: colors.onAccent }}>{isLastPage ? '开始使用' : '下一步'}</Text>

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [Unreleased]
 
+### Fixed
+- 修复 Android 新手引导可能在显示时被触摸尾事件自动跳过的问题
+
 ## [2.0.0-beta.5] - 2026-09-01
 
 ### Added
