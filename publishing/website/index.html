@@ -906,16 +906,25 @@
       .footer-inner {
         width: var(--page);
         margin: 0 auto;
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         align-items: center;
-        justify-content: space-between;
         gap: 24px;
         color: var(--text-secondary);
         font-size: 13px;
       }
 
+      .footer-record {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-self: center;
+        color: var(--text-secondary);
+      }
+
       .footer-links {
         display: flex;
+        justify-self: end;
         gap: 22px;
       }
 
@@ -1159,8 +1168,13 @@
         }
 
         .footer-inner {
-          align-items: flex-start;
-          flex-direction: column;
+          grid-template-columns: 1fr;
+          justify-items: center;
+          text-align: center;
+        }
+
+        .footer-links {
+          justify-self: center;
         }
       }
 
@@ -1452,6 +1466,9 @@
     <footer>
       <div class="footer-inner">
         <span>© <span id="year">2026</span> ota log</span>
+        <a class="footer-record" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
+          浙ICP备2026072747号-1
+        </a>
         <div class="footer-links">
           <a href="./privacy/">隐私政策</a>
           <a href="./support/">技术支持</a>
