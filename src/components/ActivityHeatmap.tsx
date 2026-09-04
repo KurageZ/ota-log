@@ -8,6 +8,7 @@ const CELL_SIZE = 9;
 const GUTTER_SIZE = 3;
 const CHART_WIDTH = 680;
 const CHART_HEIGHT = 108;
+const CHART_CONTAINER_MAX_WIDTH = 720;
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
 function getDaysInYear(year: number): number {
@@ -55,7 +56,7 @@ export function ActivityHeatmap({
   }, [year]);
 
   return (
-    <View>
+    <View style={{ width: '100%', maxWidth: CHART_CONTAINER_MAX_WIDTH, alignSelf: 'center' }}>
       <View
         style={{
           flexDirection: 'row',

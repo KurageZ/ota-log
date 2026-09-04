@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, Pressable, Alert,
   Image, Modal, Linking, useWindowDimensions, Platform, ActivityIndicator, TextStyle,
 } from 'react-native';
-import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Calendar from 'expo-calendar/legacy';
 import { File } from 'expo-file-system';
@@ -409,17 +409,33 @@ function CardHeader({
   );
 }
 
-export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+type EventDetailScreenProps = {
+  eventId?: string;
+  embedded?: boolean;
+  availableWidth?: number;
+  onDeleted?: () => void | Promise<void>;
+};
+
+export function EventDetailScreen({
+  eventId,
+  embedded = false,
+  availableWidth,
+  onDeleted,
+}: EventDetailScreenProps = {}) {
+  const { id: routeId } = useLocalSearchParams<{ id?: string }>();
+  const id = eventId ?? routeId;
   const db = useDB();
+  const insets = useSafeAreaInsets();
   const { colors, isDark, chekiDisplayMode } = useAppTheme();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = availableWidth ?? windowWidth;
   const chekiW = Math.floor((screenWidth - 80) / 3);
   const chekiH = chekiDisplayMode === 'original'
     ? chekiW
     : Math.round(chekiW * 86 / 54);
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
@@ -558,7 +574,13 @@ export default function EventDetailScreen() {
 
 
   const load = useCallback(async () => {
-    if (!id) return;
+    if (!id) {
+      setEvent(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setEvent(null);
     const [ev, ar, ck, manual, photos, allArs, config, loadedSessions] = await Promise.all([
       db.events.findById(id),
       db.events.getArtists(id),
@@ -588,6 +610,7 @@ export default function EventDetailScreen() {
     setTimetables(Object.fromEntries(
       loadedSessions.map((session, index) => [session.id, loadedTimetables[index]]),
     ));
+    setLoading(false);
   }, [db, id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -614,7 +637,8 @@ export default function EventDetailScreen() {
           try {
             await db.events.delete(id!);
             hapticDeleteSuccess();
-            router.back();
+            if (onDeleted) await onDeleted();
+            else router.back();
           } catch {
             showDeleteFailedAlert();
           }
@@ -888,6 +912,14 @@ export default function EventDetailScreen() {
     count + [session.end_time, session.end_date].filter(Boolean).length
   ), 0) + [event?.url].filter(Boolean).length;
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
   if (!event) {
     return (
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen, alignItems: 'center', justifyContent: 'center' }}>
@@ -1042,8 +1074,8 @@ export default function EventDetailScreen() {
   );
 
   return (
-    <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
-      <Stack.Screen
+    <SafeAreaView edges={embedded ? [] : SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
+      {!embedded ? <Stack.Screen
         options={{
           title: '',
           headerTitleAlign: 'center',
@@ -1074,8 +1106,8 @@ export default function EventDetailScreen() {
             </View>
           ),
         }}
-      />
-      <NativeTextToolbar
+      /> : null}
+      {!embedded ? <NativeTextToolbar
         right={[
           {
             label: '分享',
@@ -1091,7 +1123,42 @@ export default function EventDetailScreen() {
             onPress: () => router.push(`/events/${id}/edit`),
           },
         ]}
-      />
+      /> : (
+        <View
+          style={{
+            height: 52 + insets.top,
+            paddingTop: insets.top,
+            paddingHorizontal: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 4,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.divider,
+            backgroundColor: colors.header,
+          }}
+        >
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="分享活动"
+            disabled={shareBusy}
+            onPress={() => setShareMenuVisible(true)}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: shareBusy ? 0.5 : 1 }}
+          >
+            {shareBusy
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <AppIcon name="share" size={20} color={colors.accent} />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="编辑活动"
+            onPress={() => router.push(`/events/${id}/edit`)}
+            style={{ minWidth: 52, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '700' }}>编辑</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -1762,3 +1829,5 @@ export default function EventDetailScreen() {
     </SafeAreaView>
   );
 }
+
+export default EventDetailScreen;

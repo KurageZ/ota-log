@@ -27,6 +27,13 @@ import {
   ArtistGroupFilter,
   matchesArtistGroupFilter,
 } from '../../src/utils/artistManagementFilters';
+import { useWindowMode } from '../../src/utils/windowMode';
+import {
+  MASTER_PANE_WIDTH,
+  MasterDetailEmptyState,
+  MasterPaneHeader,
+} from '../../src/components/adaptive/MasterDetailLayout';
+import { ArtistDetailScreen } from './[id]/index';
 
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
@@ -53,6 +60,9 @@ export default function ArtistsScreen() {
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
+  const [detailWidth, setDetailWidth] = useState<number | undefined>();
+  const { isWide } = useWindowMode();
 
   const parentNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -237,17 +247,24 @@ export default function ArtistsScreen() {
     activeSearchFilters.length > 0
   );
 
+  useEffect(() => {
+    if (!isWide) return;
+    if (selectedArtistId && artists.some((artist) => artist.id === selectedArtistId)) return;
+    setSelectedArtistId(filteredArtists[0]?.id ?? null);
+  }, [artists, filteredArtists, isWide, selectedArtistId]);
+
   return (
     <>
       <Stack.Screen
         options={{
           title: '艺人管理',
+          headerShown: !isWide,
           headerTitleAlign: 'center',
           headerStyle: { backgroundColor: colors.header },
           headerShadowVisible: false,
           headerTintColor: colors.accent,
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerRight: IS_IOS ? undefined : () => (
+          headerRight: IS_IOS || isWide ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push('/artists/new')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -259,7 +276,24 @@ export default function ArtistsScreen() {
         }}
       />
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: bg }}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+        <View style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
+          <View
+            style={isWide ? {
+              width: MASTER_PANE_WIDTH,
+              flexShrink: 0,
+              borderRightWidth: 1,
+              borderRightColor: colors.divider,
+            } : { flex: 1 }}
+          >
+          {isWide ? (
+            <MasterPaneHeader
+              title="艺人管理"
+              actionLabel="新建艺人"
+              onAction={() => router.push('/artists/new')}
+              colors={colors}
+            />
+          ) : null}
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           {showTypeNotice && artists.some((artist) => artist.artist_type == null) ? (
             <View style={{
               marginBottom: 12, padding: 14, borderRadius: 14,
@@ -388,10 +422,14 @@ export default function ArtistsScreen() {
 
             return (
               <TouchableOpacity
-                onPress={() => router.push(`/artists/${artist.id}`)}
+                onPress={() => {
+                  if (isWide) setSelectedArtistId(artist.id);
+                  else router.push(`/artists/${artist.id}`);
+                }}
                 activeOpacity={0.7}
+                accessibilityState={{ selected: isWide && selectedArtistId === artist.id }}
                 style={{
-                  backgroundColor: cardBg,
+                  backgroundColor: isWide && selectedArtistId === artist.id ? colors.accentSoft : cardBg,
                   borderTopLeftRadius: index === 0 ? 18 : 0,
                   borderTopRightRadius: index === 0 ? 18 : 0,
                   borderBottomLeftRadius: isLast ? 18 : 0,
@@ -450,6 +488,30 @@ export default function ArtistsScreen() {
             );
           }}
         />
+          </View>
+          {isWide ? (
+            <View
+              style={{ flex: 1, minWidth: 0 }}
+              onLayout={(event) => setDetailWidth(event.nativeEvent.layout.width)}
+            >
+              {selectedArtistId ? (
+                <ArtistDetailScreen
+                  key={selectedArtistId}
+                  artistId={selectedArtistId}
+                  embedded
+                  availableWidth={detailWidth}
+                />
+              ) : (
+                <MasterDetailEmptyState
+                  icon={<AppIcon name="artist" size={34} color={colors.textMuted} />}
+                  title="选择一位艺人"
+                  message="从左侧列表选择艺人后，可在这里查看和编辑详情。"
+                  colors={colors}
+                />
+              )}
+            </View>
+          ) : null}
+        </View>
         <FilterSheet
           visible={filterVisible}
           sections={filterSections}
@@ -458,7 +520,7 @@ export default function ArtistsScreen() {
           onClose={() => setFilterVisible(false)}
         />
       </SafeAreaView>
-      {IS_IOS ? (
+      {IS_IOS && !isWide ? (
         <NativeAddToolbar
           accessibilityLabel="新建艺人"
           onPress={() => router.push('/artists/new')}

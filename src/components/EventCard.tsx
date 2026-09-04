@@ -17,6 +17,8 @@ interface Props {
   tone?: 'default' | 'showcase' | 'showcase-light';
   eyebrow?: ReactNode;
   showStatus?: boolean;
+  selected?: boolean;
+  onPress?: () => void;
 }
 
 export function EventCard({
@@ -27,6 +29,8 @@ export function EventCard({
   tone = 'default',
   eyebrow,
   showStatus = true,
+  selected = false,
+  onPress,
 }: Props) {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
@@ -86,9 +90,18 @@ export function EventCard({
 
   return (
     <TouchableOpacity
-      style={[containerStyle, style]}
-      onPress={() => router.push(`/events/${event.id}`)}
+      style={[
+        containerStyle,
+        style,
+        selected ? {
+          backgroundColor: colors.accentSoft,
+          borderWidth: 1,
+          borderColor: colors.accentBorder,
+        } : null,
+      ]}
+      onPress={onPress ?? (() => router.push(`/events/${event.id}`))}
       activeOpacity={0.72}
+      accessibilityState={{ selected }}
     >
       <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', gap: isCompact ? 5 : 6 }}>
         {eyebrow ? (

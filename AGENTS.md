@@ -19,7 +19,9 @@
 - 拍立得数据结构设计：`docs/data/cheki-data-model-design.md`
 - 技术选型：`docs/tech/stack.md`
 - 决策记录模板：`docs/decisions/0000-template.md`
+- iPad 自适应布局决策：`docs/decisions/0002-ipad-adaptive-layout.md`
 - 当前进度：`docs/progress/now.md`
+- iPad 自适应布局进度：`docs/progress/ipad-adaptation.md`
 - 测试验证工作流：`docs/workflows/testing.md`
 - 发版工作流：`docs/workflows/release.md`
 - App Store 截图工作流：`docs/workflows/app-store-screenshots.md`
@@ -60,6 +62,7 @@
 
 - 设计事实以当前代码为准；设计意图、验收标准和页面规范见 `docs/product/ui-ux.md`。
 - UI 改动先复用现有 theme、共享组件和页面结构，不做无关重绘。
+- 宽屏布局按窗口宽度（`src/utils/windowMode.ts`）切换，不按设备型号判断；页面水平边距统一使用 `ReadingContainer` / `DashboardContainer`（`src/components/adaptive/AppContainers.tsx`），不硬编码 16px。
 - 如果 UI 方向未定，优先在 `design/` 做一次性 HTML 原型；除非用户明确要求，不把原型纳入功能提交。
 - 文字、按钮、卡片和状态必须同时检查浅色/深色模式，避免溢出、遮挡和只靠颜色表达状态。
 

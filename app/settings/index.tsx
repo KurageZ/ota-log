@@ -11,11 +11,14 @@ import { resetAppForDevelopment } from '../../src/utils/developerReset';
 import { showOperationFailedAlert } from '../../src/utils/failureAlert';
 import { hapticDeleteSuccess } from '../../src/utils/haptics';
 import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsMenu';
+import { DashboardContainer, ReadingContainer } from '../../src/components/adaptive/AppContainers';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
+import { useWindowMode } from '../../src/utils/windowMode';
 
 export default function SettingsScreen() {
   const { colors } = useAppTheme();
+  const { isWide } = useWindowMode();
   const db = useDB();
 
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
@@ -141,144 +144,184 @@ export default function SettingsScreen() {
   const preferenceTint = settingsTints.stats;
   const dataTint = settingsTints.backupExport;
 
+  const personalSection = (
+    <View>
+      <SectionLabel label="个人" />
+      <MenuCard>
+        <MenuItem
+          icon="profile"
+          label="个人资料"
+          subtitle={userConfig ? `昵称：${userConfig.name}` : '管理昵称和头像'}
+          tint={identityTint}
+          onPress={() => router.push('/settings/profile')}
+        />
+        <MenuItem
+          icon="oshi"
+          label="单推设置"
+          subtitle={oshiDisplay ? oshiDisplay.title : '还没有设置单推，设置后会自动加入收藏'}
+          tint={oshiTint}
+          isLast
+          onPress={() => router.push('/settings/oshi')}
+        />
+      </MenuCard>
+    </View>
+  );
+
+  const appearanceSection = (
+    <View>
+      <SectionLabel label="外观与显示" />
+      <MenuCard>
+        <MenuItem
+          icon="appearance"
+          label="外观"
+          subtitle="显示模式与主题色"
+          tint={appearanceTint}
+          onPress={() => router.push('/settings/appearance')}
+        />
+        <MenuItem
+          icon="image"
+          label="拍立得展示方式"
+          subtitle="艺人、活动、记录详情与切册的图片展示方式"
+          tint={preferenceTint}
+          isLast
+          onPress={() => router.push('/settings/cheki-display')}
+        />
+      </MenuCard>
+    </View>
+  );
+
+  const preferenceSection = (
+    <View>
+      <SectionLabel label="偏好" />
+      <MenuCard>
+        <MenuItem
+          icon="viewSettings"
+          label="功能"
+          subtitle="默认视图与出演者确认方式"
+          tint={preferenceTint}
+          onPress={() => router.push('/settings/features')}
+        />
+        <MenuItem
+          icon="calendar"
+          label="日历"
+          subtitle="周起始日与月视图展示"
+          tint={preferenceTint}
+          isLast
+          onPress={() => router.push('/settings/calendar')}
+        />
+      </MenuCard>
+    </View>
+  );
+
+  const widgetSection = Platform.OS === 'ios' ? (
+    <View>
+      <SectionLabel label="小组件" />
+      <MenuCard>
+        <MenuItem
+          icon="widget"
+          label="拍立得回忆"
+          subtitle="管理小组件分组与展示内容"
+          tint={settingsTints.widget}
+          isLast
+          onPress={() => router.push('/settings/widget')}
+        />
+      </MenuCard>
+    </View>
+  ) : null;
+
+  const dataSection = (
+    <View>
+      <SectionLabel label="数据管理" />
+      <MenuCard>
+        <MenuItem
+          icon="document"
+          label="存储空间"
+          subtitle={storageTotalBytes != null ? `已用 ${formatBytes(storageTotalBytes)}` : '查看照片、切册与数据库占用'}
+          tint={dataTint}
+          onPress={() => router.push('/settings/storage')}
+        />
+        <MenuItem
+          icon="backupDownload"
+          label="备份和恢复"
+          subtitle="生成、保存或恢复完整备份"
+          tint={settingsTints.backupRestore}
+          onPress={() => router.push('/settings/backup-restore')}
+        />
+        <MenuItem
+          icon="artists"
+          label="艺人类型转换"
+          subtitle="批量设置个人或团体，并转换普通所属关系"
+          tint={dataTint}
+          isLast
+          onPress={() => router.push('/settings/artist-type-conversion')}
+        />
+      </MenuCard>
+    </View>
+  );
+
+  const advancedSection = showDeveloperOptions ? (
+    <View>
+      <SectionLabel label="高级" />
+      <MenuCard>
+        <MenuItem
+          icon="artists"
+          label="移除孤立艺人"
+          subtitle="移除没有活动或拍立得关联的艺人"
+          badge={isRemovingOrphanArtists ? 'spinner' : undefined}
+          tint={settingsTints.cleanup}
+          onPress={handleRemoveOrphanArtists}
+        />
+        <MenuItem
+          icon="trash"
+          label="清空所有数据"
+          subtitle="删除全部数据并恢复初始状态"
+          badge={isClearingAllData ? 'spinner' : undefined}
+          tint={colors.danger}
+          isLast
+          onPress={handleClearAllData}
+        />
+      </MenuCard>
+    </View>
+  ) : null;
+
+  const singleColumnContent = (
+    <View style={{ gap: 16 }}>
+      {personalSection}
+      {appearanceSection}
+      {preferenceSection}
+      {widgetSection}
+      {dataSection}
+      {advancedSection}
+    </View>
+  );
+
+  const wideContent = (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 20 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+        {personalSection}
+        {appearanceSection}
+        {widgetSection}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+        {preferenceSection}
+        {dataSection}
+        {advancedSection}
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
       >
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="个人" />
-          <MenuCard>
-            <MenuItem
-              icon="profile"
-              label="个人资料"
-              subtitle={userConfig ? `昵称：${userConfig.name}` : '管理昵称和头像'}
-              tint={identityTint}
-              onPress={() => router.push('/settings/profile')}
-            />
-            <MenuItem
-              icon="oshi"
-              label="单推设置"
-              subtitle={oshiDisplay ? oshiDisplay.title : '还没有设置单推，设置后会自动加入收藏'}
-              tint={oshiTint}
-              isLast
-              onPress={() => router.push('/settings/oshi')}
-            />
-          </MenuCard>
-        </View>
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="外观与显示" />
-          <MenuCard>
-            <MenuItem
-              icon="appearance"
-              label="外观"
-              subtitle="显示模式与主题色"
-              tint={appearanceTint}
-              onPress={() => router.push('/settings/appearance')}
-            />
-            <MenuItem
-              icon="image"
-              label="拍立得展示方式"
-              subtitle="艺人、活动、记录详情与切册的图片展示方式"
-              tint={preferenceTint}
-              isLast
-              onPress={() => router.push('/settings/cheki-display')}
-            />
-          </MenuCard>
-        </View>
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="偏好" />
-          <MenuCard>
-            <MenuItem
-              icon="viewSettings"
-              label="功能"
-              subtitle="默认视图与出演者确认方式"
-              tint={preferenceTint}
-              onPress={() => router.push('/settings/features')}
-            />
-            <MenuItem
-              icon="calendar"
-              label="日历"
-              subtitle="周起始日与月视图展示"
-              tint={preferenceTint}
-              isLast
-              onPress={() => router.push('/settings/calendar')}
-            />
-          </MenuCard>
-        </View>
-
-        {Platform.OS === 'ios' ? (
-          <View style={{ marginBottom: 16 }}>
-            <SectionLabel label="小组件" />
-            <MenuCard>
-              <MenuItem
-                icon="widget"
-                label="拍立得回忆"
-                subtitle="管理小组件分组与展示内容"
-                tint={settingsTints.widget}
-                isLast
-                onPress={() => router.push('/settings/widget')}
-              />
-            </MenuCard>
-          </View>
-        ) : null}
-
-        <View style={{ marginBottom: 16 }}>
-          <SectionLabel label="数据管理" />
-          <MenuCard>
-            <MenuItem
-              icon="document"
-              label="存储空间"
-              subtitle={storageTotalBytes != null ? `已用 ${formatBytes(storageTotalBytes)}` : '查看照片、切册与数据库占用'}
-              tint={dataTint}
-              onPress={() => router.push('/settings/storage')}
-            />
-            <MenuItem
-              icon="backupDownload"
-              label="备份和恢复"
-              subtitle="生成、保存或恢复完整备份"
-              tint={settingsTints.backupRestore}
-              onPress={() => router.push('/settings/backup-restore')}
-            />
-            <MenuItem
-              icon="artists"
-              label="艺人类型转换"
-              subtitle="批量设置个人或团体，并转换普通所属关系"
-              tint={dataTint}
-              isLast
-              onPress={() => router.push('/settings/artist-type-conversion')}
-            />
-          </MenuCard>
-        </View>
-
-        {showDeveloperOptions ? (
-          <View>
-            <SectionLabel label="高级" />
-            <MenuCard>
-              <MenuItem
-                icon="artists"
-                label="移除孤立艺人"
-                subtitle="移除没有活动或拍立得关联的艺人"
-                badge={isRemovingOrphanArtists ? 'spinner' : undefined}
-                tint={settingsTints.cleanup}
-                onPress={handleRemoveOrphanArtists}
-              />
-              <MenuItem
-                icon="trash"
-                label="清空所有数据"
-                subtitle="删除全部数据并恢复初始状态"
-                badge={isClearingAllData ? 'spinner' : undefined}
-                tint={colors.danger}
-                isLast
-                onPress={handleClearAllData}
-              />
-            </MenuCard>
-          </View>
-        ) : null}
+        {isWide ? (
+          <DashboardContainer>{wideContent}</DashboardContainer>
+        ) : (
+          <ReadingContainer>{singleColumnContent}</ReadingContainer>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

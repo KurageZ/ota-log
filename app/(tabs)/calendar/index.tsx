@@ -1,5 +1,5 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Image,
   ImageSourcePropType,
@@ -18,6 +18,10 @@ import {
 } from '../../../src/components/AndroidCollapsibleTabHeader';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { CalendarMonthPicker } from '../../../src/components/CalendarMonthPicker';
+import {
+  DashboardContainer,
+  getAdaptiveContentWidth,
+} from '../../../src/components/adaptive/AppContainers';
 import { EventCard } from '../../../src/components/EventCard';
 import { EventSectionHeader } from '../../../src/components/EventSectionHeader';
 import { ArtistRankingList } from '../../../src/components/ArtistRankingList';
@@ -40,9 +44,15 @@ import {
 } from '../../../src/utils/calendarWeeks';
 import { calculateChekiGridLayout, getChekiManualCount } from '../../../src/utils/cheki';
 import { withAlpha } from '../../../src/utils/color';
+import {
+  CALENDAR_MONTH_PANE_MAX_WIDTH,
+  CALENDAR_SPLIT_GAP,
+  shouldUseCalendarSplitLayout,
+} from '../../../src/utils/calendarLayout';
 import { toISODate } from '../../../src/utils/date';
 import { getLocalDayDifference } from '../../../src/utils/dateItems';
 import { getEventCardOshiBadge } from '../../../src/utils/oshiMatch';
+import { useWindowMode } from '../../../src/utils/windowMode';
 
 type ChekiMonthCell = {
   date: string;
@@ -69,6 +79,8 @@ const CALENDAR_RANKING_PREVIEW_LIMIT = 10;
 const CALENDAR_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const CALENDAR_MONTH_CELL_HEIGHT = 92;
 const CALENDAR_MONTH_CELL_COMPACT_HEIGHT = 89;
+const CALENDAR_MONTH_CELL_WIDE_HEIGHT = 104;
+const CALENDAR_MONTH_CELL_WIDE_COMPACT_HEIGHT = 100;
 function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
@@ -235,7 +247,9 @@ export default function CalendarScreen() {
   } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const { width: screenWidth } = useWindowDimensions();
+  const { mode } = useWindowMode();
   const isIOS = Platform.OS === 'ios';
+  const useSplitLayout = shouldUseCalendarSplitLayout(mode, isIOS);
   const androidHeader = useAndroidCollapsibleTabHeader();
   const monthViewTabBarScroll = useFloatingTabBarScroll();
   const monthViewScrollProps = isIOS ? monthViewTabBarScroll : androidHeader.scrollProps;
@@ -245,7 +259,6 @@ export default function CalendarScreen() {
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(today);
-  const [dayEvents, setDayEvents] = useState<Event[]>([]);
   const [chekiSummaries, setChekiSummaries] = useState<ChekiCalendarDaySummary[]>([]);
   const [dayChekis, setDayChekis] = useState<Cheki[]>([]);
   const [dayNoPhotoEntries, setDayNoPhotoEntries] = useState<ChekiManualEntry[]>([]);
@@ -253,41 +266,58 @@ export default function CalendarScreen() {
   const [dayDateItemOccurrences, setDayDateItemOccurrences] = useState<DateItemCalendarOccurrence[]>([]);
   const [artistMap, setArtistMap] = useState<Map<string, Artist>>(new Map());
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
+  const [detailPaneWidth, setDetailPaneWidth] = useState(0);
+  const detailPaneScrollRef = useRef<ScrollView>(null);
+  const monthLoadRequestRef = useRef(0);
+  const selectedDayLoadRequestRef = useRef(0);
 
   const selectedMonth = useMemo(() => parseISODate(selectedDate), [selectedDate]);
 
-  const loadData = useCallback(async () => {
-    const [events, summaries, chekis, noPhotoEntries, artists, monthDateItems, selectedDateItems, config] = await Promise.all([
+  const loadSharedData = useCallback(async () => {
+    const [events, artists, config] = await Promise.all([
       db.events.findCalendarEvents(),
-      db.cheki.findCalendarSummariesByMonth(selectedMonth.year, selectedMonth.month),
-      db.cheki.findByDate(selectedDate),
-      db.chekiManualEntries.findByDate(selectedDate),
       db.artists.findAll(),
-      db.dateItems.findCalendarOccurrencesByMonth(selectedMonth.year, selectedMonth.month, today),
-      db.dateItems.findCalendarOccurrencesByDate(selectedDate, today),
       db.userConfig.getConfig(),
     ]);
     setAllEvents(events);
-    setDayEvents(sortDayEvents(events.filter((event) => event.event_date === selectedDate)));
-    setChekiSummaries(summaries);
-    setDayChekis(chekis);
-    setDayNoPhotoEntries(noPhotoEntries);
-    setDateItemOccurrences(monthDateItems);
-    setDayDateItemOccurrences(selectedDateItems);
     setArtistMap(new Map(artists.map((artist) => [artist.id, artist])));
     setOshiArtistId(config.oshi_artist_id);
-  }, [db, selectedDate, selectedMonth.month, selectedMonth.year, today]);
+  }, [db]);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  const loadMonthData = useCallback(async () => {
+    const requestId = monthLoadRequestRef.current + 1;
+    monthLoadRequestRef.current = requestId;
+    const [summaries, monthDateItems] = await Promise.all([
+      db.cheki.findCalendarSummariesByMonth(selectedMonth.year, selectedMonth.month),
+      db.dateItems.findCalendarOccurrencesByMonth(selectedMonth.year, selectedMonth.month, today),
+    ]);
+    if (requestId !== monthLoadRequestRef.current) return;
+    setChekiSummaries(summaries);
+    setDateItemOccurrences(monthDateItems);
+  }, [db, selectedMonth.month, selectedMonth.year, today]);
+
+  const loadSelectedDayData = useCallback(async () => {
+    const requestId = selectedDayLoadRequestRef.current + 1;
+    selectedDayLoadRequestRef.current = requestId;
+    const [chekis, noPhotoEntries, selectedDateItems] = await Promise.all([
+      db.cheki.findByDate(selectedDate),
+      db.chekiManualEntries.findByDate(selectedDate),
+      db.dateItems.findCalendarOccurrencesByDate(selectedDate, today),
+    ]);
+    if (requestId !== selectedDayLoadRequestRef.current) return;
+    setDayChekis(chekis);
+    setDayNoPhotoEntries(noPhotoEntries);
+    setDayDateItemOccurrences(selectedDateItems);
+  }, [db, selectedDate, today]);
+
+  useFocusEffect(useCallback(() => { loadSharedData(); }, [loadSharedData]));
+  useFocusEffect(useCallback(() => { loadMonthData(); }, [loadMonthData]));
+  useFocusEffect(useCallback(() => { loadSelectedDayData(); }, [loadSelectedDayData]));
 
   const handleSelectDate = useCallback((date: string) => {
     setSelectedDate(date);
-    setDayEvents(sortDayEvents(allEvents.filter((event) => event.event_date === date)));
     setDayDateItemOccurrences(dateItemOccurrences.filter((occurrence) => occurrence.date === date));
-    db.dateItems.findCalendarOccurrencesByDate(date, today)
-      .then(setDayDateItemOccurrences)
-      .catch(() => {});
-  }, [allEvents, dateItemOccurrences, db, today]);
+  }, [dateItemOccurrences]);
 
   const handleChangeChekiMonth = useCallback((delta: number) => {
     handleSelectDate(addMonths(selectedDate, delta));
@@ -313,6 +343,10 @@ export default function CalendarScreen() {
     }
     return byDate;
   }, [allEvents]);
+  const dayEvents = useMemo(
+    () => eventsByDate.get(selectedDate) ?? [],
+    [eventsByDate, selectedDate],
+  );
   const dateItemOccurrencesByDate = useMemo(() => {
     const byDate = new Map<string, DateItemCalendarOccurrence[]>();
     for (const occurrence of dateItemOccurrences) {
@@ -345,7 +379,16 @@ export default function CalendarScreen() {
   const selectedChekiSummary = summaryMap.get(selectedDate) ?? null;
   const noPhotoCount = useMemo(() => getChekiManualCount(dayNoPhotoEntries), [dayNoPhotoEntries]);
   const totalChekiCount = selectedChekiSummary?.totalCount ?? (dayChekis.length + noPhotoCount);
-  const chekiPreviewAreaWidth = Math.max(1, screenWidth - 62);
+  const estimatedDetailPaneWidth = Math.max(
+    1,
+    (getAdaptiveContentWidth(screenWidth, mode, 'dashboard') - CALENDAR_SPLIT_GAP) * 0.4,
+  );
+  const chekiPreviewAreaWidth = Math.max(
+    1,
+    useSplitLayout
+      ? (detailPaneWidth || estimatedDetailPaneWidth) - 28
+      : screenWidth - 62,
+  );
   const calendarChekiLayout = useMemo(
     () => calculateChekiGridLayout({
       density: 'large',
@@ -385,6 +428,19 @@ export default function CalendarScreen() {
   const formattedDate = formatSelectedDateLabel(selectedDate);
   const selectedDateDistance = formatDateDistanceLabel(selectedDate, today);
   const monthTitle = `${selectedMonth.year}年${selectedMonth.month}月`;
+  const showsCalendarTextSignals = calendarDisplay.showEvents || calendarDisplay.showDateItems;
+  const regularMonthCellHeight = showsCalendarTextSignals
+    ? CALENDAR_MONTH_CELL_HEIGHT
+    : CALENDAR_MONTH_CELL_COMPACT_HEIGHT;
+  const wideMonthCellHeight = showsCalendarTextSignals
+    ? CALENDAR_MONTH_CELL_WIDE_HEIGHT
+    : CALENDAR_MONTH_CELL_WIDE_COMPACT_HEIGHT;
+  const calendarMonthCellHeight = useSplitLayout ? wideMonthCellHeight : regularMonthCellHeight;
+
+  useEffect(() => {
+    if (!useSplitLayout) return;
+    detailPaneScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [selectedDate, useSplitLayout]);
 
   const openChekiLibraryForSelectedDate = useCallback(() => {
     router.push({
@@ -553,19 +609,8 @@ export default function CalendarScreen() {
     );
   }, [calendarDisplay, colors, isDark]);
 
-  const renderChekiMonthView = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,
-        paddingBottom: contentBottomPadding,
-      }}
-      contentInsetAdjustmentBehavior="automatic"
-      scrollIndicatorInsets={isIOS ? undefined : { bottom: contentBottomPadding }}
-      {...monthViewScrollProps}
-    >
+  const renderMonthCalendar = () => (
+    <>
       {!isIOS ? (
         <AndroidLargeTabTitle
           title="日历"
@@ -668,9 +713,7 @@ export default function CalendarScreen() {
                 onPress={() => handleSelectDate(cell.date)}
                 style={{
                   width: `${100 / 7}%`,
-                  height: calendarDisplay.showEvents || calendarDisplay.showDateItems
-                    ? CALENDAR_MONTH_CELL_HEIGHT
-                    : CALENDAR_MONTH_CELL_COMPACT_HEIGHT,
+                  height: calendarMonthCellHeight,
                   paddingTop: 7,
                   paddingHorizontal: 2,
                   borderBottomWidth: 1,
@@ -681,7 +724,7 @@ export default function CalendarScreen() {
                   position: 'relative',
                   alignSelf: 'stretch',
                   alignItems: 'center',
-                  minHeight: 70,
+                  minHeight: useSplitLayout ? 82 : 70,
                   marginHorizontal: 0,
                   marginBottom: 1,
                   paddingTop: 3,
@@ -781,7 +824,7 @@ export default function CalendarScreen() {
                           <View
                             key={card.key}
                             style={{
-                              height: 12,
+                              height: useSplitLayout ? 14 : 12,
                               paddingHorizontal: 4,
                               borderRadius: 4,
                               borderWidth: 1,
@@ -798,8 +841,8 @@ export default function CalendarScreen() {
                               style={{
                                 flex: 1,
                                 minWidth: 0,
-                                fontSize: 8,
-                                lineHeight: 9,
+                                fontSize: useSplitLayout ? 9 : 8,
+                                lineHeight: useSplitLayout ? 11 : 9,
                                 fontWeight: '700',
                                 color: cardTextColor,
                               }}
@@ -817,7 +860,11 @@ export default function CalendarScreen() {
           })}
         </View>
       </View>
+    </>
+  );
 
+  const renderSelectedDayDetails = () => (
+    <>
       <View style={{
         alignSelf: 'flex-start',
         flexDirection: 'row',
@@ -1009,9 +1056,65 @@ export default function CalendarScreen() {
           </Text>
         </View>
       )}
-
-    </ScrollView>
+    </>
   );
+
+  const renderChekiMonthView = () => {
+    if (useSplitLayout) {
+      return (
+        <DashboardContainer
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            gap: CALENDAR_SPLIT_GAP,
+          }}
+        >
+          <ScrollView
+            style={{ flex: 3, minWidth: 0, maxWidth: CALENDAR_MONTH_PANE_MAX_WIDTH }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: contentBottomPadding }}
+            contentInsetAdjustmentBehavior="automatic"
+          >
+            {renderMonthCalendar()}
+          </ScrollView>
+
+          <ScrollView
+            ref={detailPaneScrollRef}
+            style={{ flex: 2, minWidth: 0 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: contentBottomPadding }}
+            contentInsetAdjustmentBehavior="automatic"
+            onLayout={(event) => {
+              const nextWidth = event.nativeEvent.layout.width;
+              setDetailPaneWidth((currentWidth) => (
+                Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth
+              ));
+            }}
+          >
+            {renderSelectedDayDetails()}
+          </ScrollView>
+        </DashboardContainer>
+      );
+    }
+
+    return (
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: isIOS ? 0 : androidHeader.contentTopPadding,
+          paddingBottom: contentBottomPadding,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+        scrollIndicatorInsets={isIOS ? undefined : { bottom: contentBottomPadding }}
+        {...monthViewScrollProps}
+      >
+        {renderMonthCalendar()}
+        {renderSelectedDayDetails()}
+      </ScrollView>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen }}>

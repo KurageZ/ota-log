@@ -11,6 +11,7 @@ import { useDB } from '../../../src/context/DBContext';
 import { OshiAvatar, OshiBadge } from '../../../src/components/Oshi';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { MenuCard, MenuItem, SectionLabel } from '../../../src/components/SettingsMenu';
+import { DashboardContainer, ReadingContainer } from '../../../src/components/adaptive/AppContainers';
 import { useFloatingTabBarScroll } from '../../../src/navigation/FloatingTabBarVisibility';
 import { useFloatingTabBarSpacing } from '../../../src/navigation/floatingTabBar';
 import { useAppTheme, type ThemeColors } from '../../../src/theme/appTheme';
@@ -18,6 +19,7 @@ import { Artist, UserConfig } from '../../../src/types/models';
 import { APP_VERSION_LABEL } from '../../../src/utils/appInfo';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
+import { useWindowMode } from '../../../src/utils/windowMode';
 
 type ProfileStats = {
   events: number;
@@ -88,6 +90,7 @@ export default function ProfileScreen() {
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const db = useDB();
   const isAndroid = Platform.OS === 'android';
+  const { isWide } = useWindowMode();
   const androidHeader = useAndroidCollapsibleTabHeader();
   const iosTabBarScroll = useFloatingTabBarScroll();
 
@@ -132,7 +135,7 @@ export default function ProfileScreen() {
     return getArtistDisplayText({ artist: oshiArtist, parentName });
   }, [allArtists, oshiArtist]);
   const profileName = userConfig?.name ?? 'Otaku';
-  const avatarSize = 92;
+  const avatarSize = isWide ? 76 : 92;
   const menuTints = colors.profileMenu;
   const renderSettingsIcon = useCallback(() => (
     <TouchableOpacity
@@ -145,147 +148,171 @@ export default function ProfileScreen() {
       <AppIcon name="settings" size={22} color={colors.accent} />
     </TouchableOpacity>
   ), [colors.accent, router]);
-  const content = (
-    <>
-      <View style={{ marginHorizontal: 16, marginBottom: 32 }}>
-        {isAndroid ? (
-          <AndroidLargeTabTitle
-            title="我的"
-            right={renderSettingsIcon()}
-            largeTitleStyle={androidHeader.largeTitleStyle}
+  const profileIdentity = (
+    <View style={{ alignItems: 'center' }}>
+      <View
+        style={{
+          width: avatarSize,
+          height: avatarSize,
+          borderRadius: avatarSize / 2,
+          backgroundColor: colors.oshiAvatarBg,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        {userConfig?.avatar_uri ? (
+          <Image
+            source={{ uri: userConfig.avatar_uri }}
+            style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
           />
-        ) : null}
-
-        <View
-          style={{
-            backgroundColor: colors.card,
-            borderRadius: 22,
-            paddingHorizontal: 16,
-            paddingTop: 20,
-            paddingBottom: 16,
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: isDark ? 0.18 : 0.08,
-            shadowRadius: 12,
-            elevation: 3,
-          }}
-        >
-          <View style={{ alignItems: 'center' }}>
-            <View
-              style={{
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: avatarSize / 2,
-                backgroundColor: colors.oshiAvatarBg,
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-              }}
-            >
-              {userConfig?.avatar_uri ? (
-                <Image
-                  source={{ uri: userConfig.avatar_uri }}
-                  style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
-                />
-              ) : (
-                <AppIcon name="profile" size={42} color={colors.textSecondary} />
-              )}
-            </View>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                maxWidth: '84%',
-                marginTop: 14,
-                fontSize: 18,
-                lineHeight: 22,
-                fontWeight: '800',
-                textAlign: 'center',
-                color: colors.heading,
-              }}
-            >
-              {profileName}
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'stretch',
-              marginTop: 22,
-              paddingTop: 18,
-              borderTopWidth: 1,
-              borderTopColor: colors.divider,
-            }}
-          >
-            <ProfileStat label="活动总数" value={stats.events} colors={colors} />
-            <ProfileStat label="已完成" value={stats.completed} colors={colors} />
-            <ProfileStat label="收藏艺人" value={stats.favoriteArtists} colors={colors} />
-            <ProfileStat label="拍立得" value={stats.cheki} colors={colors} isLast />
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              if (oshiArtist) {
-                router.push(`/artists/${oshiArtist.id}`);
-                return;
-              }
-              router.push('/settings/oshi');
-            }}
-            style={{
-              marginTop: 18,
-              paddingTop: 15,
-              paddingHorizontal: 8,
-              borderTopWidth: 1,
-              borderTopColor: colors.divider,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
-              {oshiArtist ? (
-                <View style={{ marginRight: 12 }}>
-                  <OshiAvatar source={resolveAvatarSource(oshiArtist.avatar_uri)} size={40} isOshi name={getArtistPrimaryName(oshiArtist)} />
-                </View>
-              ) : (
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <AppIcon name="oshi" variant="inactive" size={20} color={colors.oshiBadgeBg} />
-                </View>
-              )}
-
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 15.5,
-                    lineHeight: 20,
-                    fontWeight: '800',
-                    color: oshiArtist ? colors.text : colors.textSecondary,
-                  }}
-                >
-                  {oshiDisplay?.title ?? '设置单推'}
-                </Text>
-              </View>
-
-              {oshiArtist ? (
-                <View style={{ marginLeft: 12 }}>
-                  <OshiBadge />
-                </View>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <AppIcon name="profile" size={isWide ? 36 : 42} color={colors.textSecondary} />
+        )}
       </View>
 
-      <View style={{ marginHorizontal: 16, marginBottom: 20 }}>
+      <Text
+        numberOfLines={1}
+        style={{
+          maxWidth: '84%',
+          marginTop: isWide ? 10 : 14,
+          fontSize: 18,
+          lineHeight: 22,
+          fontWeight: '800',
+          textAlign: 'center',
+          color: colors.heading,
+        }}
+      >
+        {profileName}
+      </Text>
+    </View>
+  );
+
+  const statsSummary = (
+    <View
+      style={{
+        flex: isWide ? 1 : undefined,
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        justifyContent: 'center',
+        marginTop: isWide ? 0 : 22,
+        marginLeft: isWide ? 24 : 0,
+        paddingTop: isWide ? 0 : 18,
+        paddingLeft: isWide ? 24 : 0,
+        borderTopWidth: isWide ? 0 : 1,
+        borderTopColor: colors.divider,
+        borderLeftWidth: isWide ? 1 : 0,
+        borderLeftColor: colors.divider,
+      }}
+    >
+      <ProfileStat label="活动总数" value={stats.events} colors={colors} />
+      <ProfileStat label="已完成" value={stats.completed} colors={colors} />
+      <ProfileStat label="收藏艺人" value={stats.favoriteArtists} colors={colors} />
+      <ProfileStat label="拍立得" value={stats.cheki} colors={colors} isLast />
+    </View>
+  );
+
+  const oshiSummary = (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        if (oshiArtist) {
+          router.push(`/artists/${oshiArtist.id}`);
+          return;
+        }
+        router.push('/settings/oshi');
+      }}
+      style={{
+        marginTop: isWide ? 14 : 18,
+        paddingTop: isWide ? 11 : 15,
+        paddingHorizontal: 8,
+        borderTopWidth: 1,
+        borderTopColor: colors.divider,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+        {oshiArtist ? (
+          <View style={{ marginRight: 12 }}>
+            <OshiAvatar
+              source={resolveAvatarSource(oshiArtist.avatar_uri)}
+              size={40}
+              isOshi
+              name={getArtistPrimaryName(oshiArtist)}
+            />
+          </View>
+        ) : (
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 12,
+            }}
+          >
+            <AppIcon name="oshi" variant="inactive" size={20} color={colors.oshiBadgeBg} />
+          </View>
+        )}
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 15.5,
+              lineHeight: 20,
+              fontWeight: '800',
+              color: oshiArtist ? colors.text : colors.textSecondary,
+            }}
+          >
+            {oshiDisplay?.title ?? '设置单推'}
+          </Text>
+        </View>
+
+        {oshiArtist ? (
+          <View style={{ marginLeft: 12 }}>
+            <OshiBadge />
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const profileCard = (
+    <View
+      style={{
+        backgroundColor: colors.card,
+        borderRadius: 22,
+        paddingHorizontal: 16,
+        paddingTop: 20,
+        paddingBottom: 16,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.18 : 0.08,
+        shadowRadius: 12,
+        elevation: 3,
+      }}
+    >
+      {isWide ? (
+        <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+          <View style={{ width: 300, flexShrink: 0 }}>
+            {profileIdentity}
+            {oshiSummary}
+          </View>
+          {statsSummary}
+        </View>
+      ) : (
+        <>
+          {profileIdentity}
+          {statsSummary}
+          {oshiSummary}
+        </>
+      )}
+    </View>
+  );
+
+  const functionSection = (
+    <View>
         <SectionLabel label="功能" />
         <MenuCard>
           <MenuItem
@@ -317,9 +344,11 @@ export default function ProfileScreen() {
             onPress={() => router.push('/tools')}
           />
         </MenuCard>
-      </View>
+    </View>
+  );
 
-      <View style={{ marginHorizontal: 16, marginBottom: 20 }}>
+  const moreSection = (
+    <View>
         <SectionLabel label="更多" />
         <MenuCard>
           <MenuItem
@@ -345,8 +374,41 @@ export default function ProfileScreen() {
             onPress={() => router.push('/about')}
           />
         </MenuCard>
+    </View>
+  );
+
+  const profileContent = (
+    <>
+      {isAndroid ? (
+        <AndroidLargeTabTitle
+          title="我的"
+          right={renderSettingsIcon()}
+          largeTitleStyle={androidHeader.largeTitleStyle}
+        />
+      ) : null}
+
+      <View style={{ marginBottom: isWide ? 24 : 32 }}>
+        {profileCard}
       </View>
+
+      {isWide ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 20 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>{functionSection}</View>
+          <View style={{ flex: 1, minWidth: 0 }}>{moreSection}</View>
+        </View>
+      ) : (
+        <View style={{ gap: 20 }}>
+          {functionSection}
+          {moreSection}
+        </View>
+      )}
     </>
+  );
+
+  const content = isWide ? (
+    <DashboardContainer>{profileContent}</DashboardContainer>
+  ) : (
+    <ReadingContainer>{profileContent}</ReadingContainer>
   );
 
   if (!isAndroid) {

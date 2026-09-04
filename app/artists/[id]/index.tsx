@@ -108,13 +108,26 @@ function buildArtistChekiItems(
   return items;
 }
 
-export default function ArtistDetailScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+type ArtistDetailScreenProps = {
+  artistId?: string;
+  embedded?: boolean;
+  availableWidth?: number;
+};
+
+export function ArtistDetailScreen({
+  artistId,
+  embedded = false,
+  availableWidth,
+}: ArtistDetailScreenProps = {}) {
+  const { id: routeId } = useLocalSearchParams<{ id?: string }>();
+  const id = artistId ?? routeId;
   const db = useDB();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: windowWidth, height: screenHeight } = useWindowDimensions();
+  const screenWidth = availableWidth ?? windowWidth;
   const { colors, isDark, chekiDisplayMode } = useAppTheme();
   const isIOS = Platform.OS === 'ios';
+  const usesNativeHeader = isIOS && !embedded;
 
   const [loading, setLoading] = useState(true);
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -316,7 +329,7 @@ export default function ArtistDetailScreen() {
     router.replace('/artists');
   };
 
-  const compactHeaderHeight = isIOS ? 0 : insets.top + 52;
+  const compactHeaderHeight = usesNativeHeader ? 0 : insets.top + 52;
   const usesLiquidGlass = hasBackground && canUseLiquidGlass(reduceTransparency);
   const heroHeight = hasBackground
     ? Math.round(Math.min(
@@ -371,22 +384,24 @@ export default function ArtistDetailScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: loadingBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Stack.Screen
-          options={isIOS
-            ? {
-                title: '',
-                headerShown: true,
-                headerLargeTitleEnabled: false,
-                headerTransparent: true,
-                headerLargeTitleShadowVisible: false,
-                headerShadowVisible: false,
-                headerBackButtonDisplayMode: 'minimal',
-                headerStyle: { backgroundColor: 'transparent' },
-                headerTitleStyle: { color: colors.heading },
-                headerTintColor: colors.accent,
-              }
-            : { headerShown: false }}
-        />
+        {!embedded ? (
+          <Stack.Screen
+            options={isIOS
+              ? {
+                  title: '',
+                  headerShown: true,
+                  headerLargeTitleEnabled: false,
+                  headerTransparent: true,
+                  headerLargeTitleShadowVisible: false,
+                  headerShadowVisible: false,
+                  headerBackButtonDisplayMode: 'minimal',
+                  headerStyle: { backgroundColor: 'transparent' },
+                  headerTitleStyle: { color: colors.heading },
+                  headerTintColor: colors.accent,
+                }
+              : { headerShown: false }}
+          />
+        ) : null}
         <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
@@ -395,7 +410,7 @@ export default function ArtistDetailScreen() {
   if (!artist) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: loadingBg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Stack.Screen options={{ headerShown: false }} />
+        {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
         <AppIcon name="artist" size={32} color={colors.textSecondary} style={{ marginBottom: 12 }} />
         <Text style={{ fontSize: 16, fontWeight: '700', color: loadingFg, marginBottom: 6 }}>
           艺人不存在
@@ -792,30 +807,32 @@ export default function ArtistDetailScreen() {
 
   return (
     <View
-      style={isIOS
+      style={usesNativeHeader
         ? { display: 'contents' }
         : { flex: 1, backgroundColor: pageBackgroundColor }}
     >
-      <Stack.Screen
-        options={isIOS
-          ? {
-              title: '',
-              headerShown: true,
-              headerLargeTitleEnabled: false,
-              headerTransparent: true,
-              headerLargeTitleShadowVisible: false,
-              headerShadowVisible: false,
-              headerBackButtonDisplayMode: 'minimal',
-              headerStyle: { backgroundColor: hasBackground ? 'transparent' : pageBackgroundColor },
-              headerLargeStyle: { backgroundColor: 'transparent' },
-              headerTitleStyle: { color: hasBackground ? backdropText : colors.heading },
-              headerLargeTitleStyle: { color: hasBackground ? backdropText : colors.heading },
-              headerTintColor: colors.accent,
-            }
-          : { headerShown: false }}
-      />
+      {!embedded ? (
+        <Stack.Screen
+          options={isIOS
+            ? {
+                title: '',
+                headerShown: true,
+                headerLargeTitleEnabled: false,
+                headerTransparent: true,
+                headerLargeTitleShadowVisible: false,
+                headerShadowVisible: false,
+                headerBackButtonDisplayMode: 'minimal',
+                headerStyle: { backgroundColor: hasBackground ? 'transparent' : pageBackgroundColor },
+                headerLargeStyle: { backgroundColor: 'transparent' },
+                headerTitleStyle: { color: hasBackground ? backdropText : colors.heading },
+                headerLargeTitleStyle: { color: hasBackground ? backdropText : colors.heading },
+                headerTintColor: colors.accent,
+              }
+            : { headerShown: false }}
+        />
+      ) : null}
 
-      {!isIOS ? (
+      {!usesNativeHeader ? (
         <View
           pointerEvents="box-none"
           style={{
@@ -853,14 +870,16 @@ export default function ArtistDetailScreen() {
             justifyContent: 'space-between',
           }}
         >
-          <CircleIconButton
-            icon="disclosure"
-            variant="back"
-            onPress={handleBack}
-            overlayMode={hasBackground}
-            overlayIsDark={pDark}
-            usesLiquidGlass={usesLiquidGlass}
-          />
+          {embedded ? <View style={{ width: 40 }} /> : (
+            <CircleIconButton
+              icon="disclosure"
+              variant="back"
+              onPress={handleBack}
+              overlayMode={hasBackground}
+              overlayIsDark={pDark}
+              usesLiquidGlass={usesLiquidGlass}
+            />
+          )}
           <Animated.View
             pointerEvents="none"
             style={[
@@ -903,7 +922,7 @@ export default function ArtistDetailScreen() {
         pointerEvents={activeTab === 'cheki' ? 'auto' : 'none'}
         accessibilityElementsHidden={activeTab !== 'cheki'}
         importantForAccessibility={activeTab === 'cheki' ? 'auto' : 'no-hide-descendants'}
-        style={isIOS
+        style={usesNativeHeader
           ? { display: activeTab === 'cheki' ? 'contents' : 'none' }
           : [StyleSheet.absoluteFill, { opacity: activeTab === 'cheki' ? 1 : 0 }]}
       >
@@ -914,7 +933,7 @@ export default function ArtistDetailScreen() {
           onScroll={chekiScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior={isIOS && !hasBackground ? 'automatic' : 'never'}
+          contentInsetAdjustmentBehavior={usesNativeHeader && !hasBackground ? 'automatic' : 'never'}
           style={{ flex: 1, backgroundColor: pageBackgroundColor }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           ListHeaderComponent={hasBackground ? (
@@ -1245,7 +1264,7 @@ export default function ArtistDetailScreen() {
         pointerEvents={activeTab === 'events' ? 'auto' : 'none'}
         accessibilityElementsHidden={activeTab !== 'events'}
         importantForAccessibility={activeTab === 'events' ? 'auto' : 'no-hide-descendants'}
-        style={isIOS
+        style={usesNativeHeader
           ? { display: activeTab === 'events' ? 'contents' : 'none' }
           : [StyleSheet.absoluteFill, { opacity: activeTab === 'events' ? 1 : 0 }]}
       >
@@ -1253,7 +1272,7 @@ export default function ArtistDetailScreen() {
           onScroll={eventsScrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior={isIOS && !hasBackground ? 'automatic' : 'never'}
+          contentInsetAdjustmentBehavior={usesNativeHeader && !hasBackground ? 'automatic' : 'never'}
           style={{ flex: 1, backgroundColor: pageBackgroundColor }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         >
@@ -1624,7 +1643,7 @@ export default function ArtistDetailScreen() {
         </Animated.ScrollView>
       </View>
 
-      {isIOS ? (
+      {usesNativeHeader ? (
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button onPress={() => router.push(`/artists/${artist.id}/edit`)}>
             编辑
@@ -1654,6 +1673,8 @@ export default function ArtistDetailScreen() {
     </View>
   );
 }
+
+export default ArtistDetailScreen;
 
 function CircleIconButton({
   icon,

@@ -206,6 +206,33 @@ describe('ArtistDetailScreen background layout', () => {
     jest.clearAllMocks();
   });
 
+  test('keeps embedded header controls below the status area while the hero remains edge-to-edge', async () => {
+    await act(async () => {
+      renderer = create(
+        <ArtistDetailScreen
+          artistId="artist-1"
+          embedded
+          availableWidth={600}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const overlayHeaders = renderer.root.findAllByType(View).filter(
+      (node) => node.props.style?.position === 'absolute' && node.props.style?.zIndex === 20,
+    );
+    expect(overlayHeaders).toHaveLength(1);
+    expect(overlayHeaders[0].props.style.height).toBe(96);
+
+    const headerRows = overlayHeaders[0].findAllByType(View).filter(
+      (node) => node.props.style?.justifyContent === 'space-between',
+    );
+    expect(headerRows).toHaveLength(1);
+    expect(headerRows[0].props.style.paddingTop).toBe(52);
+    expect(renderer.root.findAllByType(ImageBackground).length).toBeGreaterThan(0);
+  });
+
   test('keeps the backdrop fixed and presents more attributes in a bottom sheet', async () => {
     await act(async () => {
       renderer = create(<ArtistDetailScreen />);

@@ -27,6 +27,7 @@ import {
 import { FilteredEmptyState } from '../../src/components/FilteredEmptyState';
 import { AppIcon } from '../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../src/components/native-add-toolbar';
+import { ReadingContainer } from '../../src/components/adaptive/AppContainers';
 import type { EventFilter } from '../../src/repositories/EventRepository';
 import { buildEventMonthSections } from '../../src/utils/eventSections';
 import { ChekiDatePicker, type ChekiDatePickerMode } from '../../src/components/ChekiDatePicker';
@@ -42,6 +43,13 @@ import {
 } from '../../src/utils/eventFilters';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import { toggleBatchSelection } from '../../src/utils/filterSelection';
+import { useWindowMode } from '../../src/utils/windowMode';
+import {
+  MASTER_PANE_WIDTH,
+  MasterDetailEmptyState,
+  MasterPaneHeader,
+} from '../../src/components/adaptive/MasterDetailLayout';
+import { EventDetailScreen } from './[id]';
 
 const IS_IOS = process.env.EXPO_OS === 'ios';
 const SCORE_OPTIONS = [5, 4, 3, 2, 1];
@@ -82,6 +90,9 @@ export default function EventsIndexScreen() {
   const [draftFilters, setDraftFilters] = useState<EventListFilters>(() => cloneEventListFilters(sessionFilters));
   const [filterVisible, setFilterVisible] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<ChekiDatePickerMode | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [detailWidth, setDetailWidth] = useState<number | undefined>();
+  const { isWide } = useWindowMode();
   const consumedDeepLinkRef = useRef<string | null>(null);
   const loadRequestIdRef = useRef(0);
   const debouncedKeyword = useDebouncedValue(keyword, 250);
@@ -327,17 +338,24 @@ export default function EventsIndexScreen() {
     setDraftFilters(cloneEventListFilters(EMPTY_EVENT_LIST_FILTERS));
   }, [setAppliedFilters, setKeyword]);
 
+  useEffect(() => {
+    if (!isWide) return;
+    if (selectedEventId && events.some((event) => event.id === selectedEventId)) return;
+    setSelectedEventId(events[0]?.id ?? null);
+  }, [events, isWide, selectedEventId]);
+
   return (
     <>
       <Stack.Screen
         options={{
           title: '所有活动',
+          headerShown: !isWide,
           headerTitleAlign: 'center',
           headerStyle: { backgroundColor: colors.header },
           headerShadowVisible: false,
           headerTintColor: colors.accent,
           headerTitleStyle: { color: colors.heading, fontWeight: '700' },
-          headerRight: IS_IOS ? undefined : () => (
+          headerRight: IS_IOS || isWide ? undefined : () => (
             <TouchableOpacity
               onPress={() => router.push('/events/compose')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -351,58 +369,111 @@ export default function EventsIndexScreen() {
         }}
       />
       <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <SearchFilterBar
-            keyword={keyword}
-            onKeywordChange={setKeyword}
-            placeholder="搜索活动、艺人、场次或内容"
-            onOpenFilter={() => {
-              setDraftFilters(cloneEventListFilters(filters));
-              setFilterVisible(true);
-            }}
-            showActiveFilters={false}
-            activeCount={activeFilterCount}
-            isDark={isDark}
-          />
-          {events.length > 0 ? (
-            <Text style={{ marginBottom: 10, fontSize: 12.5, color: colors.textSecondary }}>
-              共 {events.length} 场活动
-            </Text>
+        <View style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
+        <ReadingContainer
+          style={isWide ? {
+            flex: 0,
+            width: MASTER_PANE_WIDTH,
+            paddingHorizontal: 0,
+            borderRightWidth: 1,
+            borderRightColor: colors.divider,
+          } : { flex: 1 }}
+        >
+          {isWide ? (
+            <MasterPaneHeader
+              title="所有活动"
+              actionLabel="新建活动"
+              onAction={() => router.push('/events/compose')}
+              colors={colors}
+            />
           ) : null}
-        </View>
+          <View style={{ paddingTop: 12, paddingHorizontal: isWide ? 16 : 0 }}>
+            <SearchFilterBar
+              keyword={keyword}
+              onKeywordChange={setKeyword}
+              placeholder="搜索活动、艺人、场次或内容"
+              onOpenFilter={() => {
+                setDraftFilters(cloneEventListFilters(filters));
+                setFilterVisible(true);
+              }}
+              showActiveFilters={false}
+              activeCount={activeFilterCount}
+              isDark={isDark}
+            />
+            {events.length > 0 ? (
+              <Text style={{ marginBottom: 10, fontSize: 12.5, color: colors.textSecondary }}>
+                共 {events.length} 场活动
+              </Text>
+            ) : null}
+          </View>
 
-        <SectionList
-          contentInsetAdjustmentBehavior="automatic"
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-          renderSectionHeader={({ section }) => (
-            <EventSectionHeader title={section.title} count={section.data.length} colors={colors} />
-          )}
-          renderItem={({ item }) => (
-            <EventCard event={item} oshiBadge={getEventCardOshiBadge(item.status, null)} />
-          )}
-          ListEmptyComponent={!refreshing ? (
-            hasAnyFilter ? (
-              <FilteredEmptyState
-                title="没有符合条件的活动"
-                onClear={clearAll}
-                clearLabel="清除全部"
-                isDark={isDark}
+          <SectionList
+            style={{ flex: 1 }}
+            contentInsetAdjustmentBehavior="automatic"
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingHorizontal: isWide ? 16 : 0, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+            renderSectionHeader={({ section }) => (
+              <EventSectionHeader title={section.title} count={section.data.length} colors={colors} />
+            )}
+            renderItem={({ item }) => (
+              <EventCard
+                event={item}
+                oshiBadge={getEventCardOshiBadge(item.status, null)}
+                variant={isWide ? 'compact' : 'default'}
+                selected={isWide && selectedEventId === item.id}
+                onPress={isWide ? () => setSelectedEventId(item.id) : undefined}
+              />
+            )}
+            ListEmptyComponent={!refreshing ? (
+              hasAnyFilter ? (
+                <FilteredEmptyState
+                  title="没有符合条件的活动"
+                  onClear={clearAll}
+                  clearLabel="清除全部"
+                  isDark={isDark}
+                />
+              ) : (
+                <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                  <AppIcon name="eventDate" size={32} color={colors.textMuted} style={{ marginBottom: 12 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 6 }}>还没有活动</Text>
+                  <Text style={{ fontSize: 13, color: colors.textMuted }}>新建活动后会出现在这里</Text>
+                </View>
+              )
+            ) : null}
+          />
+        </ReadingContainer>
+        {isWide ? (
+          <View
+            style={{ flex: 1, minWidth: 0 }}
+            onLayout={(event) => setDetailWidth(event.nativeEvent.layout.width)}
+          >
+            {selectedEventId ? (
+              <EventDetailScreen
+                key={selectedEventId}
+                eventId={selectedEventId}
+                embedded
+                availableWidth={detailWidth}
+                onDeleted={async () => {
+                  setSelectedEventId(null);
+                  await loadData();
+                }}
               />
             ) : (
-              <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                <AppIcon name="eventDate" size={32} color={colors.textMuted} style={{ marginBottom: 12 }} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 6 }}>还没有活动</Text>
-                <Text style={{ fontSize: 13, color: colors.textMuted }}>新建活动后会出现在这里</Text>
-              </View>
-            )
-          ) : null}
-        />
+              <MasterDetailEmptyState
+                icon={<AppIcon name="eventDate" size={36} color={colors.textMuted} />}
+                title="选择一场活动"
+                message="从左侧列表选择活动后，可在这里查看和编辑详情。"
+                colors={colors}
+              />
+            )}
+          </View>
+        ) : null}
+        </View>
 
         <FilterSheet
           visible={filterVisible}
@@ -436,7 +507,7 @@ export default function EventsIndexScreen() {
           }}
         />
       </SafeAreaView>
-      {IS_IOS ? <NativeAddToolbar accessibilityLabel="新建活动" onPress={() => router.push('/events/compose')} /> : null}
+      {IS_IOS && !isWide ? <NativeAddToolbar accessibilityLabel="新建活动" onPress={() => router.push('/events/compose')} /> : null}
     </>
   );
 }

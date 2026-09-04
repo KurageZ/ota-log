@@ -37,7 +37,9 @@
 - 技术选型：`tech/stack.md`
 - 决策记录模板：`decisions/0000-template.md`
 - 艺人类型与团体履历决策：`decisions/0001-artist-types-and-memberships.md`
+- iPad 自适应布局决策：`decisions/0002-ipad-adaptive-layout.md`
 - 当前进度：`progress/now.md`
+- iPad 自适应布局进度：`progress/ipad-adaptation.md`
 - App Store Connect 简体中文元数据：[`publishing/app-store/metadata/zh-Hans.md`](../publishing/app-store/metadata/zh-Hans.md)
 - 官网首页与预览说明：[`publishing/website/README.md`](../publishing/website/README.md)
 - 拍立得新版 UI 验收清单：`progress/cheki-v2-ui-checklist.md`

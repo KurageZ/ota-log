@@ -28,6 +28,7 @@ import {
 import type { HydratedDateItem } from '../../../src/repositories/DateItemRepository';
 import { AppIcon, getAppIconSFSymbol } from '../../../src/components/AppIcon';
 import { NativeAddToolbar } from '../../../src/components/native-add-toolbar';
+import { DashboardContainer } from '../../../src/components/adaptive/AppContainers';
 import { EventCardOshiBadge, getEventCardOshiBadge, getOshiMatchSource } from '../../../src/utils/oshiMatch';
 import { buildHomeTimelineGroups } from '../../../src/utils/homeTimeline';
 import { useAppTheme } from '../../../src/theme/appTheme';
@@ -686,7 +687,6 @@ export default function HomeScreen() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.screen }}
       contentContainerStyle={{
-        paddingHorizontal: 16,
         paddingTop: isAndroid ? androidHeader.contentTopPadding : 6,
         paddingBottom: contentBottomPadding,
       }}
@@ -696,19 +696,21 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       {...scrollProps}
     >
-      {isAndroid ? (
-        <AndroidLargeTabTitle
-          title="首页"
-          right={renderHeaderRight()}
-          largeTitleStyle={androidHeader.largeTitleStyle}
-        />
-      ) : null}
+      <DashboardContainer>
+        {isAndroid ? (
+          <AndroidLargeTabTitle
+            title="首页"
+            right={renderHeaderRight()}
+            largeTitleStyle={androidHeader.largeTitleStyle}
+          />
+        ) : null}
 
-      {renderPinnedInfo()}
+        {renderPinnedInfo()}
 
-      {hasRenderedHomeCards ? renderedHomeCards : (
-        <HomeCardsEmptyState onCustomizePress={() => router.push('/settings/home')} />
-      )}
+        {hasRenderedHomeCards ? renderedHomeCards : (
+          <HomeCardsEmptyState onCustomizePress={() => router.push('/settings/home')} />
+        )}
+      </DashboardContainer>
     </ScrollView>
   );
 

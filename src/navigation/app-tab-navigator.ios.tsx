@@ -14,6 +14,9 @@ export function AppTabNavigator() {
       }}
       minimizeBehavior="onScrollDown"
       tintColor={colors.accent}
+      // 五个主入口是同级的顶层导航，固定使用 Tab Bar。
+      // iPad 的 adaptable sidebar 会浮在内容上方，不适合这种扁平信息架构。
+      sidebarAdaptable={false}
     >
       <NativeTabs.Trigger name="(home)">
         {createNativeTabIcon('home')}

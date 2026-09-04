@@ -81,14 +81,31 @@ function RootNavigator() {
           contentStyle: { backgroundColor: 'transparent' },
         }}
       />
-      <Stack.Screen name="events/create" options={{ presentation: 'fullScreenModal', title: '新建活动' }} />
+      <Stack.Screen
+        name="events/create"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: [0.9, 1],
+          sheetGrabberVisible: true,
+          title: '新建活动',
+        }}
+      />
       <Stack.Screen name="events/[id]" options={{ title: '活动详情' }} />
-      <Stack.Screen name="events/[id]/edit" options={{ presentation: 'modal', title: '编辑活动' }} />
+      <Stack.Screen
+        name="events/[id]/edit"
+        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '编辑活动' }}
+      />
       <Stack.Screen name="artists/index" options={{ title: '艺人管理' }} />
-      <Stack.Screen name="artists/new" options={{ presentation: 'modal', title: '新建艺人' }} />
+      <Stack.Screen
+        name="artists/new"
+        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '新建艺人' }}
+      />
       <Stack.Screen name="artists/[id]/index" options={{ title: '艺人详情' }} />
       <Stack.Screen name="artists/[id]/memberships" options={{ title: '所属履历' }} />
-      <Stack.Screen name="artists/[id]/edit" options={{ presentation: 'modal', title: '编辑艺人' }} />
+      <Stack.Screen
+        name="artists/[id]/edit"
+        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '编辑艺人' }}
+      />
       <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得记录' }} />
       <Stack.Screen name="cheki/records/[id]/index" options={{ title: '拍立得记录' }} />
       <Stack.Screen name="cheki/records/[id]/edit" options={{ presentation: 'modal', title: '编辑拍立得记录' }} />
