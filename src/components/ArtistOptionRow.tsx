@@ -20,6 +20,7 @@ export const ArtistOptionRow = memo(function ArtistOptionRow({
   parentName,
   colors,
   displayMode = 'compact',
+  recommendationReason,
   trailing = 'none',
   onPress,
   onTrailingPress,
@@ -32,6 +33,7 @@ export const ArtistOptionRow = memo(function ArtistOptionRow({
   parentName?: string | null;
   colors: ThemeColors;
   displayMode?: ArtistDisplayMode;
+  recommendationReason?: string;
   trailing?: ArtistOptionTrailing;
   onPress?: (artist: Artist) => void;
   onTrailingPress?: (artist: Artist) => void;
@@ -76,6 +78,14 @@ export const ArtistOptionRow = memo(function ArtistOptionRow({
             {display.title}
           </Text>
           {isOshi ? <OshiBadge /> : null}
+          {recommendationReason ? (
+            <Text
+              numberOfLines={1}
+              style={{ flexShrink: 1, fontSize: 11, fontWeight: '600', color: colors.accent }}
+            >
+              名称匹配 · {recommendationReason}
+            </Text>
+          ) : null}
         </View>
         {display.subtitle ? (
           <Text

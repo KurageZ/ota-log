@@ -23,10 +23,13 @@ import { hapticError, hapticFavoriteToggle } from '../../src/utils/haptics';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { toISODate } from '../../src/utils/date';
+import {
+  ArtistGroupFilter,
+  matchesArtistGroupFilter,
+} from '../../src/utils/artistManagementFilters';
 
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
-type ArtistGroupFilter = 'has_parent' | 'no_parent' | null;
 type ArtistTypeFilter = 'person' | 'group' | 'unset' | null;
 const IS_IOS = process.env.EXPO_OS === 'ios';
 const ARTIST_TYPE_NOTICE_DISMISSED_KEY = 'artist_type_notice_dismissed_v1';
@@ -65,9 +68,11 @@ export default function ArtistsScreen() {
       if (filter === 'favorites' && artist.is_favorite !== 1) return false;
       if (hasChekiOnly && !chekiArtistIds.has(artist.id)) return false;
       if (eventFilter === 'attended' && !eventArtistIds.has(artist.id)) return false;
-      const hasGroup = Boolean(artist.parent_id || currentGroupLabels[artist.id]);
-      if (groupFilter === 'has_parent' && !hasGroup) return false;
-      if (groupFilter === 'no_parent' && hasGroup) return false;
+      if (!matchesArtistGroupFilter(
+        artist,
+        groupFilter,
+        Boolean(currentGroupLabels[artist.id]),
+      )) return false;
       if (typeFilter === 'person' && artist.artist_type !== 'person') return false;
       if (typeFilter === 'group' && artist.artist_type !== 'group') return false;
       if (typeFilter === 'unset' && artist.artist_type != null) return false;

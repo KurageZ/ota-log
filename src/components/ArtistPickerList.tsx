@@ -21,6 +21,7 @@ export function ArtistPickerList({
   parentNameMap,
   displayMode = 'compact',
   selectedIndicator = 'check',
+  recommendationReasonByArtistId,
 }: {
   artists: Artist[];
   selectedIds?: Set<string> | string[];
@@ -35,6 +36,7 @@ export function ArtistPickerList({
   parentNameMap?: Record<string, string>;
   displayMode?: ArtistDisplayMode;
   selectedIndicator?: SelectedIndicator;
+  recommendationReasonByArtistId?: Record<string, string>;
 }) {
   const { colors } = useAppTheme();
   const selectedSet = useMemo(
@@ -61,11 +63,12 @@ export function ArtistPickerList({
         parentName={artist.parent_id ? parentNameMap?.[artist.parent_id] : undefined}
         colors={colors}
         displayMode={displayMode}
+        recommendationReason={recommendationReasonByArtistId?.[artist.id]}
         trailing={trailing}
         onPress={onPressArtist}
       />
     );
-  }, [displayMode, hiddenCount, isDark, onPressArtist, oshiArtistId, parentNameMap, selectedIndicator, selectedSet, visibleArtists.length, colors]);
+  }, [colors, displayMode, hiddenCount, isDark, onPressArtist, oshiArtistId, parentNameMap, recommendationReasonByArtistId, selectedIndicator, selectedSet, visibleArtists.length]);
 
   const renderItem = useCallback(({ item, index }: { item: Artist; index: number }) => (
     renderRow(item, index, artists.length)

@@ -718,6 +718,7 @@ export default function EditArtistScreen() {
                     placeholder={artistType === 'person' ? '搜索团体...' : '搜索成员...'}
                     maxHeight={200}
                     parentNameMap={artistNameMap}
+                    recommendationSource={{ name, short_name: shortName }}
                     onSelectArtist={toggleTypedRelationship}
                     onRemoveArtist={toggleTypedRelationship}
                   />

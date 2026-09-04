@@ -10,6 +10,11 @@ import { withAlpha } from '../utils/color';
 import { AppIcon } from './AppIcon';
 import { ArtistOptionRow } from './ArtistOptionRow';
 import { ArtistPickerList } from './ArtistPickerList';
+import {
+  getArtistNameRecommendations,
+  promoteArtistNameRecommendations,
+} from '../utils/artistRelationshipRecommendations';
+import type { ArtistNameRecommendationSource } from '../utils/artistRelationshipRecommendations';
 
 const DEFAULT_VISIBLE_SELECTED_ARTISTS = 5;
 
@@ -42,6 +47,7 @@ export function ArtistSearchPicker({
   onRemoveExtraSelectedRow,
   typePreference,
   lookup,
+  recommendationSource,
 }: {
   artists: Artist[];
   /** 完整的艺人库（含所属团体），用于搜索匹配与所属链解析；候选列表是子集时传入 */
@@ -75,6 +81,8 @@ export function ArtistSearchPicker({
   onRemoveExtraSelectedRow?: (id: string) => void;
   /** 类型优先：'group' 团体优先，'person' 个人优先，不传/null 不区分类型 */
   typePreference?: ArtistTypePreference;
+  /** 按另一侧艺人名称推荐关系候选；仅在搜索词为空时生效，不会自动选择 */
+  recommendationSource?: ArtistNameRecommendationSource;
 }) {
   const { colors } = useAppTheme();
   const [showAllSelected, setShowAllSelected] = useState(false);
@@ -89,14 +97,29 @@ export function ArtistSearchPicker({
     if (selectedArtists) return selectedArtists;
     return artists.filter((artist) => selectedSet.has(artist.id));
   }, [artists, selectedArtists, selectedSet]);
+  const trimmedSearch = searchValue.trim();
+  const nameRecommendations = useMemo(() => {
+    if (trimmedSearch || !recommendationSource) return [];
+    const recommendationCandidates = hideSelectedFromCandidates
+      ? artists.filter((artist) => !selectedSet.has(artist.id))
+      : artists;
+    return getArtistNameRecommendations(recommendationSource, recommendationCandidates);
+  }, [artists, hideSelectedFromCandidates, recommendationSource, selectedSet, trimmedSearch]);
+  const recommendationReasonByArtistId = useMemo(
+    () => Object.fromEntries(nameRecommendations.map((item) => [item.artistId, item.matchedText])),
+    [nameRecommendations],
+  );
   const filteredArtists = useMemo(
-    () => sortArtistsByPreference(
-      filterArtistsByQuery(artists, searchValue, oshiArtistId, lookup),
-      oshiArtistId,
-      typePreference,
-      lookup,
+    () => promoteArtistNameRecommendations(
+      sortArtistsByPreference(
+        filterArtistsByQuery(artists, searchValue, oshiArtistId, lookup),
+        oshiArtistId,
+        typePreference,
+        lookup,
+      ),
+      nameRecommendations,
     ),
-    [artists, lookup, oshiArtistId, searchValue, typePreference],
+    [artists, lookup, nameRecommendations, oshiArtistId, searchValue, typePreference],
   );
   const candidateArtists = useMemo(
     () => hideSelectedFromCandidates
@@ -109,7 +132,6 @@ export function ArtistSearchPicker({
     : resolvedSelectedArtists.slice(0, maxVisibleSelected);
   const hiddenSelectedCount = resolvedSelectedArtists.length - visibleSelectedArtists.length;
   const hasExtraSelectedRows = Boolean(extraSelectedRows && extraSelectedRows.length > 0);
-  const trimmedSearch = searchValue.trim();
   const candidateRenderLimit = renderLimit ?? (trimmedSearch ? 80 : 32);
   const canCreateArtist = Boolean(
     onCreateArtist
@@ -308,6 +330,7 @@ export function ArtistSearchPicker({
         renderLimit={candidateRenderLimit}
         parentNameMap={parentNameMap}
         displayMode={displayMode}
+        recommendationReasonByArtistId={recommendationReasonByArtistId}
         onPressArtist={onSelectArtist}
         emptyComponent={
           <View style={{ padding: 14, alignItems: 'center' }}>

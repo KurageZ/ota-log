@@ -140,3 +140,81 @@ describe('ArtistSearchPicker quick create', () => {
     expect(renderer.root.findAllByType(ActivityIndicator)).toHaveLength(0);
   });
 });
+
+describe('ArtistSearchPicker relationship recommendations', () => {
+  let renderer: ReactTestRenderer;
+
+  afterEach(() => {
+    act(() => renderer?.unmount());
+  });
+
+  test('promotes and explains a name-matched candidate while the search is empty', () => {
+    const favoriteGroup: Artist = {
+      ...existingArtist,
+      id: 'favorite-group',
+      name: '收藏团体',
+      artist_type: 'group',
+      is_favorite: 1,
+    };
+    const vortexGroup: Artist = {
+      ...existingArtist,
+      id: 'vortex-group',
+      name: '惑星 VORTEX',
+      artist_type: 'group',
+    };
+
+    act(() => {
+      renderer = create(
+        <ArtistSearchPicker
+          artists={[favoriteGroup, vortexGroup]}
+          isDark={false}
+          searchValue=""
+          onSearchChange={jest.fn()}
+          onSelectArtist={jest.fn()}
+          onRemoveArtist={jest.fn()}
+          recommendationSource={{ name: '海羽Rione-VORTEX' }}
+          usePlainScroll
+        />,
+      );
+    });
+
+    const labels = renderer.root.findAllByType(Text).map((node) => node.props.children);
+    expect(labels.indexOf('惑星 VORTEX')).toBeLessThan(labels.indexOf('收藏团体'));
+    expect(labels).toContainEqual(['名称匹配 · ', 'VORTEX']);
+  });
+
+  test('manual search replaces recommendation ordering and annotations', () => {
+    const vortexGroup: Artist = {
+      ...existingArtist,
+      id: 'vortex-group',
+      name: '惑星 VORTEX',
+      artist_type: 'group',
+    };
+    const searchedGroup: Artist = {
+      ...existingArtist,
+      id: 'searched-group',
+      name: '目标团体',
+      artist_type: 'group',
+    };
+
+    act(() => {
+      renderer = create(
+        <ArtistSearchPicker
+          artists={[vortexGroup, searchedGroup]}
+          isDark={false}
+          searchValue="目标"
+          onSearchChange={jest.fn()}
+          onSelectArtist={jest.fn()}
+          onRemoveArtist={jest.fn()}
+          recommendationSource={{ name: '海羽Rione-VORTEX' }}
+          usePlainScroll
+        />,
+      );
+    });
+
+    const labels = renderer.root.findAllByType(Text).map((node) => node.props.children);
+    expect(labels).toContain('目标团体');
+    expect(labels).not.toContain('惑星 VORTEX');
+    expect(labels.some((label) => Array.isArray(label) && label[0] === '名称匹配 · ')).toBe(false);
+  });
+});
