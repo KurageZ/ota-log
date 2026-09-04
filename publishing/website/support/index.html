@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="ota log 技术支持与常见问题" />
+    <meta name="theme-color" content="#eef3f8" />
+    <link rel="icon" href="../icon.png" />
+    <title>技术支持 — ota log</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #eef3f8;
+        --card: #ffffff;
+        --text: #17191d;
+        --secondary: #606773;
+        --border: rgba(16, 24, 40, 0.12);
+        --accent: #0b63f6;
+        --accent-text: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 48px auto;
+        padding: 40px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--card);
+      }
+
+      h1,
+      h2 {
+        line-height: 1.35;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.9rem, 5vw, 2.5rem);
+      }
+
+      h2 {
+        margin: 32px 0 8px;
+        font-size: 1.2rem;
+      }
+
+      p,
+      ul {
+        margin: 8px 0;
+      }
+
+      ul {
+        padding-left: 1.4em;
+      }
+
+      .intro {
+        color: var(--secondary);
+      }
+
+      a {
+        color: var(--accent);
+        text-underline-offset: 3px;
+      }
+
+      .back {
+        display: inline-block;
+        margin-bottom: 24px;
+      }
+
+      .button {
+        display: inline-block;
+        margin-top: 12px;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--accent-text);
+        padding: 10px 16px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      @media (max-width: 600px) {
+        main {
+          margin: 0 auto;
+          width: 100%;
+          min-height: 100vh;
+          padding: 28px 20px 48px;
+          border: 0;
+          border-radius: 0;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #0f1115;
+          --card: #191c22;
+          --text: #f3f4f6;
+          --secondary: #a9b0bb;
+          --border: rgba(255, 255, 255, 0.12);
+          --accent: #75a7ff;
+          --accent-text: #101114;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="../">返回 ota log</a>
+
+      <h1>ota log 技术支持</h1>
+      <p class="intro">如果你在使用 ota log 时遇到问题，可以在这里获取帮助。</p>
+
+      <h2>联系开发者</h2>
+      <p>
+        请通过 GitHub Issues 提交问题。为了便于排查，建议说明设备系统、ota log 版本、操作步骤和出现的现象。
+      </p>
+      <p>请勿提交个人记录、微博登录信息、备份文件或其他敏感内容。</p>
+      <a class="button" href="https://github.com/KurageZ/ota-log/issues/new">提交问题</a>
+
+      <h2>常见问题</h2>
+      <ul>
+        <li>数据默认保存在当前设备中，不会自动同步到其他设备。</li>
+        <li>更换设备前，请在“设置 → 备份和恢复”中生成并保存完整备份。</li>
+        <li>相机、照片或日历功能不可用时，请检查系统设置中的 App 权限。</li>
+        <li>微博或 iEvent 导入依赖对应第三方服务，服务异常时可以稍后重试。</li>
+      </ul>
+
+      <h2>隐私</h2>
+      <p>关于本地存储、系统权限和第三方服务的说明，请查看 <a href="../privacy/">ota log 隐私政策</a>。</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="ota log 隐私政策" />
+    <meta name="theme-color" content="#eef3f8" />
+    <link rel="icon" href="../icon.png" />
+    <title>隐私政策 — ota log</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #eef3f8;
+        --card: #ffffff;
+        --text: #17191d;
+        --secondary: #606773;
+        --border: rgba(16, 24, 40, 0.12);
+        --accent: #0b63f6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 48px auto;
+        padding: 40px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--card);
+      }
+
+      h1,
+      h2 {
+        line-height: 1.35;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.9rem, 5vw, 2.5rem);
+      }
+
+      h2 {
+        margin: 32px 0 8px;
+        font-size: 1.2rem;
+      }
+
+      p,
+      ul {
+        margin: 8px 0;
+      }
+
+      ul {
+        padding-left: 1.4em;
+      }
+
+      .meta {
+        color: var(--secondary);
+      }
+
+      a {
+        color: var(--accent);
+        text-underline-offset: 3px;
+      }
+
+      .back {
+        display: inline-block;
+        margin-bottom: 24px;
+      }
+
+      @media (max-width: 600px) {
+        main {
+          margin: 0 auto;
+          width: 100%;
+          min-height: 100vh;
+          padding: 28px 20px 48px;
+          border: 0;
+          border-radius: 0;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #0f1115;
+          --card: #191c22;
+          --text: #f3f4f6;
+          --secondary: #a9b0bb;
+          --border: rgba(255, 255, 255, 0.12);
+          --accent: #75a7ff;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="../">返回 ota log</a>
+
+      <h1>ota log 隐私政策</h1>
+      <p class="meta">生效日期：2026 年 9 月 4 日</p>
+
+      <p>
+        ota log 是一款本地优先应用。本政策说明 ota log 如何访问、使用、保存和删除你的数据。
+      </p>
+
+      <h2>1. 数据存储</h2>
+      <p>
+        你的昵称、头像、活动、艺人、拍立得、重要日期、备注、花费和图片保存在当前设备的应用私有存储中。ota log 不要求注册账号，也没有自建云端同步、广告或使用行为分析服务。
+      </p>
+
+      <h2>2. 系统权限</h2>
+      <ul>
+        <li>照片：选择头像、艺人图片、活动资料图和拍立得照片，以及保存你主动生成的图片。</li>
+        <li>相机：拍摄拍立得照片或制作贴纸照片。ota log 不访问麦克风。</li>
+        <li>日历：仅在你选择“添加到日历”时，将活动信息写入系统日历。</li>
+      </ul>
+      <p>这些权限仅在你使用对应功能时请求，你可以随时在系统设置中撤回。</p>
+
+      <h2>3. 联网与第三方服务</h2>
+      <p>
+        当你主动使用微博解析、微博登录、关注导入或 iEvent 活动导入时，ota log 会通过 HTTPS 直接连接相应服务以完成请求。微博登录状态保存在当前设备，可在 App 内清除。第三方服务会按照其自身的隐私政策处理相关请求。
+      </p>
+
+      <h2>4. 备份与分享</h2>
+      <p>
+        你可以主动生成并导出包含记录和本地图片的备份，也可以通过系统分享功能发送图片。导出后，文件由你选择的保存位置或第三方应用负责处理，请妥善保管。
+      </p>
+
+      <h2>5. 数据删除</h2>
+      <p>
+        你可以在 App 内删除记录、清除微博登录状态，并在“存储空间”中清理未使用的本地图片。卸载 App 会删除其应用私有存储。已经导出的备份或图片需要由你在对应保存位置单独删除。
+      </p>
+
+      <h2>6. 政策网站</h2>
+      <p>
+        本页面通过 GitHub Pages 提供。访问本页面时，GitHub 可能为安全和服务运行目的处理必要的网络信息。
+      </p>
+
+      <h2>7. 联系方式</h2>
+      <p>
+        如对本隐私政策有疑问，可以通过
+        <a href="https://github.com/KurageZ/ota-log/issues">ota log GitHub Issues</a>
+        联系开发者。请勿在公开 Issue 中提交个人记录、登录信息或其他敏感内容。
+      </p>
+      <p>其他使用问题请访问 <a href="../support/">ota log 技术支持</a>。</p>
+
+      <h2>8. 政策更新</h2>
+      <p>本政策发生变化时，更新后的版本会发布在本页面，并注明新的生效日期。</p>
+    </main>
+  </body>
+</html>
