@@ -42,7 +42,10 @@ describe('OnboardingGuide', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    storage.getItem.mockReset();
+    storage.setItem.mockReset();
     storage.getItem.mockResolvedValue(null);
+    storage.setItem.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -82,19 +85,38 @@ describe('OnboardingGuide', () => {
 
     const unlockedSkipButton = renderer!.root.findByProps({ accessibilityLabel: '跳过引导' });
     expect(unlockedSkipButton.props.disabled).toBe(false);
-    act(() => unlockedSkipButton.props.onPress());
+    await act(async () => {
+      unlockedSkipButton.props.onPress();
+      await Promise.resolve();
+    });
 
     expect(renderer!.root.findAllByProps({ accessibilityLabel: '跳过引导' })).toHaveLength(0);
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.setItem).toHaveBeenCalledWith('ota-log.onboarding-guide-seen.v2', 'true');
   });
 
-  test('always shows in development without reading or writing the completion marker', async () => {
-    storage.getItem.mockResolvedValue('true');
+  test('does not show again after the guide has been completed', async () => {
+    let completionMarker: string | null = null;
+    storage.getItem.mockImplementation(async () => completionMarker);
+    storage.setItem.mockImplementation(async (_key, value) => {
+      completionMarker = value;
+    });
 
     await renderGuide();
+    act(() => {
+      renderer!.root.findByType(Modal).props.onShow();
+      jest.advanceTimersByTime(300);
+    });
+    await act(async () => {
+      renderer!.root.findByProps({ accessibilityLabel: '跳过引导' }).props.onPress();
+      await Promise.resolve();
+    });
 
-    expect(renderer!.root.findByType(Modal).props.visible).toBe(true);
-    expect(storage.getItem).not.toHaveBeenCalled();
-    expect(storage.setItem).not.toHaveBeenCalled();
+    act(() => renderer!.unmount());
+    renderer = undefined;
+    await renderGuide();
+
+    expect(renderer!.root.findAllByType(Modal)).toHaveLength(0);
+    expect(storage.getItem).toHaveBeenCalledTimes(2);
+    expect(storage.setItem).toHaveBeenCalledTimes(1);
   });
 });

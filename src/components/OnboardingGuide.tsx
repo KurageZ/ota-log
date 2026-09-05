@@ -500,14 +500,6 @@ function OnboardingGuideOverlay({
     if (!isHydrated) return;
     let isActive = true;
 
-    if (__DEV__) {
-      setIsAutoVisible(true);
-      setIsChecking(false);
-      return () => {
-        isActive = false;
-      };
-    }
-
     AsyncStorage.getItem(STORAGE_KEY)
       .then((value) => {
         if (!isActive) return;
@@ -562,7 +554,6 @@ function OnboardingGuideOverlay({
     }
 
     setIsAutoVisible(false);
-    if (__DEV__) return;
 
     try {
       await AsyncStorage.setItem(STORAGE_KEY, 'true');
