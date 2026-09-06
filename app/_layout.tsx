@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 import { useFonts } from 'expo-font';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -84,27 +85,28 @@ function RootNavigator() {
       <Stack.Screen
         name="events/create"
         options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: [0.9, 1],
-          sheetGrabberVisible: true,
+          // Android form sheets do not render native headers or their save/cancel actions.
+          presentation: Platform.OS === 'ios' ? 'formSheet' : 'fullScreenModal',
+          sheetAllowedDetents: Platform.OS === 'ios' ? [0.9, 1] : undefined,
+          sheetGrabberVisible: Platform.OS === 'ios',
           title: '新建活动',
         }}
       />
       <Stack.Screen name="events/[id]" options={{ title: '活动详情' }} />
       <Stack.Screen
         name="events/[id]/edit"
-        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '编辑活动' }}
+        options={{ presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal', sheetAllowedDetents: Platform.OS === 'ios' ? [0.9, 1] : undefined, sheetGrabberVisible: Platform.OS === 'ios', title: '编辑活动' }}
       />
       <Stack.Screen name="artists/index" options={{ title: '艺人管理' }} />
       <Stack.Screen
         name="artists/new"
-        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '新建艺人' }}
+        options={{ presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal', sheetAllowedDetents: Platform.OS === 'ios' ? [0.9, 1] : undefined, sheetGrabberVisible: Platform.OS === 'ios', title: '新建艺人' }}
       />
       <Stack.Screen name="artists/[id]/index" options={{ title: '艺人详情' }} />
       <Stack.Screen name="artists/[id]/memberships" options={{ title: '所属履历' }} />
       <Stack.Screen
         name="artists/[id]/edit"
-        options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, title: '编辑艺人' }}
+        options={{ presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal', sheetAllowedDetents: Platform.OS === 'ios' ? [0.9, 1] : undefined, sheetGrabberVisible: Platform.OS === 'ios', title: '编辑艺人' }}
       />
       <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得记录' }} />
       <Stack.Screen name="cheki/records/[id]/index" options={{ title: '拍立得记录' }} />

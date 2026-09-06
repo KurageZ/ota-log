@@ -39,6 +39,7 @@ npm test -- --runInBand
 - 主要文本不溢出、不遮挡。
 - 空状态、加载态、错误态可用。
 - iOS/Android 图标和字体加载稳定。
+- 活动、艺人的新建和编辑页：Android 使用普通 modal（活动新建为 fullScreenModal），iOS 保留 formSheet；检查顶部取消/保存、表单双向滚动和键盘弹出后的字段可达性。Android formSheet 不支持原生导航栏，不能将 iOS 的 sheet 配置直接应用到 Android。
 
 涉及视觉结构大改时，优先在 `design/` 放一次性 HTML 原型或截图检查说明；除非明确要求，不把原型作为功能提交的一部分。
 
