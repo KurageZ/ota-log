@@ -14,7 +14,7 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 
 ## 文件与内容
 
-- `index.html`：首页内容、响应式样式及下载占位提示交互。
+- `index.html`：首页内容、响应式样式及 iOS / Android 下载入口。
 - `privacy/index.html`：可独立部署和访问的隐私政策页面。
 - `support/index.html`：App Store 技术支持页面和问题反馈入口。
 - `icon.png`：来自 App 的 `assets/icon.png`，保留本地副本以便独立预览与部署。
@@ -26,10 +26,30 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 
 - 已包含最小可用的隐私政策和技术支持页面；未来更新计划不在本版范围。
 - App 界面及记录数据均为示意，页面已有标注；真实截图后续替换。
-- TestFlight 和 APK 尚未接入真实地址，按钮只显示提示，不会下载文件。
-- 展示版本号来自采集时资料，不是自动获取的最新版本。
-- 正式发布前需核对功能文案与隐私说明，接入下载地址，并更新版本号、更新时间、APK 大小和校验值。
+- Android APK 地址由部署时的 `android-download.js` 配置提供；未配置时按钮不可点击。TestFlight 已接入公开测试入口。
+- 展示版本号来自当前发布资料，不会自动更新。
+- 后续发布需核对功能文案与隐私说明，并核对展示版本号。
 - 审阅截图位于仓库的 `.impeccable/review/`，属于本地产物，不纳入源码管理。
+
+## 服务器部署
+
+```sh
+./scripts/deploy-website.sh --apk-url 'https://example.com/download/android'
+```
+
+支持下载网页和 APK 直链；带查询参数的 URL 请加引号。也可设置 `OTA_LOG_APK_URL`，命令行参数优先。
+脚本在临时目录生成配置并部署，结束后清理，不修改仓库 HTML 或配置文件。
+每次部署（含 `--dry-run`）必须提供地址，避免意外清空下载入口。
+
+```sh
+./scripts/deploy-website.sh --check-only
+./scripts/deploy-website.sh --check-only --apk-url 'https://example.com/app.apk'
+./scripts/deploy-website.sh --dry-run --apk-url 'https://example.com/app.apk'
+```
+
+`--check-only` 不连接服务器；提供 URL 时同时校验地址及生成后的站点。
+本地直接预览和下面的 GitHub Pages 工作流使用默认空配置，Android 按钮不可点击。
+如需在这些环境启用下载，请在发布产物中设置 `android-download.js` 的 `window.OTA_LOG_APK_URL`。
 
 ## GitHub Pages 部署
 

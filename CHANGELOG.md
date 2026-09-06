@@ -2,8 +2,6 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-## [Unreleased]
-
 ## [2.0.0] - 2026-09-04
 
 ### Added
@@ -26,7 +24,6 @@ All notable changes to this project will be documented in this file. See [standa
 - 修复月份汇总未在月份视图中打开的问题
 - 修复隐私页面未链接已发布隐私政策的问题
 - 修复 Android 新手引导可能被触摸尾事件自动跳过的问题
-- 修复 Android 活动、艺人新建和编辑页误用 formSheet，导致顶部取消与保存按钮缺失的问题
 
 ## [2.0.0-beta.5] - 2026-09-01
 

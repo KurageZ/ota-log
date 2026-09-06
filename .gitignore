@@ -33,6 +33,7 @@ yarn-error.*
 # local env files
 .env*.local
 /build_apk.sh
+/scripts/deploy-website.sh
 /release/
 /test-backups/
 /tmp/

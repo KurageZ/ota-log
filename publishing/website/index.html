@@ -935,32 +935,6 @@
         color: var(--text-secondary);
       }
 
-      .toast {
-        position: fixed;
-        left: 50%;
-        bottom: 24px;
-        z-index: 100;
-        max-width: calc(100vw - 32px);
-        transform: translate(-50%, 24px);
-        border-radius: 12px;
-        background: var(--heading);
-        color: var(--screen);
-        padding: 12px 16px;
-        opacity: 0;
-        pointer-events: none;
-        box-shadow: var(--shadow);
-        font-size: 14px;
-        font-weight: 750;
-        transition:
-          opacity 180ms ease,
-          transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-      }
-
-      .toast.is-visible {
-        transform: translate(-50%, 0);
-        opacity: 1;
-      }
-
       @keyframes phone-arrive {
         from {
           transform: translateY(28px) scale(0.97);
@@ -1267,8 +1241,19 @@
             ota log 是一款为偶像演出爱好者准备的本地记录 App。把活动、艺人、拍立得和回顾数据放在一起，重要的经历由你自己保管。
           </p>
           <div class="hero-actions" aria-label="下载选项">
-            <a class="button button-primary" href="#download">通过 TestFlight 获取</a>
-            <a class="button button-secondary" href="#download">下载 Android APK</a>
+            <a
+              class="button button-primary"
+              href="https://testflight.apple.com/join/NzwWTE6f"
+              target="_blank"
+              rel="noopener noreferrer"
+            >通过 TestFlight 获取</a>
+            <a
+              class="button button-secondary"
+              data-android-download
+              aria-disabled="true"
+              target="_blank"
+              rel="noopener noreferrer"
+            >下载 Android APK</a>
           </div>
           <p class="release-meta">
             <span>v2.0.0</span>
@@ -1432,32 +1417,43 @@
         <div class="section-inner">
           <div class="download-head">
             <h2 id="download-title">下载 ota log</h2>
-            <p>首版官网将同时提供 iOS TestFlight 和 Android APK。下面的按钮目前用于演示，正式链接接入后无需改变页面结构。</p>
+            <p>iOS TestFlight 公开测试与 Android 正式安装包现已开放下载。</p>
           </div>
           <div class="download-list">
             <article class="download-row">
               <div class="platform-name">iOS</div>
               <div class="platform-copy">
                 <strong>TestFlight 测试版</strong>
-                <span>v2.0.0 · 公开邀请链接待接入</span>
+                <span>v2.0.0 · 公开测试</span>
               </div>
-              <button class="button button-primary download-button" type="button" data-demo-download="TestFlight">
+              <a
+                class="button button-primary download-button"
+                href="https://testflight.apple.com/join/NzwWTE6f"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 获取测试版
-              </button>
+              </a>
             </article>
             <article class="download-row">
               <div class="platform-name">Android</div>
               <div class="platform-copy">
-                <strong>独立 APK 安装包</strong>
-                <span>版本号、文件大小与 SHA-256 将随正式文件显示</span>
+                <strong>Android APK 安装包</strong>
+                <span>独立安装包</span>
               </div>
-              <button class="button button-secondary download-button" type="button" data-demo-download="Android APK">
+              <a
+                class="button button-secondary download-button"
+                data-android-download
+                aria-disabled="true"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 下载 APK
-              </button>
+              </a>
             </article>
           </div>
           <p class="download-note">
-            Demo 不包含真实下载地址，也不会触发文件下载。正式站点需要在发布时同步版本号、更新时间、APK 文件大小和校验值。
+            安装时 Android 可能要求允许浏览器安装未知来源应用。
           </p>
         </div>
       </section>
@@ -1477,24 +1473,18 @@
       </div>
     </footer>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
+    <script src="./android-download.js"></script>
     <script>
-      const toast = document.querySelector("#toast");
+      if (window.OTA_LOG_APK_URL) {
+        document.querySelectorAll("[data-android-download]").forEach((link) => {
+          link.href = window.OTA_LOG_APK_URL;
+          link.removeAttribute("aria-disabled");
+        });
+      }
+
       const year = document.querySelector("#year");
-      let toastTimer;
 
       year.textContent = String(new Date().getFullYear());
-
-      document.querySelectorAll("[data-demo-download]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const platform = button.dataset.demoDownload;
-          toast.textContent = `${platform} 下载链接将在正式上线前接入。`;
-          toast.classList.add("is-visible");
-          clearTimeout(toastTimer);
-          toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2800);
-        });
-      });
     </script>
   </body>
 </html>
