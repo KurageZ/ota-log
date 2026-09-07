@@ -101,16 +101,21 @@ export function EventLiveActivityRow({
   }, [refresh]);
 
   const state = snapshot?.eventId === event.id ? snapshot.state : null;
+  const isActive = state?.status === 'active';
+  const isClosed = state?.status === 'closed';
 
-  if (event.status !== 'planned' || state?.status !== 'active') return null;
+  if (event.status !== 'planned' || (!isActive && !isClosed)) return null;
 
-  const handleClose = async () => {
+  const handleAction = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const next = await closeEventLiveActivity(input);
+      const next = isActive
+        ? await closeEventLiveActivity(input)
+        : await ensureEventLiveActivity(input, { force: true });
       setSnapshot({ eventId: event.id, state: next });
       if (next.status === 'closed') hapticToggle(false);
+      else if (next.status === 'active') hapticToggle(true);
       else hapticError();
     } finally {
       setBusy(false);
@@ -120,7 +125,9 @@ export function EventLiveActivityRow({
   return (
     <View
       accessibilityRole="summary"
-      accessibilityLabel="实时活动，正在锁屏与灵动岛显示"
+      accessibilityLabel={isActive
+        ? '实时活动，正在锁屏与灵动岛显示'
+        : '实时活动，已关闭'}
       style={{
         minHeight: 62,
         marginTop: 14,
@@ -148,7 +155,7 @@ export function EventLiveActivityRow({
           实时活动
         </Text>
         <Text numberOfLines={2} style={{ marginTop: 2, fontSize: 12, lineHeight: 17, color: colors.textSecondary }}>
-          正在锁屏与灵动岛显示
+          {isActive ? '正在锁屏与灵动岛显示' : '已关闭'}
         </Text>
       </View>
       {busy ? (
@@ -156,26 +163,26 @@ export function EventLiveActivityRow({
       ) : (
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="关闭实时活动"
+          accessibilityLabel={isActive ? '关闭实时活动' : '开启实时活动'}
           accessibilityState={{ busy, disabled: busy }}
           disabled={busy}
           activeOpacity={0.7}
-          onPress={() => void handleClose()}
+          onPress={() => void handleAction()}
           style={{
             minHeight: 44,
             justifyContent: 'center',
             paddingHorizontal: 10,
             borderRadius: 10,
             borderCurve: 'continuous',
-            backgroundColor: withAlpha(colors.danger, 0.08),
+            backgroundColor: isActive ? withAlpha(colors.danger, 0.08) : colors.accentSoft,
           }}
         >
           <Text style={{
             fontSize: 12.5,
             fontWeight: '700',
-            color: colors.danger,
+            color: isActive ? colors.danger : colors.accent,
           }}>
-            关闭
+            {isActive ? '关闭' : '开启'}
           </Text>
         </TouchableOpacity>
       )}

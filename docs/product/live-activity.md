@@ -159,8 +159,9 @@ App 持久化一份轻量标记：`eventId`、`sessionId`、`startedAt`、`effec
 | 状态 | 副文案 | 操作 |
 |---|---|---|
 | 已自动启动 | 正在锁屏与灵动岛显示 | 关闭 |
+| 已手动关闭 | 已关闭 | 开启 |
 
-尚未进入窗口、缺少时间、不可用、已关闭、已过期、已结束以及非当前活动均不渲染该行，也不保留空白占位。入口复用详情页现有卡片、分隔线和 `AppIcon` 业务图标，不新建高饱和 Hero，不把运行状态只交给颜色表达。首次自动启动不弹成功对话框；关闭后该行立即消失并提供轻触觉反馈。
+尚未进入窗口、缺少时间、不可用、已过期、已结束以及非当前活动均不渲染该行，也不保留空白占位。入口复用详情页现有卡片、分隔线和 `AppIcon` 业务图标，不新建高饱和 Hero，不把运行状态只交给颜色表达。首次自动启动不弹成功对话框；关闭后该行立即切换为「已关闭 / 开启」，点击「开启」会强制重建当前场次的 Live Activity。关闭和重新开启均提供轻触觉反馈。
 
 ## 5. 系统界面设计
 
@@ -172,21 +173,22 @@ App 持久化一份轻量标记：`eventId`、`sessionId`、`startedAt`、`effec
 
 1. 左侧显示活动资料图，固定比例裁切并使用连续圆角；没有图片时文字区自然扩展，不保留空白占位。
 2. 右侧依次显示大号演出标题与「即将开场」「即将开演」「正在进行中」或「已结束」。
-3. 无时间表时显示语义标签与系统动态计时；有时间表且命中当前条目时显示当前条目头像和标题，并以箭头连接下一项头像。
-4. 时间表出现空档时不冒充当前条目，仅显示箭头和下一项头像；下一项缺少图片时使用标题首字符头像。
-5. 场次标题与演出标题不同时放在文字区底部。锁屏不显示「更新于」或旧版的下一项文字行。
+3. 开场前显示「场馆 · 开演 HH:MM」，缺少其中一项时只显示可用信息，不预告时间表条目。
+4. 进行中无时间表时显示语义标签与系统动态计时；有时间表且命中当前条目时显示当前条目头像和标题，当前项不显示时间，并以箭头连接下一项头像与开始时间。
+5. 时间表出现空档时不冒充当前条目，仅显示箭头和下一项头像；下一项缺少图片时使用标题首字符头像。
+6. 场次标题与演出标题不同时放在文字区底部。锁屏不显示「更新于」或旧版的下一项文字行。
 
 锁屏根布局使用左右 20pt、上下 16pt 的内容留白，并避免传递无法安全跨 JSON 桥接的非有限 frame 数值。信息不足时直接缩短高度，不保留空白占位。点击整卡通过 `otalog:///events/{eventId}` 打开活动详情。
 
 ### 5.2 灵动岛
 
-- `compactLeading`：当前条目关联艺人有可用本地头像时显示 22pt 圆形头像，否则显示当前条目或活动标题的首字符圆形头像；不增加朝向原深感摄像头一侧的额外 padding。
+- `compactLeading`：演出进行中且命中当前时间表条目、条目艺人有可用本地头像时，显示 22pt 圆形艺人头像；开场前、时间表空档、无头像或无时间表时显示 22pt 圆形 App Icon。图片均保留原色，不增加朝向原深感摄像头一侧的额外 padding。
 - `compactTrailing`：不重复锁屏与 expanded 的倒计时，只显示当前阶段：「开场前」「开演前」「进行中」「待下一项」「演出中」或「已结束」。文字使用固有宽度，不设置 frame 或额外 padding，使内容贴近原深感摄像头并避免无意义地撑宽。
-- `minimal`：只复用 `compactLeading` 的艺人头像或首字符头像，不显示倒计时或标题，避免把最小形态横向撑长。提供完整 accessibility label。
+- `minimal`：复用 `compactLeading` 当前选择的艺人头像或 App Icon，不显示倒计时或标题，避免把最小形态横向撑长。提供完整 accessibility label。
 - `expandedLeading`：留空，不显示阶段图标，避免挤压中央内容区。
 - `expandedTrailing`：留空；expanded 的关键信息统一进入中央阅读顺序，避免再次压缩文字宽度。
-- `expandedCenter`：在同一个横向容器中显示活动资料图和文字，统一按「大号演出标题 → 状态 → 第三层信息」排列。无时间表时第三层为距开场/距开演/距结束计时，默认结束边界下显示「已开始」经过时间；有时间表时第三层改为当前时间表条目标题，条目关联艺人有可用头像时在标题左侧显示小号圆形头像，当前没有命中条目时不占位。图片与文字共同使用明确的展开态内容宽度。
-- `expandedBottom`：仅在场次标题与演出标题不同且有区分价值时显示场次标题。不显示下一项或「更新于」。
+- `expandedCenter`：在同一个横向容器中显示活动资料图和文字，统一按「大号演出标题 → 状态 → 第三层信息」排列。开场前第三层显示「场馆 · 开演 HH:MM」，缺少其中一项时只显示可用信息，不预告时间表条目；进行中无时间表时第三层为距结束计时，默认结束边界下显示「已开始」经过时间；进行中有时间表时第三层显示当前条目头像与标题，当前项不附带时间，下一项通过箭头连接并显示头像与开始时间。当前没有命中条目时不占位。图片与文字共同使用明确的展开态内容宽度。
+- `expandedBottom`：仅在场次标题与演出标题不同且有区分价值时显示场次标题。不显示场馆、下一项或「更新于」。
 
 动态岛背景由系统控制，设计不依赖自定义背景色。暂不单独提供 `bannerSmall`；CarPlay、watchOS 及系统小尺寸派生形态按 `expo-widgets` 的回退规则复用 `banner`，避免 iOS 根据 `activityFamily` 进入另一套未经验证的锁屏渲染路径。
 
@@ -208,15 +210,18 @@ interface EventLiveActivityProps {
   phase: 'upcoming' | 'running' | 'ended';
   eventTitle: string;
   sessionTitle?: string;
+  upcomingDetails?: string;
   primaryTitle: string;
   currentEntryTitle?: string;
   nextEntryTitle?: string;
   nextEntryInitial?: string;
+  nextEntryTime?: string;
   hasTimetable: boolean;
   nextLabel?: string;
   currentArtistAvatarUri?: string;
   nextArtistAvatarUri?: string;
   eventImageUri?: string;
+  appIconUri?: string;
   countdownTargetAt?: number;
   countdownKind: 'opens' | 'starts' | 'ends';
   timerStartAt?: number;

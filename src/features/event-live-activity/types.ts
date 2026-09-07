@@ -20,15 +20,18 @@ export interface EventLiveActivityProps {
   phase: 'upcoming' | 'running' | 'ended';
   eventTitle: string;
   sessionTitle?: string;
+  upcomingDetails?: string;
   primaryTitle: string;
   currentEntryTitle?: string;
   nextEntryTitle?: string;
   nextEntryInitial?: string;
+  nextEntryTime?: string;
   hasTimetable: boolean;
   nextLabel?: string;
   currentArtistAvatarUri?: string;
   nextArtistAvatarUri?: string;
   eventImageUri?: string;
+  appIconUri?: string;
   countdownTargetAt?: number;
   countdownKind: 'opens' | 'starts' | 'ends';
   timerStartAt?: number;

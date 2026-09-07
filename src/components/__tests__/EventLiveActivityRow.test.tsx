@@ -86,7 +86,6 @@ describe('EventLiveActivityRow', () => {
 
   test.each<EventLiveActivityControlState>([
     { status: 'too-early', nextEligibleAt: Date.now() + 60_000 },
-    { status: 'closed', sessionId: 'session-1' },
     { status: 'expired', sessionId: 'session-1' },
     { status: 'missing-time' },
     { status: 'ended' },
@@ -108,7 +107,18 @@ describe('EventLiveActivityRow', () => {
     expect(renderer?.root.findByProps({ accessibilityLabel: '关闭实时活动' })).toBeDefined();
   });
 
-  test('disappears immediately after the active Live Activity is closed', async () => {
+  test('shows the reopen action when a previously closed activity is loaded', async () => {
+    await renderRow({ status: 'closed', sessionId: 'session-1' });
+
+    expect(renderer?.root.findAllByType(Text).map((node) => node.props.children)).toEqual([
+      '实时活动',
+      '已关闭',
+      '开启',
+    ]);
+    expect(renderer?.root.findByProps({ accessibilityLabel: '开启实时活动' })).toBeDefined();
+  });
+
+  test('shows a reopen action after the active Live Activity is closed', async () => {
     mockClose.mockResolvedValue({ status: 'closed', sessionId: 'session-1' });
     await renderRow({ status: 'active', sessionId: 'session-1' });
 
@@ -117,7 +127,19 @@ describe('EventLiveActivityRow', () => {
       await Promise.resolve();
     });
 
-    expect(renderer?.toJSON()).toBeNull();
+    expect(renderer?.root.findAllByType(Text).map((node) => node.props.children)).toEqual([
+      '实时活动',
+      '已关闭',
+      '开启',
+    ]);
+
+    await act(async () => {
+      renderer?.root.findByProps({ accessibilityLabel: '开启实时活动' }).props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(mockEnsure).toHaveBeenLastCalledWith(expect.anything(), { force: true });
+    expect(renderer?.root.findByProps({ accessibilityLabel: '关闭实时活动' })).toBeDefined();
   });
 
   test('refreshes and clears a stale active state when the screen regains focus', async () => {
@@ -150,6 +172,6 @@ describe('EventLiveActivityRow', () => {
       resolveRefresh?.({ status: 'closed', sessionId: 'session-1' });
       await refreshResult;
     });
-    expect(renderer?.toJSON()).toBeNull();
+    expect(renderer?.root.findByProps({ accessibilityLabel: '开启实时活动' })).toBeDefined();
   });
 });

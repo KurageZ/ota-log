@@ -49,12 +49,15 @@ const props: EventLiveActivityProps = {
   phase: 'running',
   eventTitle: '夏日偶像联合公演',
   sessionTitle: '夜场',
+  upcomingDetails: '测试场馆 · 开演 18:00',
   primaryTitle: '星空舞台',
   currentEntryTitle: '星空舞台',
   nextEntryTitle: '特典会',
   nextEntryInitial: '特',
+  nextEntryTime: '20:00',
   hasTimetable: true,
   nextLabel: '下一项 20:00 特典会',
+  appIconUri: 'file:///widgets/live-activity/appIcon.png',
   countdownTargetAt: new Date('2026-09-01T19:30:00').getTime(),
   countdownKind: 'ends',
   timerMode: 'countdown',
@@ -87,8 +90,8 @@ describe('EventLiveActivity compilation', () => {
     expect(result.expandedTrailing).toBeDefined();
     expect(result.expandedCenter).toBeDefined();
     expect(result.expandedBottom).toBeDefined();
-    expect(result.minimal?.type).toBe('Text');
-    expect(result.minimal?.props.children).toBe('星');
+    expect(result.minimal?.type).toBe('Image');
+    expect(result.minimal?.props.uiImage).toBe(props.appIconUri);
     expect(result.minimal?.props.timerInterval).toBeUndefined();
     expect([
       result.minimal,
@@ -130,6 +133,9 @@ describe('EventLiveActivity compilation', () => {
     expect(result.minimal?.props.uiImage).toBe(richProps.currentArtistAvatarUri);
     expect(result.compactLeading).toBe(result.minimal);
     expect(result.compactLeading?.props.modifiers?.some((modifier) => (
+      modifier.name === 'clipShape' && modifier.args[0] === 'circle'
+    ))).toBe(true);
+    expect(result.compactLeading?.props.modifiers?.some((modifier) => (
       modifier.name === 'padding'
     ))).toBe(false);
     expect(result.minimal?.props.modifiers?.some((modifier) => (
@@ -160,7 +166,7 @@ describe('EventLiveActivity compilation', () => {
     ))).toBe(false);
   });
 
-  test('uses the event initial when the timetable has no current entry', () => {
+  test('uses the app icon when the timetable has no current entry', () => {
     const render = compileLiveActivity();
     const result = render({
       ...props,
@@ -170,8 +176,31 @@ describe('EventLiveActivity compilation', () => {
       currentArtistAvatarUri: undefined,
     }, { colorScheme: 'light' });
 
-    expect(result.compactLeading?.props.children).toBe('星');
-    expect(result.minimal?.props.children).toBe('星');
+    expect(result.compactLeading?.props.uiImage).toBe(props.appIconUri);
+    expect(result.minimal?.props.uiImage).toBe(props.appIconUri);
+  });
+
+  test('uses the app icon before the performance even if an avatar is present', () => {
+    const render = compileLiveActivity();
+    const result = render({
+      ...props,
+      phase: 'upcoming',
+      currentArtistAvatarUri: 'file:///widgets/live-activity/artist.jpg',
+    }, { colorScheme: 'light' });
+
+    expect(result.compactLeading?.props.uiImage).toBe(props.appIconUri);
+    expect(result.minimal?.props.uiImage).toBe(props.appIconUri);
+  });
+
+  test('uses the app icon when the current timetable artist has no avatar', () => {
+    const render = compileLiveActivity();
+    const result = render({
+      ...props,
+      currentArtistAvatarUri: undefined,
+    }, { colorScheme: 'light' });
+
+    expect(result.compactLeading?.props.uiImage).toBe(props.appIconUri);
+    expect(result.minimal?.props.uiImage).toBe(props.appIconUri);
   });
 
   test('mirrors the expanded information hierarchy on the lock screen', () => {
@@ -203,6 +232,9 @@ describe('EventLiveActivity compilation', () => {
     expect(bannerNodes.some((node) => (
       node.type === 'Image' && node.props.uiImage === richProps.nextArtistAvatarUri
     ))).toBe(true);
+    expect(bannerNodes.filter((node) => (
+      node.type === 'Text' && node.props.children === richProps.nextEntryTime
+    ))).toHaveLength(1);
     expect(bannerNodes.some((node) => (
       node.type === 'Text' && String(node.props.children).includes('更新于')
     ))).toBe(false);
@@ -304,6 +336,9 @@ describe('EventLiveActivity compilation', () => {
     expect(centerNodes.some((node) => (
       node.type === 'Text' && node.props.children === props.nextEntryInitial
     ))).toBe(true);
+    expect(centerNodes.filter((node) => (
+      node.type === 'Text' && node.props.children === props.nextEntryTime
+    ))).toHaveLength(1);
     expect(centerNodes.some((node) => node.props.timerInterval)).toBe(false);
     expect(descendants(result.expandedBottom).some((node) => (
       node.type === 'Text' && node.props.children === props.sessionTitle
@@ -347,6 +382,9 @@ describe('EventLiveActivity compilation', () => {
     expect(centerNodes.some((node) => (
       node.type === 'Text' && node.props.children === props.nextEntryInitial
     ))).toBe(true);
+    expect(centerNodes.some((node) => (
+      node.type === 'Text' && node.props.children === props.nextEntryTime
+    ))).toBe(true);
   });
 
   test('distinguishes the opening and performance countdown states', () => {
@@ -354,28 +392,53 @@ describe('EventLiveActivity compilation', () => {
     const opening = render({
       ...props,
       phase: 'upcoming',
-      hasTimetable: false,
       countdownKind: 'opens',
     }, { colorScheme: 'light' });
     const performance = render({
       ...props,
       phase: 'upcoming',
-      hasTimetable: false,
       countdownKind: 'starts',
     }, { colorScheme: 'light' });
+    const openingBannerNodes = descendants(opening.banner);
+    const openingBannerLabel = opening.banner?.props.modifiers?.find((modifier) => (
+      modifier.name === 'accessibilityLabel'
+    ))?.args[0];
 
     expect(descendants(opening.expandedCenter).some((node) => (
       node.type === 'Text' && node.props.children === '即将开场'
     ))).toBe(true);
-    expect(descendants(opening.expandedCenter).some((node) => (
-      node.type === 'Text' && node.props.children === '距开场'
-    ))).toBe(true);
+    expect(descendants(opening.expandedCenter).some((node) => node.props.timerInterval)).toBe(false);
     expect(descendants(performance.expandedCenter).some((node) => (
       node.type === 'Text' && node.props.children === '即将开演'
     ))).toBe(true);
-    expect(descendants(performance.expandedCenter).some((node) => (
-      node.type === 'Text' && node.props.children === '距开演'
+    expect(descendants(performance.expandedCenter).some((node) => node.props.timerInterval)).toBe(false);
+    expect(descendants(opening.expandedCenter).some((node) => (
+      node.type === 'Text' && node.props.children === props.nextEntryTitle
+    ))).toBe(false);
+    expect(descendants(opening.expandedCenter).some((node) => (
+      node.type === 'Text' && node.props.children === props.upcomingDetails
     ))).toBe(true);
+    expect(openingBannerNodes.some((node) => (
+      node.type === 'Text' && node.props.children === props.upcomingDetails
+    ))).toBe(true);
+    expect(openingBannerNodes.some((node) => (
+      node.type === 'Text' && node.props.children === props.nextEntryTitle
+    ))).toBe(false);
+    expect(openingBannerNodes.some((node) => node.props.timerInterval)).toBe(false);
+    expect(openingBannerLabel).toContain(props.upcomingDetails);
+    expect(openingBannerLabel).not.toContain(props.nextLabel);
+    expect(descendants(opening.expandedBottom).some((node) => (
+      node.type === 'Text' && node.props.children === props.sessionTitle
+    ))).toBe(true);
+  });
+
+  test('uses a generic app symbol instead of a title initial if the app icon is unavailable', () => {
+    const render = compileLiveActivity();
+    const result = render({ ...props, appIconUri: undefined }, { colorScheme: 'light' });
+
+    expect(result.compactLeading?.type).toBe('Image');
+    expect(result.compactLeading?.props.systemName).toBe('app.fill');
+    expect(result.minimal).toBe(result.compactLeading);
   });
 
   test('maps compact trailing content to short event phases instead of a countdown', () => {

@@ -113,6 +113,7 @@ describe('event Live Activity manager', () => {
     expect(activity.start).toHaveBeenCalledWith(
       expect.objectContaining({
         phase: 'upcoming',
+        upcomingDetails: '测试场馆 · 开演 18:00',
         countdownTargetAt: new Date('2026-09-01T18:00:00').getTime(),
         countdownKind: 'starts',
         timerMode: 'countdown',
@@ -138,6 +139,7 @@ describe('event Live Activity manager', () => {
         currentEntryTitle: '星空舞台',
         nextEntryTitle: '特典会',
         nextEntryInitial: '特',
+        nextEntryTime: '19:00',
       }),
       'otalog:///events/event-1',
     );

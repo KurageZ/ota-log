@@ -57,16 +57,19 @@ const EventLiveActivityView = (
     props.eventTitle,
     props.sessionTitle && props.sessionTitle !== props.eventTitle ? props.sessionTitle : null,
     props.primaryTitle,
-    countdownTarget ? timerLabel : null,
-    props.nextLabel,
+    countdownTarget && !isUpcoming ? timerLabel : null,
+    isUpcoming ? props.upcomingDetails : props.nextLabel,
   ].filter(Boolean).join('，');
-  const currentInitial = (props.currentEntryTitle || props.eventTitle)
-    .trim()
-    .slice(0, 1);
 
-  const compactIdentity = props.currentArtistAvatarUri ? (
+  const currentEntryAvatarUri = props.phase === 'running'
+    && props.hasTimetable
+    && props.currentEntryTitle
+    ? props.currentArtistAvatarUri
+    : undefined;
+  const compactIdentityUri = currentEntryAvatarUri ?? props.appIconUri;
+  const compactIdentity = compactIdentityUri ? (
     <Image
-      uiImage={props.currentArtistAvatarUri}
+      uiImage={compactIdentityUri}
       modifiers={[
         resizable(),
         aspectRatio({ contentMode: 'fill' }),
@@ -74,23 +77,21 @@ const EventLiveActivityView = (
         clipShape('circle'),
         clipped(),
         widgetAccentedRenderingMode('fullColor'),
-        accessibilityLabel(`当前条目艺人，${statusLabel}`),
+        accessibilityLabel(currentEntryAvatarUri
+          ? `当前时间表条目艺人，${statusLabel}`
+          : `ota log，${statusLabel}`),
       ]}
     />
   ) : (
-    <Text
+    <Image
+      systemName="app.fill"
+      color={accent}
       modifiers={[
+        font({ size: 20, weight: 'semibold' }),
         frame({ width: 22, height: 22, alignment: 'center' }),
-        backgroundOverlay({ color: accent }),
-        clipShape('circle'),
-        font({ size: 11, weight: 'bold' }),
-        foregroundStyle('#ffffff'),
-        lineLimit(1),
         accessibilityLabel(accessibilityText),
       ]}
-    >
-      {currentInitial}
-    </Text>
+    />
   );
 
   const compactStatusLabel = isEnded
@@ -126,6 +127,19 @@ const EventLiveActivityView = (
         minimumScaleFactor(0.72),
       ]}
     />
+  ) : null;
+
+  const upcomingDetailsText = props.upcomingDetails ? (
+    <Text
+      modifiers={[
+        font({ size: 13, weight: 'semibold' }),
+        foregroundStyle(secondaryStyle),
+        lineLimit(1),
+        minimumScaleFactor(0.78),
+      ]}
+    >
+      {props.upcomingDetails}
+    </Text>
   ) : null;
 
   const banner = (
@@ -166,7 +180,9 @@ const EventLiveActivityView = (
         <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle(accent), lineLimit(1)]}>
           {expandedStatusLabel}
         </Text>
-        {props.hasTimetable ? (
+        {isUpcoming ? (
+          upcomingDetailsText
+        ) : props.hasTimetable ? (
           props.currentEntryTitle || props.nextEntryTitle ? (
             <HStack spacing={6} alignment="center">
               {props.currentEntryTitle ? (
@@ -202,7 +218,10 @@ const EventLiveActivityView = (
                 <HStack
                   spacing={6}
                   alignment="center"
-                  modifiers={[fixedSize(), accessibilityLabel(`下一项，${props.nextEntryTitle}`)]}
+                  modifiers={[
+                    fixedSize(),
+                    accessibilityLabel(`下一项，${props.nextEntryTime ?? ''}，${props.nextEntryTitle}`),
+                  ]}
                 >
                   <Image
                     systemName="arrow.right"
@@ -233,6 +252,18 @@ const EventLiveActivityView = (
                       ]}
                     >
                       {props.nextEntryInitial}
+                    </Text>
+                  ) : null}
+                  {props.nextEntryTime ? (
+                    <Text
+                      modifiers={[
+                        font({ size: 11, weight: 'semibold', design: 'rounded' }),
+                        foregroundStyle(secondaryStyle),
+                        monospacedDigit(),
+                        lineLimit(1),
+                      ]}
+                    >
+                      {props.nextEntryTime}
                     </Text>
                   ) : null}
                 </HStack>
@@ -301,7 +332,9 @@ const EventLiveActivityView = (
           <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle(accent), lineLimit(1)]}>
             {expandedStatusLabel}
           </Text>
-          {props.hasTimetable ? (
+          {isUpcoming ? (
+            upcomingDetailsText
+          ) : props.hasTimetable ? (
             props.currentEntryTitle || props.nextEntryTitle ? (
               <HStack spacing={6} alignment="center">
                 {props.currentEntryTitle ? (
@@ -337,7 +370,10 @@ const EventLiveActivityView = (
                   <HStack
                     spacing={5}
                     alignment="center"
-                    modifiers={[fixedSize(), accessibilityLabel(`下一项，${props.nextEntryTitle}`)]}
+                    modifiers={[
+                      fixedSize(),
+                      accessibilityLabel(`下一项，${props.nextEntryTime ?? ''}，${props.nextEntryTitle}`),
+                    ]}
                   >
                     <Image
                       systemName="arrow.right"
@@ -368,6 +404,18 @@ const EventLiveActivityView = (
                         ]}
                       >
                         {props.nextEntryInitial}
+                      </Text>
+                    ) : null}
+                    {props.nextEntryTime ? (
+                      <Text
+                        modifiers={[
+                          font({ size: 11, weight: 'semibold', design: 'rounded' }),
+                          foregroundStyle(secondaryStyle),
+                          monospacedDigit(),
+                          lineLimit(1),
+                        ]}
+                      >
+                        {props.nextEntryTime}
                       </Text>
                     ) : null}
                   </HStack>

@@ -1,3 +1,4 @@
+import { Asset } from 'expo-asset';
 import { Directory, File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { after, widgetsDirectory } from 'expo-widgets';
@@ -38,7 +39,13 @@ function runExclusive<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 async function cacheLiveActivityMedia(
-  sources: Array<{ key: string; uri?: string; width: number }>,
+  sources: Array<{
+    key: string;
+    uri?: string;
+    assetModule?: number;
+    width: number;
+    format?: SaveFormat;
+  }>,
 ): Promise<Record<string, string>> {
   if (!widgetsDirectory) return {};
   try {
@@ -47,17 +54,23 @@ async function cacheLiveActivityMedia(
     const cached: Record<string, string> = {};
     const retainedUris = new Set<string>();
     for (const source of sources) {
-      if (!source.uri?.startsWith('file://')) continue;
-      const sourceFile = new File(source.uri);
+      const asset = source.assetModule == null
+        ? null
+        : await Asset.fromModule(source.assetModule).downloadAsync();
+      const sourceUri = source.uri ?? asset?.localUri ?? asset?.uri;
+      if (!sourceUri?.startsWith('file://')) continue;
+      const sourceFile = new File(sourceUri);
       if (!sourceFile.exists) continue;
-      const destination = new File(directory, `${source.key}.jpg`);
-      const context = ImageManipulator.manipulate(source.uri);
+      const format = source.format ?? SaveFormat.JPEG;
+      const extension = format === SaveFormat.PNG ? 'png' : 'jpg';
+      const destination = new File(directory, `${source.key}.${extension}`);
+      const context = ImageManipulator.manipulate(sourceUri);
       try {
         const image = await context.resize({ width: source.width }).renderAsync();
         try {
           const result = await image.saveAsync({
             compress: LIVE_ACTIVITY_IMAGE_COMPRESSION,
-            format: SaveFormat.JPEG,
+            format,
           });
           const temporaryFile = new File(result.uri);
           try {
@@ -95,6 +108,11 @@ async function buildProps(
   const sessionTitle = rawSessionTitle && rawSessionTitle !== eventTitle
     ? rawSessionTitle
     : undefined;
+  const venue = compactLiveActivityText(projection.session.venue, 48);
+  const performanceTime = projection.session.start_time
+    ? `开演 ${projection.session.start_time}`
+    : undefined;
+  const upcomingDetails = [venue, performanceTime].filter(Boolean).join(' · ') || undefined;
   const currentTitle = compactLiveActivityText(projection.currentEntry?.entry.title, 72);
   const nextTitle = compactLiveActivityText(projection.nextEntry?.entry.title, 48);
   const currentArtistId = projection.currentEntry?.entry.artist_id;
@@ -102,6 +120,12 @@ async function buildProps(
   const nextEntryInitial = nextTitle ? Array.from(nextTitle.trim())[0] : undefined;
   const showsElapsedTime = phase === 'running' && projection.usesDefaultEndTime;
   const cachedMedia = await cacheLiveActivityMedia([
+    {
+      key: 'appIcon',
+      assetModule: require('../../../assets/icon.png'),
+      width: 96,
+      format: SaveFormat.PNG,
+    },
     { key: 'event', uri: input.eventImageUri, width: 240 },
     {
       key: 'artist',
@@ -118,10 +142,14 @@ async function buildProps(
     phase,
     eventTitle,
     sessionTitle,
+    upcomingDetails: phase === 'upcoming' ? upcomingDetails : undefined,
     hasTimetable: projection.hasTimedEntries,
     currentEntryTitle: currentTitle,
     nextEntryTitle: phase === 'ended' ? undefined : nextTitle,
     nextEntryInitial: phase === 'ended' ? undefined : nextEntryInitial,
+    nextEntryTime: phase === 'ended' || !projection.nextEntry
+      ? undefined
+      : formatLiveActivityClock(projection.nextEntry.startAt),
     primaryTitle: phase === 'ended'
       ? '活动已结束'
       : projection.hasTimedEntries
@@ -133,6 +161,7 @@ async function buildProps(
     currentArtistAvatarUri: cachedMedia.artist,
     nextArtistAvatarUri: cachedMedia.nextArtist,
     eventImageUri: cachedMedia.event,
+    appIconUri: cachedMedia.appIcon,
     countdownTargetAt: phase === 'ended' ? undefined : projection.countdownTargetAt,
     countdownKind: projection.countdownKind,
     timerStartAt: showsElapsedTime ? projection.sessionStartsAt : undefined,
