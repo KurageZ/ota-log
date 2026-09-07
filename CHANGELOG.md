@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.1] - 2026-09-07
+
+### Changed
+- 官网接入 TestFlight 与 Android APK 下载入口，并更新隐私政策中的托管说明
+- 网站部署脚本支持传入 Android 下载网址，自动生成下载配置，无需修改 HTML；移除写死的网盘链接和过期安装包信息
+- 将应用版本与关于页版本标识更新至 2.0.1，Android versionCode 更新为 20001
+
+### Fixed
+- 修复开发模式下新手引导完成状态未持久化、重新挂载后重复显示的问题
+- 修复 Android 活动、艺人新建和编辑页误用 formSheet，导致顶部取消与保存按钮缺失的问题
+
 ## [2.0.0] - 2026-09-04
 
 ### Added
