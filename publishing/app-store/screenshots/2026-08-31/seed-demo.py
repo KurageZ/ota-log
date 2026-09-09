@@ -44,7 +44,7 @@ def main():
         db.backup(dest)
     media = container / 'Documents/store-demo'
     media.mkdir(exist_ok=True)
-    for name in ('haru', 'mio', 'rin', 'haru2', 'mio2', 'rin2'):
+    for name in ('haru', 'mio', 'rin', 'haru2', 'mio2', 'rin2', 'cheki-haru', 'cheki-mio', 'cheki-rin'):
         shutil.copy2(ROOT / 'assets' / f'{name}.png', media / f'{name}.png')
     def uri(name):
         return (media / f'{name}.png').as_uri()
@@ -95,7 +95,7 @@ def main():
                     at = f'{date}T20:{10+j:02d}:00+08:00'
                     put('cheki_records', id=record, event_id=eid, artist_id=people[person], date=date, quantity=1, notes=['今天也很开心！','下次现场见。','收藏一个闪闪发光的瞬间。'][j], created_at=at, updated_at=at)
                     put('cheki_items', id=item, record_id=record, sort_order=0, unit_price=60, spec='three_inch_portrait', is_favorite=int(i>=10), created_at=at, updated_at=at)
-                    asset=['haru','mio','rin'][person]+('2' if i%2==0 else '')
+                    asset=['cheki-haru','cheki-mio','cheki-rin'][person]
                     put('cheki_item_images', id=uid(), item_id=item, side='front', photo_uri=uri(asset), created_at=at, updated_at=at)
         put('important_dates', id=uid(), title='第一次见面的日子', date='2026-07-11', source_kind='manual', show_on_calendar=1, created_at=STAMP, updated_at=STAMP)
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []

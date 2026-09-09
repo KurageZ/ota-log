@@ -40,6 +40,12 @@
 
 ## 修改文案或样式后重新导出
 
+### 2026-09-08 切册示例图片更新
+
+使用内置 ImageGen 生成三张独立拍立得素材，保存在 `assets/cheki-haru.png`、`assets/cheki-mio.png`、`assets/cheki-rin.png`（本地忽略文件）。生成提示词方向：虚构成年偶像的特典会直闪照片，54:86 竖版实体相纸、白边和宽底部留言区、轻微胶片颗粒、手写日文及爱心或星星涂鸦；分别为粉色服装短发比心、蓝色服装长发比耶、黄色服装挥手。蓝色图为用户确认的首张预览，另两张沿用同一质感。
+
+两台专用演示模拟器各 29 条切册图片引用已切换到这三张素材，艺人头像及背景图保留原素材；`seed-demo.py` 已同步使用独立切册图片。更新前备份位于 `qa/iphone-before-cheki-20260908.sqlite` 和 `qa/ipad-before-cheki-20260908.sqlite`。图片复制哈希、数据库完整性、外键及其他业务数据不变检查均通过。此次未重新采集或导出商店截图，现有截图和 ZIP 仍为旧画面。
+
 这次工具安装在独立临时环境 `/private/tmp/ota-store-tools`，没有向 App 的依赖清单安装 Koubou。如果临时环境被清理，可在项目外新建 Python 虚拟环境并安装 `koubou==0.20.0`、`Pillow==12.3.0` 和 `PyYAML`，再运行 `kou setup-html`。HTML 中文字体依赖 macOS 的 PingFang SC。
 
 在本目录执行：

@@ -37,14 +37,14 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 
 ## 截图与字体资源
 
-六张 `assets/01-home.webp` 至 `06-stats.webp` 来自 [2026-08-31 截图记录](../app-store/screenshots/2026-08-31/README.md) 的 `raw/iphone/` 原始截图：真实 iOS 模拟器 App 界面，使用当时的本地 Debug 构建与 Metro 工作区代码。它们不是重新采集的 2.0.1 截图，也不能作为当前 TestFlight 二进制界面完全一致的证明。Android 系统控件和布局可能不同；截图本身均为浅色，不随网站深色模式变色。
+六张 `assets/01-home.webp` 至 `06-stats.webp` 来自 [2026-09-09 截图记录](../app-store/screenshots/2026-09-09/README.md) 的 `raw/iphone/` 原始截图：真实 iOS 模拟器 App 界面，使用原生 2.0.0 / Build 1 Debug 容器加载当前 2.0.1 工作区代码。切册与日历已使用三张新生成的拍立得样式图片；这些截图不能作为当前 TestFlight 二进制界面完全一致的证明。Android 系统控件和布局可能不同；截图本身均为浅色，不随网站深色模式变色。
 
 人物、团体、活动、场地和用户资料均为虚构。人物图像由 ImageGen 生成，设定为 25–26 岁的虚构成年演出者；记录、计数和图表由真实 App 渲染，没有重绘或伪造 UI。网站保留屏幕内容与比例，仅通过 CSS 加设备边框、阴影与少量旋转。
 
 网站派生图使用 `cwebp -q 88 -resize 792 0` 转为 WebP，尺寸为 792 × 1721。示例（需要本地原始素材与 `cwebp`）：
 
 ```sh
-cwebp -q 88 -resize 792 0 publishing/app-store/screenshots/2026-08-31/raw/iphone/01-home.png -o publishing/website/assets/01-home.webp
+cwebp -q 88 -resize 792 0 publishing/app-store/screenshots/2026-09-09/raw/iphone/01-home.png -o publishing/website/assets/01-home.webp
 ```
 
 原始 PNG、营销排版成品、QA 数据及 ZIP 保持原有忽略规则；此目录只使用网站需要的压缩派生资源，不依赖被忽略目录才能部署。若需重拍，先按 [截图工作流](../../docs/workflows/app-store-screenshots.md) 使用隔离模拟器，并复核实际发布界面。

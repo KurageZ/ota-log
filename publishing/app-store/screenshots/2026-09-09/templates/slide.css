@@ -1,0 +1,25 @@
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Hiragino Sans GB',sans-serif;color:#14232d;background:#f6f4ef;-webkit-font-smoothing:antialiased}
+.orb{position:absolute;width:1260px;height:1260px;background:#e7edf3;border-radius:50%;top:1470px;left:330px;z-index:0}
+.masthead{position:absolute;top:92px;left:94px;right:94px;display:flex;justify-content:space-between;align-items:center}
+.brand{display:flex;align-items:center;gap:22px;font-size:44px;font-weight:650;letter-spacing:-1px}
+.brand img{height:70px;width:70px;border-radius:18px}
+.category{font-size:27px;letter-spacing:5px;font-weight:600;color:#617080}
+.copy{position:absolute;left:94px;right:80px;top:229px;z-index:1}
+h1{font-size:106px;line-height:1.24;letter-spacing:-4px;font-weight:750;margin:0}
+h1 span{display:block;white-space:nowrap}
+h1 span:last-child{color:#0b63f6}
+p{font-size:36px;line-height:1.55;letter-spacing:1px;color:#64707a;margin:40px 0 0}
+.device-shell{position:absolute;z-index:2;left:calc(50% - 478px);top:692px;width:956px;padding:10px;background:#22282d;border-radius:94px;box-shadow:0 25px 70px #26374626,0 5px 9px #1c263130}
+.screen{display:block;width:936px;height:auto;border-radius:84px}
+footer{position:absolute;bottom:43px;left:94px;right:94px;display:flex;justify-content:space-between;align-items:center;font-size:22px;letter-spacing:4px;font-weight:600;color:#73808a}
+.night{background:#142b3b;color:#f8f4ec}.night .orb{background:#24465c}.night p{color:#becfda}.night h1 span:last-child{color:#a6caff}.night .category,.night footer{color:#adc1cf}.night .device-shell{box-shadow:0 24px 90px #0005;background:#24323c}
+.rose{background:#f5eeea}.rose .orb{background:#ecd6d0}.rose h1 span:last-child{color:#b4524a}
+.blue{background:#edf3fa}.blue .orb{background:#d6e4f5}
+.ipad .masthead{top:84px;left:116px;right:116px}.ipad .brand{font-size:48px}.ipad .brand img{width:76px;height:76px}.ipad .category{font-size:30px}
+.ipad .copy{top:203px;left:116px;right:116px}.ipad h1{font-size:112px;line-height:1.2;letter-spacing:-3px}.ipad p{font-size:42px;margin-top:26px}
+.ipad .device-shell{top:622px;left:calc(50% - 748px);width:1496px;padding:16px;border-radius:54px}.ipad .screen{width:1464px;border-radius:38px}
+.ipad .orb{top:1180px;left:530px;width:1800px;height:1800px}.ipad footer{left:116px;right:116px;bottom:56px;font-size:25px}
+/* Reflow for the 6.5-inch upload slot; preserve the original UI aspect ratio. */
+.iphone-65 .copy{top:216px}.iphone-65 h1{font-size:103px}.iphone-65 p{font-size:35px;margin-top:38px}
+.iphone-65 .device-shell{top:665px;left:calc(50% - 461px);width:922px}.iphone-65 .screen{width:902px}
