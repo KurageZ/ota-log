@@ -16,7 +16,8 @@ import {
   ChekiArtistGroup,
   ChekiGridDensity,
   ChekiGridColumns,
-  chunkChekis,
+  chunkChekiAlbumRows,
+  getChekiAlbumColumnSpan,
   groupChekiRecordsByArtist,
   sortChekisDesc,
 } from '../utils/cheki';
@@ -171,6 +172,7 @@ function ChekiThumbnailButton({
           variant={displayMode}
           spec={cheki.spec}
           landscapeRotation={landscapeRotation}
+          fiveInchLandscape
           onRotationChange={setIsRotated}
         />
       </TouchableOpacity>
@@ -178,13 +180,13 @@ function ChekiThumbnailButton({
   );
 }
 
-function buildArtistGridItems(groups: ChekiArtistGroup[], columns: ChekiGridColumns): ChekiGalleryItem[] {
+function buildArtistGridItems(groups: ChekiArtistGroup[], columns: ChekiGridColumns, displayMode: 'portrait' | 'original'): ChekiGalleryItem[] {
   const items: ChekiGalleryItem[] = [];
   for (const group of groups) {
     const groupKey = group.artist?.id ?? '__null__';
     items.push({ type: 'header', key: `${groupKey}:header`, groupKey, group });
 
-    chunkChekis(group.chekis, columns).forEach((row, rowIndex, rows) => {
+    chunkChekiAlbumRows(group.chekis, columns, displayMode).forEach((row, rowIndex, rows) => {
       const isLastPhotoRow = rowIndex === rows.length - 1;
       items.push({
         type: 'row',
@@ -235,9 +237,10 @@ function buildAlbumGridItems(
   chekis: Cheki[],
   columns: ChekiGridColumns,
   sortOrder: ChekiSortOrder,
+  displayMode: 'portrait' | 'original',
 ): ChekiGalleryItem[] {
   const sortedChekis = sortChekiRecords(chekis, sortOrder);
-  const items: ChekiGalleryItem[] = chunkChekis(sortedChekis, columns).map((row, index, rows) => ({
+  const items: ChekiGalleryItem[] = chunkChekiAlbumRows(sortedChekis, columns, displayMode).map((row, index, rows) => ({
     type: 'row',
     key: `album:row:${index}`,
     groupKey: '__album__',
@@ -252,10 +255,11 @@ function buildDateGroupedAlbumGridItems(
   chekis: Cheki[],
   columns: ChekiGridColumns,
   sortOrder: ChekiSortOrder,
+  displayMode: 'portrait' | 'original',
 ): ChekiGalleryItem[] {
   return buildChekiDateSections(chekis, sortOrder).flatMap(({ key, items }) => {
     const groupChekis = items;
-    const rows: ChekiGalleryItem[] = chunkChekis(groupChekis, columns).map((row, index, allRows) => ({
+    const rows: ChekiGalleryItem[] = chunkChekiAlbumRows(groupChekis, columns, displayMode).map((row, index, allRows) => ({
       type: 'row',
       key: `date:${key}:row:${index}`,
       groupKey: `date:${key}`,
@@ -594,11 +598,11 @@ export default function ChekiLibraryScreen() {
     }
 
     if (viewPreferences.albumGrouping === 'none') {
-      return buildAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder);
+      return buildAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode);
     }
 
     if (viewPreferences.albumGrouping === 'date') {
-      return buildDateGroupedAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder);
+      return buildDateGroupedAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode);
     }
 
     const sortedGroups = groups.map((group) => ({
@@ -607,8 +611,9 @@ export default function ChekiLibraryScreen() {
       manualEntries: [],
       totalCount: group.chekis.length,
     })).filter((group) => group.chekis.length > 0);
-    return buildArtistGridItems(sortedGroups, columns);
+    return buildArtistGridItems(sortedGroups, columns, albumDisplayMode);
   }, [
+    albumDisplayMode,
     columns,
     filteredChekiList,
     filteredRecordList,
@@ -1091,7 +1096,9 @@ export default function ChekiLibraryScreen() {
             key={cheki.id}
             cheki={cheki}
             viewerChekis={item.viewerChekis}
-            width={chekiW}
+            width={getChekiAlbumColumnSpan(cheki.spec, albumDisplayMode) === 2
+              ? chekiW * 2 + CHEKI_GRID_GAP
+              : chekiW}
             height={chekiH}
             colors={colors}
             onOpen={openViewer}

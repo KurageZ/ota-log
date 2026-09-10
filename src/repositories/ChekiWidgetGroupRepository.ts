@@ -26,9 +26,9 @@ type GroupRow = {
   rotation_anchor_at: string | null; collection_fingerprint: string | null;
 };
 
-type ItemRow = { id: string; front_photo_uri: string; date: string | null; created_at: string; sort_order: number };
+type ItemRow = { spec: ChekiSpec; id: string; front_photo_uri: string; date: string | null; created_at: string; sort_order: number };
 
-export type ChekiWidgetManualCandidate = { id: string; uri: string };
+export type ChekiWidgetManualCandidate = { spec: ChekiSpec; id: string; uri: string };
 
 function unique(values: string[]): string[] { return [...new Set(values.map((value) => value.trim()).filter(Boolean))]; }
 function placeholders(count: number): string { return Array.from({ length: count }, () => '?').join(', '); }
@@ -108,14 +108,14 @@ export class ChekiWidgetGroupRepository {
       const ids = unique(source.itemIds).slice(0, MAX_ITEMS);
       if (!ids.length) return [];
       const rows = await this.db.getAllAsync<ItemRow>(
-        `SELECT i.id, front.photo_uri AS front_photo_uri, r.date, r.created_at, i.sort_order
+        `SELECT i.id, i.spec, front.photo_uri AS front_photo_uri, r.date, r.created_at, i.sort_order
          FROM cheki_items i JOIN cheki_records r ON r.id = i.record_id
          JOIN cheki_item_images front ON front.item_id = i.id AND front.side = 'front'
          WHERE i.id IN (${placeholders(ids.length)})`, ids);
       const byId = new Map(rows.map((item) => [item.id, item]));
       return ids.flatMap((id) => {
         const item = byId.get(id);
-        return item ? [{ id: item.id, frontPhotoUri: item.front_photo_uri, date: item.date, createdAt: item.created_at, sortOrder: item.sort_order }] : [];
+        return item ? [{ id: item.id, spec: item.spec, frontPhotoUri: item.front_photo_uri, date: item.date, createdAt: item.created_at, sortOrder: item.sort_order }] : [];
       });
     }
     const rules = source.rules;
@@ -129,13 +129,13 @@ export class ChekiWidgetGroupRepository {
     if (from && to) { conditions.push(`strftime('%Y-%m-%d', COALESCE(r.date, r.created_at)) BETWEEN ? AND ?`); params.push(from, to); }
     if (!conditions.length) return [];
     const rows = await this.db.getAllAsync<ItemRow>(
-      `SELECT i.id, front.photo_uri AS front_photo_uri, r.date, r.created_at, i.sort_order
+      `SELECT i.id, i.spec, front.photo_uri AS front_photo_uri, r.date, r.created_at, i.sort_order
        FROM cheki_items i JOIN cheki_records r ON r.id = i.record_id
        JOIN cheki_item_images front ON front.item_id = i.id AND front.side = 'front'
        WHERE ${conditions.join(' AND ')}
        ORDER BY COALESCE(r.date, r.created_at) DESC, r.created_at DESC, i.sort_order, i.id
        LIMIT ${MAX_ITEMS}`, params);
-    return rows.map((item) => ({ id: item.id, frontPhotoUri: item.front_photo_uri, date: item.date, createdAt: item.created_at, sortOrder: item.sort_order }));
+    return rows.map((item) => ({ id: item.id, spec: item.spec, frontPhotoUri: item.front_photo_uri, date: item.date, createdAt: item.created_at, sortOrder: item.sort_order }));
   }
 
   private async normalizeFilterIfEmpty(row: GroupRow, source: ChekiWidgetGroupSource): Promise<boolean> {
@@ -196,7 +196,7 @@ export class ChekiWidgetGroupRepository {
 
   async listManualCandidates(): Promise<ChekiWidgetManualCandidate[]> {
     return this.db.getAllAsync<ChekiWidgetManualCandidate>(
-      `SELECT i.id, front.photo_uri AS uri
+      `SELECT i.id, i.spec, front.photo_uri AS uri
        FROM cheki_items i
        JOIN cheki_item_images front ON front.item_id = i.id AND front.side = 'front'
        ORDER BY i.created_at DESC, i.id`,

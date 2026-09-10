@@ -43,6 +43,7 @@ export function ChekiGridThumbnail({
   spec,
   landscapeRotation = 'original',
   onRotationChange,
+  fiveInchLandscape = false,
 }: {
   uri: string;
   width: number;
@@ -53,9 +54,11 @@ export function ChekiGridThumbnail({
   spec?: ChekiSpec;
   landscapeRotation?: ChekiLandscapeRotation;
   onRotationChange?: (isRotated: boolean) => void;
+  fiveInchLandscape?: boolean;
 }) {
   const usesSquareFrame = variant === 'original';
   const shouldResolveLandscape = !usesSquareFrame
+    && !(fiveInchLandscape && (spec === 'five_inch_portrait' || spec === 'five_inch_landscape'))
     && landscapeRotation !== 'original'
     && isLandscapeChekiSpec(spec);
   const [resolvedImageOrientation, setResolvedImageOrientation] = useState<{
@@ -109,6 +112,7 @@ export function ChekiGridThumbnail({
 
   const resolvedRotation = resolveChekiLandscapeRotation({
     displayMode: variant,
+    fiveInchLandscape,
     preference: landscapeRotation,
     spec,
     isImageLandscape: imageIsLandscape === true,

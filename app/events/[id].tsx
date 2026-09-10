@@ -17,7 +17,7 @@ import { formatDateWithWeekday, formatDate, daysUntil } from '../../src/utils/da
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
-import { buildChekiViewerItems, getChekiManualCount } from '../../src/utils/cheki';
+import { buildChekiViewerItems, getChekiManualCount, getChekiAlbumColumnSpan } from '../../src/utils/cheki';
 import { ChekiViewerModal } from '../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../src/types/chekiViewer';
 import {
@@ -46,6 +46,7 @@ import { useAppTheme } from '../../src/theme/appTheme';
 import { ChekiManualEntryList } from '../../src/components/ChekiManualEntryList';
 import {
   CHEKI_SQUARE_GRID_GAP,
+  CHEKI_GRID_GAP,
   ChekiGridThumbnail,
 } from '../../src/components/ChekiAlbumThumbnail';
 import { withAlpha } from '../../src/utils/color';
@@ -980,23 +981,16 @@ export function EventDetailScreen({
             >
               {previewChekiList.map((ck) => (
                 <TouchableOpacity key={ck.id} onPress={() => setViewerSelectedId(ck.id)} activeOpacity={0.8}>
-                  {chekiDisplayMode === 'original' ? (
-                    <ChekiGridThumbnail
-                      uri={ck.photo_uri}
-                      width={chekiW}
-                      height={chekiH}
-                      colors={colors}
-                      variant="original"
-                    />
-                  ) : (
-                    <Image
-                      source={{ uri: ck.photo_uri }}
-                      resizeMethod="resize"
-                      resizeMode="contain"
-                      style={{ width: chekiW, height: chekiH, borderRadius: 10,
-                        backgroundColor: isDark ? colors.inputBorder : colors.cardAlt }}
-                    />
-                  )}
+                  <ChekiGridThumbnail
+                    uri={ck.photo_uri}
+                    width={getChekiAlbumColumnSpan(ck.spec, chekiDisplayMode) === 2
+                      ? chekiW * 2 + CHEKI_GRID_GAP : chekiW}
+                    height={chekiH}
+                    colors={{ ...colors, card: isDark ? colors.inputBorder : colors.cardAlt }}
+                    variant={chekiDisplayMode}
+                    spec={ck.spec}
+                    fiveInchLandscape
+                  />
                 </TouchableOpacity>
               ))}
             </View>

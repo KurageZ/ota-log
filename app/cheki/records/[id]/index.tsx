@@ -1,8 +1,8 @@
+import { getChekiAlbumColumnSpan } from '../../../../src/utils/cheki';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Platform,
   ScrollView,
   Text,
@@ -29,6 +29,7 @@ import {
 import { AppIcon } from '../../../../src/components/AppIcon';
 import {
   CHEKI_SQUARE_GRID_GAP,
+  CHEKI_GRID_GAP,
   ChekiGridThumbnail,
 } from '../../../../src/components/ChekiAlbumThumbnail';
 import { EventCard } from '../../../../src/components/EventCard';
@@ -387,27 +388,16 @@ export default function ChekiRecordDetailScreen() {
                     accessibilityRole="imagebutton"
                     accessibilityLabel={`查看第 ${item.sort_order + 1} 张拍立得`}
                   >
-                    {chekiDisplayMode === 'original' ? (
-                      <ChekiGridThumbnail
-                        uri={uri}
-                        width={itemWidth}
-                        height={itemHeight}
-                        colors={colors}
-                        variant="original"
-                      />
-                    ) : (
-                      <Image
-                        source={{ uri }}
-                        resizeMethod="resize"
-                        resizeMode="contain"
-                        style={{
-                          width: itemWidth,
-                          height: itemHeight,
-                          borderRadius: 10,
-                          backgroundColor: colors.cardAlt,
-                        }}
-                      />
-                    )}
+                    <ChekiGridThumbnail
+                      uri={uri}
+                      width={getChekiAlbumColumnSpan(item.spec, chekiDisplayMode) === 2
+                        ? itemWidth * 2 + CHEKI_GRID_GAP : itemWidth}
+                      height={itemHeight}
+                      colors={{ ...colors, card: colors.cardAlt }}
+                      variant={chekiDisplayMode}
+                      spec={item.spec}
+                      fiveInchLandscape
+                    />
                     {item.notes?.trim() ? (
                       <View style={{ position: 'absolute', left: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.scrim }}>
                         <AppIcon name="document" size={12} color={colors.onAccent} />

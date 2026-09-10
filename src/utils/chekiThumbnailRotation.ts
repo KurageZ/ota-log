@@ -20,13 +20,18 @@ export function resolveChekiLandscapeRotation({
   preference,
   spec,
   isImageLandscape,
+  fiveInchLandscape = false,
 }: {
   displayMode: 'portrait' | 'original';
   preference: ChekiLandscapeRotation;
   spec: ChekiSpec | undefined;
   isImageLandscape: boolean;
+  fiveInchLandscape?: boolean;
 }): ChekiLandscapeRotation {
-  if (displayMode !== 'portrait' || preference === 'original') return 'original';
+  if (displayMode !== 'portrait') return 'original';
+  if (fiveInchLandscape && spec === 'five_inch_portrait') return 'clockwise';
+  if (fiveInchLandscape && spec === 'five_inch_landscape') return 'original';
+  if (preference === 'original') return 'original';
   if (!isLandscapeChekiSpec(spec) || !isImageLandscape) return 'original';
   return preference;
 }

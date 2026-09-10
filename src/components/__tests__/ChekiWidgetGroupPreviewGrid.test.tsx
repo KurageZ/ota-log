@@ -35,6 +35,7 @@ describe('ChekiWidgetGroupPreviewGrid', () => {
     act(() => {
       renderer = create(<ChekiWidgetGroupPreviewGrid items={[{
         id: 'item-1',
+        spec: 'five_inch_portrait',
         frontPhotoUri: 'file:///one.jpg',
         date: '2026-08-25',
         createdAt: '2026-08-25T00:00:00.000Z',
@@ -47,7 +48,11 @@ describe('ChekiWidgetGroupPreviewGrid', () => {
       displayMode: 'portrait',
     }));
     const list = renderer!.root.findByType(FlatList);
-    expect(list.props.numColumns).toBe(4);
+    expect(list.props.data[0][0].spec).toBe('five_inch_portrait');
+    expect(list.props.numColumns).toBeUndefined();
+    const thumbnail = renderer!.root.findByType('ChekiGridThumbnail' as React.ElementType);
+    expect(thumbnail.props.width).toBe(168);
+    expect(thumbnail.props.fiveInchLandscape).toBe(true);
     expect(list.props.initialNumToRender).toBe(12);
     expect(list.props.windowSize).toBe(7);
   });

@@ -1,6 +1,6 @@
 import { Artist, Cheki, ChekiManualEntry, Event } from '../types/models';
 import { ChekiViewerItem } from '../types/chekiViewer';
-import { normalizeChekiSpec } from '../domain/chekiSpec';
+import { normalizeChekiSpec, type ChekiSpec } from '../domain/chekiSpec';
 import { getArtistPrimaryName } from './artistDisplay';
 import { getArtistSearchText } from './filter';
 
@@ -117,6 +117,34 @@ export function chunkChekis<T>(records: T[], columns: ChekiGridColumns): T[][] {
   for (let index = 0; index < records.length; index += safeColumns) {
     rows.push(records.slice(index, index + safeColumns));
   }
+  return rows;
+}
+
+export function getChekiAlbumColumnSpan(spec: ChekiSpec | undefined, displayMode: 'portrait' | 'original'): number {
+  return displayMode === 'portrait'
+    && (spec === 'five_inch_portrait' || spec === 'five_inch_landscape') ? 2 : 1;
+}
+
+/** Pack in display order without moving later photos into leftover slots. */
+export function chunkChekiAlbumRows<T extends { spec?: ChekiSpec }>(
+  records: T[],
+  columns: ChekiGridColumns,
+  displayMode: 'portrait' | 'original',
+): T[][] {
+  const rows: T[][] = [];
+  let row: T[] = [];
+  let occupied = 0;
+  for (const record of records) {
+    const span = getChekiAlbumColumnSpan(record.spec, displayMode);
+    if (occupied + span > columns && row.length > 0) {
+      rows.push(row);
+      row = [];
+      occupied = 0;
+    }
+    row.push(record);
+    occupied += span;
+  }
+  if (row.length > 0) rows.push(row);
   return rows;
 }
 

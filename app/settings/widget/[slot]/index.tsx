@@ -22,7 +22,7 @@ import { dismissChekiWidgetSortTutorial, hasDismissedChekiWidgetSortTutorial } f
 import type { DateFilter } from '../../../../src/utils/dateFilters';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../../../src/utils/safeArea';
 
-type PhotoItem = { id: string; uri: string };
+type PhotoItem = { id: string; uri: string; spec: ChekiSpec };
 type SourceType = ChekiWidgetGroupSource['type'];
 
 const SOURCE_TYPE_OPTIONS: ReadonlyArray<ModeChoiceOption<SourceType>> = [

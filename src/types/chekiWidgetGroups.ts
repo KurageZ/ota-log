@@ -27,6 +27,7 @@ export type SaveChekiWidgetGroupInput = {
 };
 
 export interface ResolvedChekiWidgetItem {
+  spec: ChekiSpec;
   id: string;
   frontPhotoUri: string;
   date: string | null;

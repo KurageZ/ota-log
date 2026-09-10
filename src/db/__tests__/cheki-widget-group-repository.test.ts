@@ -56,6 +56,22 @@ describe('ChekiWidgetGroupRepository', () => {
     expect((await repository.listSummaries())[0].displayCount).toBe(2);
   });
 
+  test('passes five-inch specs to manual candidates and both preview sources without changing order', async () => {
+    const { db, repository } = await setup();
+    await db.runAsync("UPDATE cheki_items SET spec = 'five_inch_portrait' WHERE id = 'item-1'");
+    const manual = await repository.previewSource(1, { type: 'manual', itemIds: ['item-2', 'item-1'] });
+    expect(manual.map(({ id, spec }) => ({ id, spec }))).toEqual([
+      { id: 'item-2', spec: 'square' }, { id: 'item-1', spec: 'five_inch_portrait' },
+    ]);
+    expect(await repository.listManualCandidates()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'item-1', spec: 'five_inch_portrait' }),
+    ]));
+    const filtered = await repository.previewSource(1, { type: 'filter', rules: {
+      artistIds: [], eventIds: [], favoriteOnly: false, date: null, specs: ['five_inch_portrait'],
+    } });
+    expect(filtered).toEqual([expect.objectContaining({ id: 'item-1', spec: 'five_inch_portrait' })]);
+  });
+
   test('filter conditions use AND across categories and OR within a category', async () => {
     const { repository } = await setup();
     await repository.save(2, { name: '收藏', source: { type: 'filter', rules: { artistIds: ['artist-1'], eventIds: ['event-1'], favoriteOnly: true, date: null, specs: ['square'] } } }, new Date('2026-08-21T00:00:00.000Z'));

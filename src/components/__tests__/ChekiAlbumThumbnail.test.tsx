@@ -82,6 +82,38 @@ describe('ChekiGridThumbnail landscape rotation', () => {
     expect(onRotationChange).toHaveBeenLastCalledWith(false);
   });
 
+  test.each(['#ffffff', '#202020'])('renders five-inch portrait horizontally on %s and resets in square mode', (card) => {
+    Image.getSize = jest.fn(originalGetSize) as unknown as typeof Image.getSize;
+    const onRotationChange = jest.fn();
+    const props = {
+      uri: 'file:///five-inch-portrait.jpg',
+      width: 188,
+      height: 144,
+      colors: { ...colors, card },
+      spec: 'five_inch_portrait' as const,
+      landscapeRotation: 'counterclockwise' as const,
+      fiveInchLandscape: true,
+      onRotationChange,
+    };
+    act(() => {
+      renderer = create(<ChekiGridThumbnail {...props} variant="portrait" />);
+    });
+    const image = renderer!.root.findByType(Image);
+    expect(image.props.resizeMode).toBe('contain');
+    expect(image.props.style).toEqual(expect.objectContaining({
+      width: 144, height: 188, opacity: 1, transform: [{ rotate: '90deg' }],
+    }));
+    expect(image.parent!.props.style.backgroundColor).toBe(card);
+    expect(onRotationChange).toHaveBeenLastCalledWith(true);
+    expect(Image.getSize).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer!.update(<ChekiGridThumbnail {...props} width={90} height={90} variant="original" />);
+    });
+    expect(renderer!.root.findByType(Image).props.style.transform).toBeUndefined();
+    expect(onRotationChange).toHaveBeenLastCalledWith(false);
+  });
+
   test('does not resolve or rotate images in the square grid', () => {
     Image.getSize = jest.fn(originalGetSize) as unknown as typeof Image.getSize;
 

@@ -64,7 +64,7 @@ describe('createChekiWidgetGroupPresentation', () => {
   });
 
   test('marks only the group whose own thumbnail failed as unavailable', () => {
-    const item = { id: 'item-1', frontPhotoUri: 'file:///one.jpg', date: null, createdAt: '2026-08-25T00:00:00.000Z', sortOrder: 0 };
+    const item = { spec: 'three_inch_portrait' as const, id: 'item-1', frontPhotoUri: 'file:///one.jpg', date: null, createdAt: '2026-08-25T00:00:00.000Z', sortOrder: 0 };
     const presentation = createChekiWidgetGroupPresentation(
       resolvedGroup({ state: 'content', items: [item] }),
       new Map(),

@@ -3,142 +3,129 @@ import { TouchableOpacity } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ChekiWidgetGroupSortableGrid } from '../ChekiWidgetGroupSortableGrid';
 
+const mockReactions: (() => void)[] = [];
+const mockFrames: ((event: { timeSincePreviousFrame: number }) => void)[] = [];
+const mockScrollTo = jest.fn();
 const mockHapticDragEnd = jest.fn();
-const mockHapticDragReorder = jest.fn();
-const mockHapticDragStart = jest.fn();
 
-jest.mock('react-native-reanimated-dnd', () => {
+jest.mock('react-native-worklets', () => ({ scheduleOnRN: (fn: Function, ...args: unknown[]) => fn(...args) }));
+jest.mock('react-native-reanimated', () => {
   const ReactModule = require('react');
-  const SortableGridItem = ({ children, ...props }: { children: React.ReactNode }) => (
-    ReactModule.createElement('SortableGridItem', props, children)
-  );
-  SortableGridItem.Handle = ({ children, ...props }: { children: React.ReactNode }) => (
-    ReactModule.createElement('SortableGridItemHandle', props, children)
-  );
+  const { View, ScrollView } = require('react-native');
   return {
-    GridOrientation: { Vertical: 'vertical' },
-    GridStrategy: { Insert: 'insert' },
-    SortableGrid: ({ data, renderItem, ...props }: {
-      data: Array<{ id: string; uri: string }>;
-      renderItem: (props: object) => React.ReactNode;
-      dimensions: object;
-      orientation: string;
-      strategy: string;
-      [key: string]: unknown;
-    }) => ReactModule.createElement(
-      'SortableGrid',
-      props,
-      data.map((item, index) => renderItem({
-        item,
-        index,
-        id: item.id,
-        positions: {},
-        scrollY: {},
-        scrollX: {},
-        autoScrollDirection: {},
-        itemsCount: data.length,
-        dimensions: props.dimensions,
-        orientation: props.orientation,
-        strategy: props.strategy,
-      })),
-    ),
-    SortableGridItem,
+    __esModule: true, default: { View, ScrollView }, ReduceMotion: { System: 'system' },
+    useSharedValue: (initial: unknown) => ReactModule.useRef({
+      current: initial, get() { return this.current; }, set(value: unknown) { this.current = value; },
+    }).current,
+    useAnimatedRef: () => ReactModule.useRef(null),
+    useAnimatedStyle: () => ({}),
+    useAnimatedScrollHandler: (fn: Function) => fn,
+    useAnimatedReaction: (prepare: Function, react: Function) => {
+      mockReactions.push(() => react(prepare(), null));
+    },
+    useFrameCallback: (fn: (event: { timeSincePreviousFrame: number }) => void) => { mockFrames.push(fn); },
+    scrollTo: (...args: unknown[]) => mockScrollTo(...args),
+    withSpring: (value: number) => value,
   };
 });
-
-jest.mock('../../theme/appTheme', () => ({
-  useAppTheme: () => ({ colors: new Proxy({}, { get: () => '#000' }) }),
-}));
-
-jest.mock('../ChekiAlbumThumbnail', () => ({
-  ChekiGridThumbnail: () => null,
-  CHEKI_BARE_THUMBNAIL_RADIUS: 8,
-  CHEKI_GRID_GAP: 8,
-  useChekiAlbumGridLayout: () => ({
-    columns: 4,
-    itemWidth: 76,
-    itemHeight: 121,
-    targetRows: 4,
-  }),
-}));
-
+jest.mock('react-native-gesture-handler', () => {
+  const ReactModule = require('react');
+  return {
+    GestureDetector: ({ children, ...props }: { children: React.ReactNode }) => ReactModule.createElement('GestureDetector', props, children),
+    Gesture: { Pan: () => {
+      const gesture: any = {};
+      for (const name of ['activateAfterLongPress', 'onStart', 'onUpdate', 'onFinalize']) {
+        gesture[name] = (value: unknown) => { gesture[name + 'Value'] = value; return gesture; };
+      }
+      return gesture;
+    } },
+  };
+});
+jest.mock('../../theme/appTheme', () => ({ useAppTheme: () => ({ colors: { accent: '#f00' } }) }));
+jest.mock('../ChekiAlbumThumbnail', () => {
+  const ReactModule = require('react');
+  return {
+    ChekiGridThumbnail: (props: object) => ReactModule.createElement('Thumbnail', props),
+    CHEKI_BARE_THUMBNAIL_RADIUS: 8, CHEKI_GRID_GAP: 8,
+    useChekiAlbumGridLayout: () => ({ columns: 4, itemWidth: 76, itemHeight: 121 }),
+  };
+});
 jest.mock('../AppIcon', () => ({ AppIcon: () => null }));
+jest.mock('../../utils/haptics', () => ({ hapticDragEnd: () => mockHapticDragEnd(), hapticDragStart: jest.fn(), hapticDragReorder: jest.fn() }));
 
-jest.mock('../../utils/haptics', () => ({
-  hapticDragEnd: () => mockHapticDragEnd(),
-  hapticDragReorder: () => mockHapticDragReorder(),
-  hapticDragStart: () => mockHapticDragStart(),
-}));
+const items = [
+  { id: 'a', uri: 'file:///a.jpg', spec: 'three_inch_portrait' as const },
+  { id: 'b', uri: 'file:///b.jpg', spec: 'five_inch_portrait' as const },
+  { id: 'c', uri: 'file:///c.jpg', spec: 'five_inch_landscape' as const },
+];
 
 describe('ChekiWidgetGroupSortableGrid', () => {
   let renderer: ReactTestRenderer;
-
-  afterEach(() => {
-    act(() => renderer.unmount());
+  const onChange = jest.fn();
+  const onDragStateChange = jest.fn();
+  beforeEach(() => {
+    mockReactions.length = 0;
+    mockFrames.length = 0;
+    act(() => { renderer = create(<ChekiWidgetGroupSortableGrid itemIds={['a', 'b', 'c']} items={items} onChange={onChange} onDragStateChange={onDragStateChange} />); });
   });
+  afterEach(() => { act(() => renderer.unmount()); });
 
-  test('emits the final item order when a drag is dropped', () => {
-    const onChange = jest.fn();
+  test('moves a three-inch photo onto the second slot of a five-inch target', () => {
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
+    act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
     act(() => {
-      renderer = create(
-        <ChekiWidgetGroupSortableGrid
-          itemIds={['a', 'b', 'c']}
-          items={[
-            { id: 'a', uri: 'file:///a.jpg' },
-            { id: 'b', uri: 'file:///b.jpg' },
-            { id: 'c', uri: 'file:///c.jpg' },
-          ]}
-          onChange={onChange}
-        />,
-      );
+      gesture.onUpdateValue({ translationX: 200, translationY: 0 });
+      mockReactions.forEach((run) => run());
+      gesture.onFinalizeValue({}, true);
     });
-
-    const firstItem = renderer.root.findAllByType(
-      'SortableGridItem' as React.ElementType,
-    )[0];
-    act(() => {
-      firstItem.props.onDragStart();
-      firstItem.props.onMove();
-      firstItem.props.onDrop('a', 2, {
-        a: { index: 2 },
-        b: { index: 0 },
-        c: { index: 1 },
-      });
-    });
-
-    expect(onChange).toHaveBeenCalledWith(['b', 'c', 'a']);
-    const grid = renderer.root.findByType('SortableGrid' as React.ElementType);
-    expect(grid.props.dimensions).toEqual(expect.objectContaining({
-      columns: 4,
-      itemWidth: 76,
-      itemHeight: 121,
-    }));
-    expect(mockHapticDragStart).toHaveBeenCalledTimes(1);
-    expect(mockHapticDragReorder).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(['b', 'a', 'c']);
+    expect(onDragStateChange).toHaveBeenCalledWith(true);
+    expect(onDragStateChange).toHaveBeenLastCalledWith(false);
     expect(mockHapticDragEnd).toHaveBeenCalledTimes(1);
+    const thumbnails = renderer.root.findAllByType('Thumbnail' as React.ElementType);
+    expect(thumbnails.map((node) => node.props.width)).toEqual([76, 160, 160]);
+    expect(thumbnails[1].props.fiveInchLandscape).toBe(true);
   });
 
-  test('removes an item without leaving the editor', () => {
-    const onChange = jest.fn();
+  test('cancelled drag keeps the order and unlocks scrolling', () => {
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[1].props.gesture;
+    act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
+    act(() => { gesture.onFinalizeValue({}, false); });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onDragStateChange).toHaveBeenLastCalledWith(false);
+  });
+
+  test('supports removal and accessible reordering', () => {
+    act(() => renderer.root.findAllByType(TouchableOpacity)[1].props.onPress());
+    expect(onChange).toHaveBeenLastCalledWith(['a', 'c']);
+    const button = renderer.root.findAll((node) => node.props.accessibilityLabel === '第 3 张拍立得，长按拖动排序' && node.props.onAccessibilityAction)[0];
+    act(() => button.props.onAccessibilityAction({ nativeEvent: { actionName: 'moveBackward' } }));
+    expect(onChange).toHaveBeenLastCalledWith(['a', 'c', 'b']);
+  });
+
+  test('auto-scrolls a long grid and stops after cancellation', () => {
+    const many = Array.from({ length: 16 }, (_, index) => ({ ...items[1], id: String(index) }));
+    act(() => renderer.update(<ChekiWidgetGroupSortableGrid itemIds={many.map(({ id }) => id)} items={many} onChange={onChange} />));
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
+    act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
     act(() => {
-      renderer = create(
-        <ChekiWidgetGroupSortableGrid
-          itemIds={['a', 'b']}
-          items={[
-            { id: 'a', uri: 'file:///a.jpg' },
-            { id: 'b', uri: 'file:///b.jpg' },
-          ]}
-          onChange={onChange}
-        />,
-      );
+      gesture.onUpdateValue({ translationX: 0, translationY: 2000 });
+      mockFrames[mockFrames.length - 1]({ timeSincePreviousFrame: 16 });
     });
+    expect(mockScrollTo.mock.calls.at(-1)[2]).toBeGreaterThan(0);
+    act(() => { gesture.onFinalizeValue({}, false); });
+    mockScrollTo.mockClear();
+    act(() => { mockFrames[mockFrames.length - 1]({ timeSincePreviousFrame: 16 }); });
+    expect(mockScrollTo).not.toHaveBeenCalled();
+  });
 
-    const removeSecond = renderer.root.findAllByType(TouchableOpacity).find(
-      (node) => node.props.accessibilityLabel === '移除第 2 张拍立得',
-    );
-    expect(removeSecond).toBeDefined();
-    act(() => removeSecond?.props.onPress());
-
-    expect(onChange).toHaveBeenCalledWith(['a']);
+  test('edge scrolling stays within the content bounds', () => {
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
+    act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
+    act(() => {
+      gesture.onUpdateValue({ translationX: 0, translationY: 500 });
+      mockFrames.forEach((run) => run({ timeSincePreviousFrame: 16 }));
+    });
+    expect(mockScrollTo).toHaveBeenLastCalledWith(expect.anything(), 0, 0, false);
   });
 });

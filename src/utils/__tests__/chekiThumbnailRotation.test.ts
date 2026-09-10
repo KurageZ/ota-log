@@ -52,3 +52,14 @@ describe('chekiThumbnailRotation', () => {
     });
   });
 });
+
+test.each(['original', 'clockwise', 'counterclockwise'] as const)(
+  'album five-inch orientation overrides %s preference only in portrait mode', (preference) => {
+    const base = { displayMode: 'portrait' as const, preference, isImageLandscape: false, fiveInchLandscape: true };
+    expect(resolveChekiLandscapeRotation({ ...base, spec: 'five_inch_portrait' })).toBe('clockwise');
+    expect(resolveChekiLandscapeRotation({ ...base, spec: 'five_inch_landscape', isImageLandscape: true })).toBe('original');
+    expect(resolveChekiLandscapeRotation({ ...base, spec: 'five_inch_portrait', displayMode: 'original' })).toBe('original');
+    expect(resolveChekiLandscapeRotation({ ...base, spec: 'three_inch_landscape', isImageLandscape: true })).toBe(preference);
+    expect(resolveChekiLandscapeRotation({ ...base, spec: 'five_inch_portrait', fiveInchLandscape: false })).toBe('original');
+  },
+);
