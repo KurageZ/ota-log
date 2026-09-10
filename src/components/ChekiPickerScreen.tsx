@@ -58,6 +58,7 @@ import { NativeTextToolbar } from './native-text-toolbar';
 import { SearchFilterBar } from './SearchFilterBar';
 
 export interface ChekiPickerItem {
+  spec?: ChekiSpec;
   id: string;
   uri: string;
 }
@@ -489,7 +490,7 @@ export function ChekiPickerScreen({
       const candidateById = new Map(candidates.map((candidate) => [candidate.item.id, candidate]));
       const selected = selectedIds.flatMap((id) => {
         const candidate = candidateById.get(id);
-        return candidate ? [{ id, uri: candidate.uri }] : [];
+        return candidate ? [{ id, uri: candidate.uri, spec: candidate.item.spec }] : [];
       });
       await onConfirm(selected);
     } finally {

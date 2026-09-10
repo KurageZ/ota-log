@@ -1,7 +1,9 @@
+import type { ChekiSpec } from '../../domain/chekiSpec';
 import { Image, View } from 'react-native';
 import { resolveStickerStackLayouts } from './sticker-preset';
 
 export interface StickerAsset {
+  spec?: ChekiSpec;
   id: string;
   uri: string;
   width: number;

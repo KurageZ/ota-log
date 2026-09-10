@@ -54,6 +54,7 @@ describe('StickerPicker', () => {
     const confirmation = picker.props.onConfirm([{
       id: 'cheki-1',
       uri: 'file:///cheki-1.jpg',
+      spec: 'five_inch_landscape',
     }]);
 
     await act(async () => {
@@ -64,6 +65,7 @@ describe('StickerPicker', () => {
     expect(onConfirm).toHaveBeenCalledWith([{
       id: 'cheki-1',
       uri: 'file:///cheki-1.jpg',
+      spec: 'five_inch_landscape',
       width: 3,
       height: 4,
     }]);

@@ -1,3 +1,5 @@
+import type { ChekiSpec } from '../../domain/chekiSpec';
+
 export const STICKER_CAMERA_ASPECT_RATIO = 3 / 4;
 export const STICKER_CAMERA_MAX_OUTPUT_DIMENSION = 2400;
 
@@ -27,6 +29,7 @@ export interface StickerLayout {
 }
 
 export interface StickerLayoutSource {
+  spec?: ChekiSpec;
   width: number;
   height: number;
 }
@@ -117,6 +120,66 @@ export function resolveStickerStackLayouts(
   preset: StickerPreset = DEFAULT_STICKER_PRESET,
 ): StickerLayout[] {
   if (sources.length === 0) return [];
+  if (sources.some(({ spec }) => spec === 'five_inch_landscape')) {
+    // 一个单位为三寸竖版的宽度；五寸横版占两个单位。
+    const single = sources.length === 1;
+    const unit = Math.min(
+      canvasWidth * (single ? preset.singleMaxWidthRatio : preset.fanMaxWidthRatio),
+      canvasHeight * (single ? preset.singleMaxHeightRatio : preset.fanMaxHeightRatio) * 54 / 86,
+    );
+    const sizes = sources.map((source) => {
+      const ratio = positiveDimension(source.width) / positiveDimension(source.height);
+      const boxWidth = source.spec === 'five_inch_landscape' ? 108
+        : source.spec === 'three_inch_landscape' ? 86 : 54;
+      const boxHeight = source.spec === 'three_inch_landscape' ? 54 : 86;
+      const width = Math.min(boxWidth, boxHeight * ratio) * unit / 54;
+      return { width, height: width / ratio, slots: boxWidth / 54 };
+    });
+    const totalSlots = sizes.reduce((sum, size) => sum + size.slots, 0);
+    const firstCenter = sizes[0].slots / 2;
+    const lastCenter = totalSlots - sizes[sizes.length - 1].slots / 2;
+    const halfSpan = canvasWidth * 0.32 * (sources.length === 2 ? preset.fanPairSpanRatio : 1);
+    let cursor = 0;
+    const layouts = sizes.map((size) => {
+      const progress = single ? 0.5 : (cursor + size.slots / 2 - firstCenter) / (lastCenter - firstCenter);
+      cursor += size.slots;
+      const angle = single ? preset.singleRotationDegrees : (progress * 2 - 1) * 12;
+      return {
+        x: (progress * 2 - 1) * halfSpan - size.width / 2,
+        y: Math.pow(progress * 2 - 1, 2) * unit * preset.fanArcDropRatio - size.height / 2,
+        width: size.width,
+        height: size.height,
+        cornerRadius: size.width * preset.cornerRadiusRatio,
+        rotationDegrees: angle,
+      };
+    });
+    // 以旋转后的实际外沿整体适配画布，保持所有规格的共同缩放比例。
+    const bounds = layouts.map((layout) => {
+      const radians = layout.rotationDegrees * Math.PI / 180;
+      const width = Math.abs(Math.cos(radians)) * layout.width + Math.abs(Math.sin(radians)) * layout.height;
+      const height = Math.abs(Math.sin(radians)) * layout.width + Math.abs(Math.cos(radians)) * layout.height;
+      const x = layout.x + layout.width / 2;
+      const y = layout.y + layout.height / 2;
+      return { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+    });
+    const left = Math.min(...bounds.map((bound) => bound.left));
+    const right = Math.max(...bounds.map((bound) => bound.right));
+    const top = Math.min(...bounds.map((bound) => bound.top));
+    const bottom = Math.max(...bounds.map((bound) => bound.bottom));
+    const margin = canvasWidth * preset.horizontalMarginRatio;
+    const scale = Math.min(1, (canvasWidth - margin * 2) / (right - left),
+      canvasHeight * (1 - preset.bottomMarginRatio * 2) / (bottom - top));
+    const offsetX = single ? margin - left * scale : canvasWidth / 2 - (left + right) / 2 * scale;
+    const offsetY = canvasHeight * (1 - preset.bottomMarginRatio) - bottom * scale;
+    return layouts.map((layout) => ({
+      ...layout,
+      x: layout.x * scale + offsetX,
+      y: layout.y * scale + offsetY,
+      width: layout.width * scale,
+      height: layout.height * scale,
+      cornerRadius: layout.cornerRadius * scale,
+    }));
+  }
   if (sources.length === 1) {
     return [resolveStickerLayout(
       canvasWidth,

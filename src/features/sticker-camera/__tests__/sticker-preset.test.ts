@@ -116,3 +116,37 @@ describe('sticker camera preset', () => {
     expect(layouts[3].y).toBeCloseTo(layouts[5].y, 6);
   });
 });
+
+describe('mixed physical sticker sizes', () => {
+  const mini = { spec: 'three_inch_portrait' as const, width: 54, height: 86 };
+  const wide = { spec: 'five_inch_landscape' as const, width: 108, height: 86 };
+  test.each([2, 3, 9])('preserves physical proportions and rotated bounds for %d stickers', (count) => {
+    const sources = Array.from({ length: count }, (_, index) => index % 2 ? wide : mini);
+    const layouts = resolveStickerStackLayouts(900, 1200, sources);
+    expect(layouts[1].width / layouts[0].width).toBeCloseTo(2);
+    expect(layouts[1].height / layouts[0].height).toBeCloseTo(1);
+    layouts.forEach((layout) => {
+      const angle = layout.rotationDegrees * Math.PI / 180;
+      const halfWidth = (Math.abs(Math.cos(angle)) * layout.width + Math.abs(Math.sin(angle)) * layout.height) / 2;
+      const halfHeight = (Math.abs(Math.sin(angle)) * layout.width + Math.abs(Math.cos(angle)) * layout.height) / 2;
+      const x = layout.x + layout.width / 2;
+      const y = layout.y + layout.height / 2;
+      expect(x - halfWidth).toBeGreaterThanOrEqual(49.5 - 0.001);
+      expect(x + halfWidth).toBeLessThanOrEqual(850.5 + 0.001);
+      expect(y - halfHeight).toBeGreaterThanOrEqual(0);
+      expect(y + halfHeight).toBeLessThanOrEqual(1146 + 0.001);
+    });
+    const exported = resolveStickerStackLayouts(1800, 2400, sources);
+    exported.forEach((layout, index) => {
+      expect(layout.width).toBeCloseTo(layouts[index].width * 2);
+      expect(layout.x).toBeCloseTo(layouts[index].x * 2);
+      expect(layout.y).toBeCloseTo(layouts[index].y * 2);
+    });
+  });
+  test('single wide sticker is twice the width of a standard mini', () => {
+    const [small] = resolveStickerStackLayouts(900, 1200, [mini]);
+    const [large] = resolveStickerStackLayouts(900, 1200, [wide]);
+    expect(large.width / small.width).toBeCloseTo(2);
+    expect(large.height / small.height).toBeCloseTo(1);
+  });
+});
