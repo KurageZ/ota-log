@@ -5,8 +5,8 @@
 ## Project Snapshot
 
 - 产品：本地优先的 Otaku 演出记录 App，面向日系 / 国内偶像、团体活动爱好者。
-- 平台：iOS + Android，Expo SDK 57 + Expo Router v6。
-- 数据：本地 SQLite，当前 migration 版本 v22；`trip` 表仍保留为历史遗留，前台功能已下线。
+- 平台：iOS + Android，Expo SDK 57 + Expo Router（版本以 `package.json` 为准）。
+- 数据：本地 SQLite，migration 版本以 `src/db/migrations.ts` 的 `CURRENT_VERSION` 为准（当前 v23）；`trips` 表仍保留为历史遗留，前台功能已下线。
 - 主要模块：活动、艺人、切册、统计、个人资料、设置、小工具。
 
 ## Documentation Map
@@ -27,21 +27,40 @@
 - App Store 截图工作流：`docs/workflows/app-store-screenshots.md`
 - 对外发布材料：`publishing/README.md`
 
-本次文档结构调整：将长期上下文集中到 `docs/`；完整 UI/UX 设计文档已从根目录迁入 `docs/product/ui-ux.md`，根目录 `design.md` 只作为兼容软链接；`AGENTS.md` 只保留 agent 每次都需要的规则、命令和入口。
+开始任务前查看 `docs/progress/now.md` 的当前阶段与范围约束；其他专题文档通过 `docs/README.md` 按需查阅。
 
 ## Commands
 
+- 开发服务：`npm run start:dev`
+- 本地开发构建：`npm run ios:dev` / `npm run android`
 - TypeScript：`npx tsc --noEmit`
 - Jest：`npm test -- --runInBand`
 - Jest 无缓存：`npm test -- --runInBand --no-cache`
 - APK 构建：`./build_apk.sh`
 - Expo Doctor：`npx expo-doctor`
 
-优先使用 `rtk` 前缀执行项目命令。涉及发版、数据库、UI 大改时，按 `docs/workflows/` 的对应文档验证。
+命令使用 `rtk` 前缀；不支持的子命令通过 `rtk proxy <command>` 执行。涉及发版、数据库、UI 大改时，按 `docs/workflows/` 的对应文档验证。
+
+## 行为规则
+
+1. 不要假设。不要隐藏困惑。主动暴露权衡取舍。
+2. 只写解决当前问题的最小代码，不做任何推测性功能。
+3. 只修改必须改的地方，只清理自己产生的问题。
+4. 明确定义成功标准，验证通过前持续迭代。
+
+### 反过度工程 / 反防御性编程
+
+- 信任内部代码和框架保证。
+- 只在系统边界（用户输入、外部 API、网络）做校验。
+- 禁止为「不可能发生」的场景添加错误处理、回退、空值检查或验证。
+- 绝不吞掉错误（禁止 `rescue nil` / 宽泛 `catch` / 静默默认值）。
+- 禁止为一次性操作创建辅助函数、工具类或抽象。
+- 优先快速失败，而不是掩盖问题。
 
 ## Implementation Rules
 
-- TypeScript strict；样式使用 inline styles + `useColorScheme()`，不使用 NativeWind `className`。
+- TypeScript strict；样式使用 inline styles + `useAppTheme()`（`src/theme/appTheme.ts`），遵循用户选择的主题与外观，不直接用系统 `useColorScheme()` 决定页面配色；不使用 NativeWind `className`。
+- 开发构建使用上述 npm 脚本设置 `APP_VARIANT=development`；`app.config.js` 管理 development / preview / production 的应用标识，未设置时沿用 `app.json` 的生产标识。
 - 所有 ID 使用 UUID v4：`expo-crypto.randomUUID()`。
 - 日期存 `YYYY-MM-DD`，时间存 `HH:MM`，时间戳存 ISO 8601。
 - 图片必须通过 `copyToDocuments()` 保存为永久 URI；不要保存相册临时 URI；删除记录时不删本地文件。
@@ -70,10 +89,7 @@
 
 - Conventional Commits 第一行必须是英文，格式为 `<type>: <summary>`。
 - commit 正文可用中文说明改动内容、范围、注意事项和验证方法。
-- 不要在 `git commit -m` 字符串里写字面量 `\n`；Git 不会把它解释成换行，而是会原样写进 commit message。
-- 需要多段正文时，优先使用多个 `-m` 参数，例如：`git commit -m "fix: ..." -m "第一段" -m "第二段"`。
-- 提交或 amend 后，使用 `git show --no-patch --format=raw HEAD` 复核 commit message，确认正文是实际换行而不是字面量 `\n`。
-- 发版按 `docs/workflows/release.md` 执行，并同步 `package.json`、`app.json`、`CHANGELOG.md`、`app/about.tsx`。
+- 发版按 `docs/workflows/release.md` 执行，并同步 `package.json`、`package-lock.json`、`app.json`、`src/utils/appInfo.ts` 和 `CHANGELOG.md`；关于页通过 `APP_VERSION_LABEL` 显示版本，无需重复硬编码版本号。
 - 生成 App Store 截图前必须阅读 `docs/workflows/app-store-screenshots.md`：使用隔离的 `ota-log Store ` 模拟器和虚构演示数据，先核对实际上传栏位尺寸，再采集、排版、自动校验和逐张检查。不得写入用户日常模拟器，不得提交原始截图、生成图片、QA 数据或 ZIP；未经用户明确授权不得上传 App Store Connect。
 - 提交前检查 `AGENTS.md` 和 `docs/` 是否需要同步更新。
 - 工作区可能有用户未提交改动；只处理本任务相关文件，不回退无关改动。

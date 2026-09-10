@@ -53,7 +53,7 @@ yarn-error.*
 
 # temp
 /tmp
-/.impeccable/review/
+/.impeccable
 
 # App Store screenshot assets and generated output (keep scripts and templates)
 /publishing/app-store/screenshots/*/assets/
