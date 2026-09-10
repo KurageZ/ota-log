@@ -7,19 +7,20 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import type { ChekiSpec } from '../domain/chekiSpec';
-import { buildChekiDragFrames, findChekiDragTarget, moveChekiWidgetItem, type ChekiDragFrame } from '../utils/chekiWidgetDragLayout';
+import { buildChekiDragFrames, findChekiDragTarget, moveChekiWidgetItem, getChekiDragPreviewIndex, type ChekiDragFrame } from '../utils/chekiWidgetDragLayout';
 import { hapticDragEnd, hapticDragReorder, hapticDragStart } from '../utils/haptics';
 import { useAppTheme } from '../theme/appTheme';
-import { ChekiGridThumbnail, CHEKI_BARE_THUMBNAIL_RADIUS, CHEKI_GRID_GAP, useChekiAlbumGridLayout } from './ChekiAlbumThumbnail';
+import { ChekiGridThumbnail, CHEKI_SQUARE_CARD_RADIUS, CHEKI_SQUARE_GRID_GAP, useChekiAlbumGridLayout } from './ChekiAlbumThumbnail';
 import { AppIcon } from './AppIcon';
 
 export type ChekiWidgetSortablePhoto = { id: string; uri: string; spec: ChekiSpec };
 type DragState = { index: number; x: number; y: number; startX: number; startY: number; startScroll: number };
 const IDLE_DRAG: DragState = { index: -1, x: 0, y: 0, startX: 0, startY: 0, startScroll: 0 };
 
-function SortablePhoto({ item, frame, index, count, drag, target, scrollY, onStart, onFinish, onMove, onRemove }: {
+function SortablePhoto({ item, frame, frames, index, count, drag, target, scrollY, onStart, onFinish, onMove, onRemove }: {
   item: ChekiWidgetSortablePhoto;
   frame: ChekiDragFrame;
+  frames: ChekiDragFrame[];
   index: number;
   count: number;
   drag: SharedValue<DragState>;
@@ -44,24 +45,27 @@ function SortablePhoto({ item, frame, index, count, drag, target, scrollY, onSta
     })
     .onFinalize((_event, success) => {
       if (drag.get().index !== index) return;
-      scheduleOnRN(onFinish, index, success ? target.get() : index);
+      const destination = success ? target.get() : index;
       drag.set(IDLE_DRAG);
+      target.set(-1);
+      scheduleOnRN(onFinish, index, destination);
     });
   const animatedStyle = useAnimatedStyle(() => {
     const current = drag.get();
     const active = current.index === index;
+    const previewFrame = frames[getChekiDragPreviewIndex(index, current.index, target.get())];
     const spring = { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System };
     return {
       zIndex: active ? 2 : 0,
       opacity: active ? 0.85 : 1,
       transform: [
-        { translateX: active ? frame.x + current.x - current.startX : withSpring(frame.x, spring) },
-        { translateY: active ? frame.y + current.y - current.startY + scrollY.get() - current.startScroll : withSpring(frame.y, spring) },
+        { translateX: active ? frame.x + current.x - current.startX : withSpring(previewFrame.x, spring) },
+        { translateY: active ? frame.y + current.y - current.startY + scrollY.get() - current.startScroll : withSpring(previewFrame.y, spring) },
       ],
     };
   });
-  const targetStyle = useAnimatedStyle(() => ({
-    opacity: drag.get().index !== -1 && drag.get().index !== index && target.get() === index ? 1 : 0,
+  const dragBorderStyle = useAnimatedStyle(() => ({
+    opacity: drag.get().index === index ? 1 : 0,
   }));
   return (
     <Animated.View style={[{ position: 'absolute', width: frame.width, height: frame.height }, animatedStyle]}>
@@ -79,13 +83,18 @@ function SortablePhoto({ item, frame, index, count, drag, target, scrollY, onSta
           }}
         >
           <ChekiGridThumbnail uri={item.uri} width={frame.width} height={frame.height} colors={colors}
-            variant="portrait" spec={item.spec} fiveInchLandscape />
+            variant="original" spec={item.spec} />
         </Animated.View>
       </GestureDetector>
-      <Animated.View pointerEvents="none" style={[{
-        position: 'absolute', inset: 0, borderWidth: 3, borderColor: colors.accent,
-        borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
-      }, targetStyle]} />
+      <Animated.View
+        pointerEvents="none"
+        style={[{
+          position: 'absolute', inset: 0,
+          borderWidth: 3, borderColor: colors.accent,
+          borderRadius: CHEKI_SQUARE_CARD_RADIUS,
+          borderCurve: 'continuous',
+        }, dragBorderStyle]}
+      />
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={`移除第 ${index + 1} 张拍立得`}
         hitSlop={10} onPress={onRemove} style={{
           position: 'absolute', top: 4, right: 4, width: 28, height: 28, borderRadius: 14,
@@ -109,13 +118,13 @@ export function ChekiWidgetGroupSortableGrid({ itemIds, items, onChange, onDragS
   const [dragging, setDragging] = useState(false);
   const { columns, itemWidth, itemHeight } = useChekiAlbumGridLayout({
     density: 'medium', availableWidth: Math.max(1, Math.min(measuredWidth ?? width - 32, 960 - 32)),
-    availableHeight: height, displayMode: 'portrait',
+    availableHeight: height, displayMode: 'original',
   });
   const selectedItems = useMemo(() => {
     const byId = new Map(items.map((item) => [item.id, item]));
     return itemIds.flatMap((id) => { const item = byId.get(id); return item ? [item] : []; });
   }, [itemIds, items]);
-  const frames = useMemo(() => buildChekiDragFrames(selectedItems, columns, itemWidth, itemHeight, CHEKI_GRID_GAP),
+  const frames = useMemo(() => buildChekiDragFrames(selectedItems, columns, itemWidth, itemHeight, CHEKI_SQUARE_GRID_GAP),
     [selectedItems, columns, itemWidth, itemHeight]);
   const contentHeight = frames.length ? frames[frames.length - 1].y + itemHeight : 0;
   const viewportHeight = Math.min(contentHeight, Math.max(280, height * 0.55));
@@ -165,7 +174,7 @@ export function ChekiWidgetGroupSortableGrid({ itemIds, items, onChange, onDragS
       <Animated.ScrollView ref={scrollRef} onScroll={handleScroll} scrollEventThrottle={16}
         scrollEnabled={!dragging} nestedScrollEnabled contentContainerStyle={{ height: contentHeight }}>
         {selectedItems.map((item, index) => (
-          <SortablePhoto key={item.id} item={item} frame={frames[index]} index={index} count={selectedItems.length}
+          <SortablePhoto key={item.id} item={item} frame={frames[index]} frames={frames} index={index} count={selectedItems.length}
             drag={drag} target={target} scrollY={scrollY} onStart={start} onFinish={finish}
             onMove={(offset) => finish(index, index + offset)}
             onRemove={() => onChange(itemIds.filter((id) => id !== item.id))} />

@@ -44,8 +44,8 @@ import {
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { AppIcon } from './AppIcon';
 import {
-  CHEKI_BARE_THUMBNAIL_RADIUS,
-  CHEKI_GRID_GAP,
+  CHEKI_SQUARE_CARD_RADIUS,
+  CHEKI_SQUARE_GRID_GAP,
   ChekiGridThumbnail,
   useChekiAlbumGridLayout,
 } from './ChekiAlbumThumbnail';
@@ -246,10 +246,10 @@ export function ChekiPickerScreen({
   const horizontalPadding = Math.max(16, (width - 720) / 2);
   const galleryContentWidth = Math.max(1, Math.min(width, 720) - 32);
   const layout = useChekiAlbumGridLayout({
-    density: 'small',
+    density: 'medium',
     availableWidth: galleryContentWidth,
     availableHeight: height,
-    displayMode: 'portrait',
+    displayMode: 'original',
   });
 
   useEffect(() => {
@@ -699,12 +699,12 @@ export function ChekiPickerScreen({
           data={filteredCandidates}
           keyExtractor={({ item }) => item.id}
           numColumns={layout.columns}
-          columnWrapperStyle={{ gap: CHEKI_GRID_GAP }}
+          columnWrapperStyle={{ gap: CHEKI_SQUARE_GRID_GAP }}
           contentContainerStyle={{
             flexGrow: filteredCandidates.length === 0 ? 1 : undefined,
             paddingHorizontal: horizontalPadding,
             paddingBottom: 24,
-            gap: CHEKI_GRID_GAP,
+            gap: CHEKI_SQUARE_GRID_GAP,
           }}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
@@ -746,7 +746,7 @@ export function ChekiPickerScreen({
                   width: layout.itemWidth,
                   height: layout.itemHeight,
                   overflow: 'hidden',
-                  borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
+                  borderRadius: CHEKI_SQUARE_CARD_RADIUS,
                   borderCurve: 'continuous',
                   opacity: disabled ? 0.32 : 1,
                 }}
@@ -756,7 +756,7 @@ export function ChekiPickerScreen({
                   width={layout.itemWidth}
                   height={layout.itemHeight}
                   colors={colors}
-                  variant="portrait"
+                  variant="original"
                 />
                 {selected ? (
                   <View
@@ -765,7 +765,7 @@ export function ChekiPickerScreen({
                       inset: 0,
                       borderWidth: 3,
                       borderColor: colors.accent,
-                      borderRadius: CHEKI_BARE_THUMBNAIL_RADIUS,
+                      borderRadius: CHEKI_SQUARE_CARD_RADIUS,
                       borderCurve: 'continuous',
                     }}
                   />

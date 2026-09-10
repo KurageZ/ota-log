@@ -20,7 +20,7 @@ export const CHEKI_SQUARE_GRID_GAP = 4;
 export const CHEKI_ASPECT_RATIO = 86 / 54;
 export const CHEKI_BARE_THUMBNAIL_RADIUS = 10;
 
-const CHEKI_SQUARE_CARD_RADIUS = 12;
+export const CHEKI_SQUARE_CARD_RADIUS = 12;
 const IMAGE_ORIENTATION_CACHE_LIMIT = 512;
 const IMAGE_ORIENTATION_RESOLVE_TIMEOUT_MS = 1000;
 const imageLandscapeCache = new Map<string, boolean>();

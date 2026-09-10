@@ -1,5 +1,4 @@
 import type { ChekiSpec } from '../domain/chekiSpec';
-import { chunkChekiAlbumRows, getChekiAlbumColumnSpan } from './cheki';
 
 export interface ChekiDragFrame {
   id: string;
@@ -16,18 +15,16 @@ export function buildChekiDragFrames(
   height: number,
   gap: number,
 ): ChekiDragFrame[] {
-  return chunkChekiAlbumRows(items, columns, 'portrait').flatMap((row, rowIndex) => {
-    let x = 0;
-    return row.map((item) => {
-      const itemWidth = getChekiAlbumColumnSpan(item.spec, 'portrait') === 2 ? width * 2 + gap : width;
-      const frame = { id: item.id, x, y: rowIndex * (height + gap), width: itemWidth, height };
-      x += itemWidth + gap;
-      return frame;
-    });
-  });
+  return items.map((item, index) => ({
+    id: item.id,
+    x: (index % columns) * (width + gap),
+    y: Math.floor(index / columns) * (height + gap),
+    width,
+    height,
+  }));
 }
 
-/** Distance to the actual rectangle, including the second slot of a five-inch photo. */
+/** Distance to each grid cell, including gaps between cells. */
 export function findChekiDragTarget(frames: ChekiDragFrame[], x: number, y: number): number {
   'worklet';
   let target = -1;
@@ -43,6 +40,16 @@ export function findChekiDragTarget(frames: ChekiDragFrame[], x: number, y: numb
     }
   }
   return target;
+}
+
+/** Preview insertion while keeping the dragged photo attached to the finger. */
+export function getChekiDragPreviewIndex(index: number, from: number, to: number): number {
+  'worklet';
+  if (from < 0 || to < 0) return index;
+  if (index === from) return to;
+  if (from < to && index > from && index <= to) return index - 1;
+  if (from > to && index >= to && index < from) return index + 1;
+  return index;
 }
 
 export function moveChekiWidgetItem(itemIds: string[], id: string, targetId: string): string[] {

@@ -3,6 +3,7 @@ import { TouchableOpacity } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ChekiWidgetGroupSortableGrid } from '../ChekiWidgetGroupSortableGrid';
 
+const mockStyles: (() => { opacity?: number; transform?: { translateX?: number; translateY?: number }[] })[] = [];
 const mockReactions: (() => void)[] = [];
 const mockFrames: ((event: { timeSincePreviousFrame: number }) => void)[] = [];
 const mockScrollTo = jest.fn();
@@ -18,7 +19,7 @@ jest.mock('react-native-reanimated', () => {
       current: initial, get() { return this.current; }, set(value: unknown) { this.current = value; },
     }).current,
     useAnimatedRef: () => ReactModule.useRef(null),
-    useAnimatedStyle: () => ({}),
+    useAnimatedStyle: (fn: () => any) => { mockStyles.push(fn); return {}; },
     useAnimatedScrollHandler: (fn: Function) => fn,
     useAnimatedReaction: (prepare: Function, react: Function) => {
       mockReactions.push(() => react(prepare(), null));
@@ -46,8 +47,8 @@ jest.mock('../ChekiAlbumThumbnail', () => {
   const ReactModule = require('react');
   return {
     ChekiGridThumbnail: (props: object) => ReactModule.createElement('Thumbnail', props),
-    CHEKI_BARE_THUMBNAIL_RADIUS: 8, CHEKI_GRID_GAP: 8,
-    useChekiAlbumGridLayout: () => ({ columns: 4, itemWidth: 76, itemHeight: 121 }),
+    CHEKI_SQUARE_CARD_RADIUS: 12, CHEKI_SQUARE_GRID_GAP: 4,
+    useChekiAlbumGridLayout: () => ({ columns: 4, itemWidth: 76, itemHeight: 76 }),
   };
 });
 jest.mock('../AppIcon', () => ({ AppIcon: () => null }));
@@ -64,17 +65,18 @@ describe('ChekiWidgetGroupSortableGrid', () => {
   const onChange = jest.fn();
   const onDragStateChange = jest.fn();
   beforeEach(() => {
+    mockStyles.length = 0;
     mockReactions.length = 0;
     mockFrames.length = 0;
     act(() => { renderer = create(<ChekiWidgetGroupSortableGrid itemIds={['a', 'b', 'c']} items={items} onChange={onChange} onDragStateChange={onDragStateChange} />); });
   });
   afterEach(() => { act(() => renderer.unmount()); });
 
-  test('moves a three-inch photo onto the second slot of a five-inch target', () => {
+  test('moves a photo onto a five-inch target occupying one square cell', () => {
     const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
     act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
     act(() => {
-      gesture.onUpdateValue({ translationX: 200, translationY: 0 });
+      gesture.onUpdateValue({ translationX: 80, translationY: 0 });
       mockReactions.forEach((run) => run());
       gesture.onFinalizeValue({}, true);
     });
@@ -83,8 +85,41 @@ describe('ChekiWidgetGroupSortableGrid', () => {
     expect(onDragStateChange).toHaveBeenLastCalledWith(false);
     expect(mockHapticDragEnd).toHaveBeenCalledTimes(1);
     const thumbnails = renderer.root.findAllByType('Thumbnail' as React.ElementType);
-    expect(thumbnails.map((node) => node.props.width)).toEqual([76, 160, 160]);
-    expect(thumbnails[1].props.fiveInchLandscape).toBe(true);
+    expect(thumbnails.map((node) => node.props.width)).toEqual([76, 76, 76]);
+    expect(thumbnails.map((node) => node.props.height)).toEqual([76, 76, 76]);
+    expect(thumbnails.every((node) => node.props.variant === 'original')).toBe(true);
+  });
+
+  test('surrounding photos move before release and return when the drag is cancelled', () => {
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
+    act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
+    act(() => {
+      gesture.onUpdateValue({ translationX: 160, translationY: 0 });
+      mockReactions.forEach((run) => run());
+    });
+    expect(mockStyles.filter((style) => style().transform).slice(-3).map((style) => style().transform![0].translateX)).toEqual([160, 0, 80]);
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => { gesture.onFinalizeValue({}, false); });
+    expect(mockStyles.filter((style) => style().transform).slice(-3).map((style) => style().transform![0].translateX)).toEqual([0, 80, 160]);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test.each([false, true])('clears drag state when start and finalize are batched (success=%s)', (success) => {
+    const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
+    act(() => {
+      gesture.onStartValue({ x: 20, y: 20 });
+      gesture.onUpdateValue({ translationX: 160, translationY: 0 });
+      mockReactions.forEach((run) => run());
+      gesture.onFinalizeValue({}, success);
+    });
+    expect(mockStyles.filter((style) => style().transform).slice(-3).map((style) => style().transform![0].translateX)).toEqual([0, 80, 160]);
+    expect(mockStyles.filter((style) => !style().transform).slice(-3).map((style) => style().opacity)).toEqual([0, 0, 0]);
+    mockScrollTo.mockClear();
+    act(() => { mockFrames[mockFrames.length - 1]({ timeSincePreviousFrame: 16 }); });
+    expect(mockScrollTo).not.toHaveBeenCalled();
+    expect(onDragStateChange).toHaveBeenLastCalledWith(false);
+    if (success) expect(onChange).toHaveBeenCalledWith(['b', 'c', 'a']);
+    else expect(onChange).not.toHaveBeenCalled();
   });
 
   test('cancelled drag keeps the order and unlocks scrolling', () => {
@@ -104,7 +139,7 @@ describe('ChekiWidgetGroupSortableGrid', () => {
   });
 
   test('auto-scrolls a long grid and stops after cancellation', () => {
-    const many = Array.from({ length: 16 }, (_, index) => ({ ...items[1], id: String(index) }));
+    const many = Array.from({ length: 48 }, (_, index) => ({ ...items[1], id: String(index) }));
     act(() => renderer.update(<ChekiWidgetGroupSortableGrid itemIds={many.map(({ id }) => id)} items={many} onChange={onChange} />));
     const gesture = renderer.root.findAllByType('GestureDetector' as React.ElementType)[0].props.gesture;
     act(() => { gesture.onStartValue({ x: 20, y: 20 }); });
