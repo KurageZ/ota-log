@@ -35,6 +35,7 @@
 - 拍立得数据结构设计：`data/cheki-data-model-design.md`
 - 重要日期数据结构设计：`data/important-date-data-model.md`
 - 技术选型：`tech/stack.md`
+- iOS 拍立得实时边框与裁切 Demo：`tech/cheki-crop-demo.md`
 - 决策记录模板：`decisions/0000-template.md`
 - 艺人类型与团体履历决策：`decisions/0001-artist-types-and-memberships.md`
 - iPad 自适应布局决策：`decisions/0002-ipad-adaptive-layout.md`

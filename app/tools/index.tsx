@@ -11,6 +11,7 @@ export default function ToolboxScreen() {
   const { colors } = useAppTheme();
   const toolTints = colors.toolsMenu;
   const weiboTint = colors.settingsMenu.weibo;
+  const showChekiCropDemo = __DEV__ && process.env.EXPO_OS === 'ios';
 
   return (
     <SafeAreaView edges={SCROLL_SCREEN_SAFE_AREA_EDGES} style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -28,9 +29,20 @@ export default function ToolboxScreen() {
                 label="拍立得贴纸相机"
                 subtitle="选择拍立得作贴纸，拍摄合成后保存分享"
                 tint={toolTints.planner}
-                isLast
+                isLast={!showChekiCropDemo}
                 onPress={() => router.push('/tools/cheki-sticker-camera')}
               />
+              {showChekiCropDemo ? (
+                <MenuItem
+                  icon="cheki"
+                  label="拍立得自动裁切"
+                  subtitle="系统扫描裁切，白边取样校正色偏"
+                  badge="Demo"
+                  tint={toolTints.planner}
+                  isLast
+                  onPress={() => router.push('/tools/cheki-crop')}
+                />
+              ) : null}
             </MenuCard>
           </View>
         ) : null}

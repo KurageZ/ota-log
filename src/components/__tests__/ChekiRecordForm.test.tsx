@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { Alert, TextInput } from 'react-native';
+import { Alert, InteractionManager, Platform, TextInput, TouchableOpacity } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { copyToDocuments } from '../../utils/copyToDocuments';
 import { ChekiRecordForm } from '../ChekiRecordForm';
 import type { ChekiRecordWithItems } from '../../repositories/ChekiRecordRepository';
 
@@ -23,6 +25,14 @@ const mockNavigation = {
 };
 
 let mockRecord: ChekiRecordWithItems;
+const mockScanDocuments = jest.fn();
+jest.mock('../../../modules/cheki-crop/src/ChekiCropModule', () => ({
+  getChekiCropModule: () => ({ scanDocuments: mockScanDocuments }),
+}));
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: jest.fn(),
+  launchCameraAsync: jest.fn(),
+}));
 
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
@@ -105,6 +115,85 @@ describe('ChekiRecordForm', () => {
     act(() => renderer?.unmount());
     jest.restoreAllMocks();
     jest.clearAllMocks();
+  });
+
+  test('imports all iOS scanned pages and raises the record quantity', async () => {
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    jest.spyOn(global, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((callback: any) => {
+      callback();
+      return { then: jest.fn(), done: jest.fn(), cancel: jest.fn() };
+    });
+    jest.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue({ status: 'granted' } as any);
+    jest.mocked(copyToDocuments).mockImplementation(async (uri) => uri.replace('/tmp/', '/documents/'));
+    mockScanDocuments.mockResolvedValue([
+      { uri: 'file:///tmp/one.jpg', width: 600, height: 900 },
+      { uri: 'file:///tmp/two.jpg', width: 900, height: 600 },
+    ]);
+    try {
+      await act(async () => { renderer = create(<ChekiRecordForm mode="edit" recordId="record-1" />); });
+      const scanButton = () => renderer.root.findAllByType(TouchableOpacity).find(
+        (button) => button.findAll((node) => node.props.children === '扫描拍立得').length > 0,
+      )!;
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(copyToDocuments).toHaveBeenCalledTimes(2);
+      expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType(TextInput).some((input) => input.props.value === '2')).toBe(true);
+      mockScanDocuments.mockResolvedValue(null);
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(copyToDocuments).toHaveBeenCalledTimes(2);
+      mockScanDocuments.mockRejectedValue(new Error('camera failed'));
+      const alert = jest.spyOn(Alert, 'alert');
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(alert).toHaveBeenCalledWith('扫描失败', 'camera failed');
+      expect(scanButton().props.disabled).toBe(false);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
+    }
+  });
+
+  test('keeps Android camera import, cancellation and failure independent of the iOS scanner', async () => {
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    jest.spyOn(global, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((callback: any) => {
+      callback();
+      return { then: jest.fn(), done: jest.fn(), cancel: jest.fn() };
+    });
+    jest.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue({ status: 'granted' } as any);
+    jest.mocked(copyToDocuments).mockImplementation(async (uri) => uri.replace('/tmp/', '/documents/'));
+    jest.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({ canceled: false, assets: [
+      { uri: 'file:///tmp/one.jpg', width: 600, height: 900 },
+      { uri: 'file:///tmp/two.jpg', width: 900, height: 600 },
+    ] });
+    try {
+      await act(async () => { renderer = create(<ChekiRecordForm mode="edit" recordId="record-1" />); });
+      const scanButton = () => renderer.root.findAllByType(TouchableOpacity).find(
+        (button) => button.findAll((node) => node.props.children === '拍摄').length > 0,
+      )!;
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(copyToDocuments).toHaveBeenCalledTimes(1);
+      expect(ImagePicker.launchCameraAsync).toHaveBeenCalledWith({ quality: 0.8 });
+      expect(mockScanDocuments).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType(TextInput).some((input) => input.props.value === '1')).toBe(true);
+      jest.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({ canceled: true, assets: null });
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(copyToDocuments).toHaveBeenCalledTimes(1);
+      jest.mocked(ImagePicker.launchCameraAsync).mockRejectedValue(new Error('camera failed'));
+      const alert = jest.spyOn(Alert, 'alert');
+      await act(async () => { await scanButton().props.onPress(); });
+      expect(alert).toHaveBeenCalledWith('拍摄失败', 'camera failed');
+      expect(scanButton().props.disabled).toBe(false);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
+    }
   });
 
   test('persists an edited price for existing items', async () => {

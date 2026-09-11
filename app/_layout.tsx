@@ -127,6 +127,7 @@ function RootNavigator() {
       <Stack.Screen name="settings/artist-type-conversion" options={{ title: '艺人类型转换' }} />
       <Stack.Screen name="weibo" options={{ title: '微博抓取' }} />
       <Stack.Screen name="tools/index" options={{ title: '工具箱' }} />
+      <Stack.Screen name="tools/cheki-crop" options={{ title: '拍立得自动裁切' }} />
       <Stack.Screen name="tools/chekiroku-import" options={{ title: '外部数据导入' }} />
       <Stack.Screen
         name="tools/cheki-sticker-camera"

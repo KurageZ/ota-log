@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { getChekiCropModule, type CropImage } from '../../modules/cheki-crop/src/ChekiCropModule';
 import { Stack, router, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -293,7 +294,7 @@ export function ChekiRecordForm({
     ]);
   }), [cleanupPendingImportedPhotos, isDirty, navigation]);
 
-  const importPhotos = useCallback(async (assets: ImagePicker.ImagePickerAsset[]) => {
+  const importPhotos = useCallback(async (assets: CropImage[]) => {
     if (assets.length === 0) return;
     setPhotoImportProgress({ current: 0, total: assets.length });
     await waitForNextFrame();
@@ -380,13 +381,25 @@ export function ChekiRecordForm({
 
   const handleTakePhoto = useCallback(async () => {
     if (isHandlingPhotos) return;
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (permission.status !== 'granted') {
-      showCameraPermissionAlert();
-      return;
+    setPhotoPickerPending(true);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.status !== 'granted') {
+        showCameraPermissionAlert();
+        return;
+      }
+      if (Platform.OS === 'ios') {
+        const images = await getChekiCropModule().scanDocuments();
+        if (images !== null) await importPhotos(images);
+      } else {
+        const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+        if (!result.canceled) await importPhotos(result.assets.slice(0, 1));
+      }
+    } catch (error) {
+      Alert.alert(Platform.OS === 'ios' ? '扫描失败' : '拍摄失败', error instanceof Error ? error.message : String(error));
+    } finally {
+      setPhotoPickerPending(false);
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled) await importPhotos(result.assets.slice(0, 1));
   }, [importPhotos, isHandlingPhotos]);
 
   const removePendingPhoto = useCallback((uri: string) => {
@@ -852,7 +865,7 @@ export function ChekiRecordForm({
               style={{ flex: 1, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: colors.accent, opacity: isHandlingPhotos ? 0.5 : 1 }}
             >
               <AppIcon name="camera" size={16} color={colors.onAccent} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onAccent }}>拍摄</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onAccent }}>{Platform.OS === 'ios' ? '扫描拍立得' : '拍摄'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handlePickPhotos}
