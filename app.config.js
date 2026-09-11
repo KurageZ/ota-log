@@ -25,13 +25,25 @@ if (variantName && !Object.hasOwn(variants, variantName)) {
 const variant = variantName ? variants[variantName] : null;
 
 module.exports = ({ config }) => {
+  const bundleIdentifier = variant?.identifier ?? config.ios.bundleIdentifier;
+  // EAS resolves extension credentials before the native project is generated.
+  const extra = structuredClone(config.extra);
+  const widgetExtension = extra.eas.build.experimental.ios.appExtensions.find(
+    (extension) => extension.targetName === 'ExpoWidgetsTarget'
+  );
+  widgetExtension.bundleIdentifier = `${bundleIdentifier}.ExpoWidgetsTarget`;
+  widgetExtension.entitlements['com.apple.security.application-groups'] = [
+    `group.${bundleIdentifier}`,
+  ];
+
   return {
     ...config,
+    extra,
     name: variant?.name ?? config.name,
     scheme: variant?.scheme ?? config.scheme,
     ios: {
       ...config.ios,
-      bundleIdentifier: variant?.identifier ?? config.ios.bundleIdentifier,
+      bundleIdentifier,
     },
     android: {
       ...config.android,

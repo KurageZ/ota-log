@@ -45,6 +45,7 @@ npm test -- --runInBand
 
 ## 常见问题
 
+- EAS iOS 多 variant 构建：`app.config.js` 必须同步主应用 Bundle ID、`extra.eas.build.experimental.ios.appExtensions` 中的小组件 Bundle ID 和 App Group；否则 development / preview 可能选到生产版描述文件。回归检查：`rtk proxy npx jest scripts/__tests__/app-config.test.ts --runInBand`。
 - Jest 缓存或空间问题导致异常时，可尝试 `npm test -- --runInBand --no-cache`。
 - 数据库测试失败时，先区分 schema/migration 问题和测试适配器问题。
 - Expo/原生构建问题需要单独记录实际错误、Node 版本、设备/模拟器状态和本地 SDK 配置。
