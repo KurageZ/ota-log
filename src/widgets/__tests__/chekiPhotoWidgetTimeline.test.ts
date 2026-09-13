@@ -21,6 +21,29 @@ describe('createChekiPhotoWidgetTimeline', () => {
     expect(timeline[1].props.group1.smallImageUri).toBe('b');
     expect(timeline[1].date.getTime() - timeline[0].date.getTime()).toBe(CHEKI_WIDGET_ROTATION_INTERVAL_MS);
   });
+  test('wide photos occupy two slots and rotation continues with the next undisplayed photo', () => {
+    const timeline = createChekiPhotoWidgetTimeline([{
+      ...group(['wide', 'a', 'b', 'wide2', 'c']), imageSpans: [2, 1, 1, 2, 1],
+    }], 0);
+    const first = timeline[0].props.group1;
+    expect(first.imageUri).toBe('wide');
+    expect(first.imageSpan).toBe(2);
+    expect(first.leadingImageUri).toBeUndefined();
+    expect(first.trailingImageUri).toBe('a');
+    const second = timeline[1].props.group1;
+    expect(second.imageUri).toBe('b');
+    expect(second.trailingImageUri).toBe('wide2');
+    expect(second.trailingImageSpan).toBe(2);
+    expect(timeline[2].props.group1.imageUri).toBe('c');
+  });
+  test('two wide photos rotate separately without squeezing into three slots', () => {
+    const timeline = createChekiPhotoWidgetTimeline([{
+      ...group(['wide1', 'wide2']), imageSpans: [2, 2],
+    }], 0);
+    expect(timeline[0].props.group1.imageUri).toBe('wide1');
+    expect(timeline[0].props.group1.trailingImageUri).toBeUndefined();
+    expect(timeline[1].props.group1.imageUri).toBe('wide2');
+  });
   test('keeps one image fixed and does not duplicate a third image', () => {
     const timeline = createChekiPhotoWidgetTimeline([group(['only']), group(['a', 'b'])], 0);
     expect(timeline[0].props.group1).toEqual({ state: 'content', imageUri: 'only', smallImageUri: 'only', emptyDeepLink: 'otalog:///cheki' });
@@ -61,6 +84,19 @@ describe('createChekiWidgetGroupPresentation', () => {
       .toBe('unavailable');
     expect(createChekiWidgetGroupPresentation(resolvedGroup({ state: 'no_match' }), new Map(), failed, now).state)
       .toBe('no_match');
+  });
+
+  test('keeps spans aligned with successfully cached photos', () => {
+    const items = ['three_inch_portrait', 'five_inch_landscape', 'five_inch_portrait'].map((spec, index) => ({
+      id: String(index), spec: spec as 'three_inch_portrait' | 'five_inch_landscape' | 'five_inch_portrait',
+      frontPhotoUri: `file:///${index}.jpg`, date: null, createdAt: '2026-08-25T00:00:00.000Z', sortOrder: index,
+    }));
+    const presentation = createChekiWidgetGroupPresentation(
+      resolvedGroup({ state: 'content', items }), new Map([['1', 'wide'], ['2', 'portrait']]),
+      new Set(['0']), new Date('2026-08-25T10:20:00.000Z'),
+    );
+    expect(presentation.imageUris).toEqual(['wide', 'portrait']);
+    expect(presentation.imageSpans).toEqual([2, 1]);
   });
 
   test('marks only the group whose own thumbnail failed as unavailable', () => {

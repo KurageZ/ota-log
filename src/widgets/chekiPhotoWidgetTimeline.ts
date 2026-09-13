@@ -11,6 +11,7 @@ export const CHEKI_WIDGET_TIMELINE_ENTRY_COUNT = 48;
 export interface ResolvedChekiWidgetGroupPresentation {
   state: 'content' | 'unconfigured' | 'no_match' | 'unavailable';
   imageUris: string[];
+  imageSpans?: number[];
   initialIndex?: number;
   emptyDeepLink: string;
 }
@@ -19,13 +20,29 @@ function frameForGroup(group: ResolvedChekiWidgetGroupPresentation, index: numbe
   if (group.state !== 'content' || group.imageUris.length === 0) return { state: group.state, emptyDeepLink: group.emptyDeepLink };
   const step = index + (group.initialIndex ?? 0);
   const small = step % group.imageUris.length;
-  const current = (step * 3) % group.imageUris.length;
+  let current = 0;
+  let selected: number[] = [];
+  for (let batch = 0; batch <= step; batch++) {
+    selected = [];
+    let used = 0;
+    while (selected.length < group.imageUris.length) {
+      const next = (current + selected.length) % group.imageUris.length;
+      const span = group.imageSpans?.[next] ?? 1;
+      if (used + span > 3) break;
+      selected.push(next);
+      used += span;
+    }
+    if (batch < step) current = (current + selected.length) % group.imageUris.length;
+  }
+  const leading = selected.length === 3 ? selected[1] : undefined;
+  const trailing = selected.length >= 2 ? selected[selected.length - 1] : undefined;
   return {
     state: 'content', imageUri: group.imageUris[current], smallImageUri: group.imageUris[small],
-    leadingImageUri: group.imageUris.length >= 3 ? group.imageUris[(current + 1) % group.imageUris.length] : undefined,
-    trailingImageUri: group.imageUris.length >= 2
-      ? group.imageUris[(current + (group.imageUris.length >= 3 ? 2 : 1)) % group.imageUris.length]
-      : undefined,
+    imageSpan: group.imageSpans?.[current],
+    leadingImageUri: leading === undefined ? undefined : group.imageUris[leading],
+    leadingImageSpan: leading === undefined ? undefined : group.imageSpans?.[leading],
+    trailingImageUri: trailing === undefined ? undefined : group.imageUris[trailing],
+    trailingImageSpan: trailing === undefined ? undefined : group.imageSpans?.[trailing],
     emptyDeepLink: group.emptyDeepLink,
   };
 }
@@ -36,9 +53,12 @@ export function createChekiWidgetGroupPresentation(
   failedItemIds: ReadonlySet<string>,
   now: Date,
 ): ResolvedChekiWidgetGroupPresentation {
+  const imageSpans: number[] = [];
   const imageUris = group.items.flatMap((item) => {
     const uri = cachedImageUris.get(item.id);
-    return uri ? [uri] : [];
+    if (!uri) return [];
+    imageSpans.push(item.spec === 'five_inch_landscape' ? 2 : 1);
+    return [uri];
   });
   const state: ResolvedChekiWidgetGroupPresentation['state'] = imageUris.length
     ? 'content'
@@ -53,7 +73,7 @@ export function createChekiWidgetGroupPresentation(
   const initialIndex = imageUris.length
     ? Math.max(0, Math.floor((now.getTime() - anchor) / CHEKI_WIDGET_ROTATION_INTERVAL_MS) % imageUris.length)
     : 0;
-  return { state, imageUris, initialIndex, emptyDeepLink: `otalog:///settings/widget/${group.slot}` };
+  return { state, imageUris, imageSpans, initialIndex, emptyDeepLink: `otalog:///settings/widget/${group.slot}` };
 }
 
 export function createChekiPhotoWidgetTimeline(groups: ResolvedChekiWidgetGroupPresentation[], startTime = Date.now()): WidgetTimelineEntry<ChekiPhotoWidgetProps>[] {
