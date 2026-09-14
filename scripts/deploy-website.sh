@@ -9,9 +9,8 @@ readonly SOURCE_DIR="${REPO_ROOT}/publishing/website/"
 DEPLOY_HOST="${OTA_LOG_DEPLOY_HOST:-root@8.133.166.21}"
 DEPLOY_PATH="${OTA_LOG_DEPLOY_PATH:-/var/www/ota-log}"
 SITE_URL="${OTA_LOG_SITE_URL:-}"
-APK_URL="${OTA_LOG_APK_URL:-}"
 GITHUB_RELEASES_URL="${OTA_LOG_GITHUB_RELEASES_URL:-https://github.com/KurageZ/ota-log/releases/latest}"
-QUARK_URL="${OTA_LOG_QUARK_URL:-}"
+APK_URL="${OTA_LOG_APK_URL:-}"
 STAGING_DIR=""
 
 DRY_RUN=false
@@ -23,7 +22,7 @@ usage() {
 Usage: ./scripts/deploy-website.sh [options]
 
 Options:
-  --apk-url URL  Android APK download page or direct HTTP(S) URL (required for deployment).
+  --apk-url URL  Android download URL, currently used for the Quark cloud-drive link (overrides OTA_LOG_APK_URL).
   --check-only  Only validate local website files; do not connect to the server.
   --dry-run     Preview files that rsync would transfer.
   --delete      Delete remote files that no longer exist locally.
@@ -32,9 +31,8 @@ Options:
 Environment overrides:
   OTA_LOG_DEPLOY_HOST  SSH target (default: root@8.133.166.21)
   OTA_LOG_DEPLOY_PATH  Remote website directory (default: /var/www/ota-log)
-  OTA_LOG_APK_URL      Android APK download URL (overridden by --apk-url)
   OTA_LOG_GITHUB_RELEASES_URL  GitHub Releases URL
-  OTA_LOG_QUARK_URL    Quark cloud-drive URL
+  OTA_LOG_APK_URL      Android download URL (overridden by --apk-url)
   OTA_LOG_SITE_URL     Optional public URL used for post-deploy HTTP checks
 EOF
 }
@@ -84,29 +82,16 @@ fi
 # Generate configuration in a temporary copy; never modify tracked website files.
 STAGING_DIR="$(mktemp -d /tmp/ota-log-website.XXXXXX)"
 trap 'rm -rf "$STAGING_DIR"' EXIT
-python3 - "$SOURCE_DIR" "$STAGING_DIR" "$APK_URL" "$GITHUB_RELEASES_URL" "$QUARK_URL" <<'PYCONFIG'
+python3 - "$SOURCE_DIR" "$STAGING_DIR" "$GITHUB_RELEASES_URL" "$APK_URL" <<'PYCONFIG'
 import json
 import shutil
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-source, destination, url, github_url, quark_url = sys.argv[1:]
-if url:
-    try:
-        parsed = urlsplit(url)
-        valid = (parsed.scheme in {"http", "https"} and parsed.hostname
-                 and not parsed.username and not parsed.password
-                 and not any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in url)
-                 and "\\" not in url)
-        parsed.port  # Validate the port, if provided.
-    except ValueError:
-        valid = False
-    if not valid:
-        raise SystemExit("APK URL must be an absolute HTTP(S) URL without credentials or whitespace")
+source, destination, github_url, quark_url = sys.argv[1:]
 shutil.copytree(source, destination, dirs_exist_ok=True)
 (Path(destination) / "android-download.js").write_text(
-    "window.OTA_LOG_APK_URL = " + json.dumps(url or None) + ";\n"
     "window.OTA_LOG_GITHUB_RELEASES_URL = " + json.dumps(github_url or None) + ";\n"
     "window.OTA_LOG_QUARK_URL = " + json.dumps(quark_url or None) + ";\n",
     encoding="utf-8",

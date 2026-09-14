@@ -56,10 +56,10 @@ cwebp -q 88 -resize 792 0 publishing/app-store/screenshots/2026-09-09/raw/iphone
 ## 服务器部署
 
 ```sh
-./scripts/deploy-website.sh --apk-url 'https://example.com/download/android'
+./scripts/deploy-website.sh --apk-url 'https://pan.quark.cn/s/example'
 ```
 
-支持下载网页和 APK 直链；带查询参数的 URL 请加引号。也可设置 `OTA_LOG_APK_URL`，命令行参数优先。
+`--apk-url` 配置 Android 下载入口（当前为夸克网盘链接）；带查询参数的 URL 请加引号。也可设置 `OTA_LOG_APK_URL`，命令行参数优先。GitHub Releases 默认使用仓库的 `releases/latest`，也可通过 `OTA_LOG_GITHUB_RELEASES_URL` 覆盖。
 脚本在临时目录生成配置并部署，结束后清理，不修改仓库 HTML 或配置文件。
 每次部署（含 `--dry-run`）必须提供地址，避免意外清空下载入口。
 
@@ -69,7 +69,7 @@ cwebp -q 88 -resize 792 0 publishing/app-store/screenshots/2026-09-09/raw/iphone
 ./scripts/deploy-website.sh --dry-run --apk-url 'https://example.com/app.apk'
 ```
 
-`--check-only` 不连接服务器；提供 URL 时同时校验地址及生成后的站点。
+`--check-only` 不连接服务器，只校验本地网站文件。
 本地直接预览和下面的 GitHub Pages 工作流使用默认空配置，Android 按钮不可点击。
 如需在这些环境启用下载，请在发布产物中设置 `android-download.js` 的 `window.OTA_LOG_APK_URL`。
 
