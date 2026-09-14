@@ -1,6 +1,6 @@
 # ota log 首次上架截图 · 简体中文
 
-长期通用流程见 [`docs/workflows/app-store-screenshots.md`](../../../docs/workflows/app-store-screenshots.md)；本文只记录 2026-08-31 这次生成的设备、数据、命令和产物。
+长期通用流程见 [`docs/workflows/app-store-screenshots.md`](../../../../docs/workflows/app-store-screenshots.md)；本文只记录 2026-08-31 这次生成的设备、数据、命令和产物。
 
 本套素材使用本地 iOS 模拟器采集真实 App 界面，再由 Koubou 0.20.0 的 HTML 模板添加标题、背景和设备外框。未上传 App Store Connect，未修改 App 代码或用户原有模拟器的数据。
 

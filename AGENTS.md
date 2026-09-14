@@ -11,23 +11,12 @@
 
 ## Documentation Map
 
-- 文档索引：`docs/README.md`
-- UI/UX 设计：`docs/product/ui-ux.md`
-  - 根目录 `design.md` 是指向该文件的软链接，保留旧入口。
-- 统计自定义功能设计：`docs/product/stats-customization.md`
-- 活动数据结构设计：`docs/data/activity-data-model-design.md`
-- 拍立得数据结构设计：`docs/data/cheki-data-model-design.md`
-- 技术选型：`docs/tech/stack.md`
-- 决策记录模板：`docs/decisions/0000-template.md`
-- iPad 自适应布局决策：`docs/decisions/0002-ipad-adaptive-layout.md`
-- 当前进度：`docs/progress/now.md`
-- iPad 自适应布局进度：`docs/progress/ipad-adaptation.md`
-- 测试验证工作流：`docs/workflows/testing.md`
-- 发版工作流：`docs/workflows/release.md`
-- App Store 截图工作流：`docs/workflows/app-store-screenshots.md`
-- 对外发布材料：`publishing/README.md`
+- 完整文档索引：[docs/README.md](docs/README.md)，按任务查阅。
+- 数据库及 UI 验证：[testing.md](docs/workflows/testing.md)。
+- 发版：[release.md](docs/workflows/release.md)。
+- App Store 截图：[app-store-screenshots.md](docs/workflows/app-store-screenshots.md)。
 
-开始任务前查看 `docs/progress/now.md` 的当前阶段与范围约束；其他专题文档通过 `docs/README.md` 按需查阅。
+任务范围以用户当前请求及明确指定的 issue 为准。不维护或重建 `now.md`，也不另建全局“当前进度”替代文件；历史计划不构成执行授权。
 
 ## Commands
 
@@ -43,10 +32,10 @@
 
 ## 行为规则
 
-1. 不要假设。不要隐藏困惑。主动暴露权衡取舍。
+1. 依据现有代码和任务上下文决定常规实现细节，并说明影响结果的假设与取舍；仅在缺失信息会改变任务范围、对外行为或不可逆操作时询问。
 2. 只写解决当前问题的最小代码，不做任何推测性功能。
 3. 只修改必须改的地方，只清理自己产生的问题。
-4. 明确定义成功标准，验证通过前持续迭代。
+4. 按本次任务定义成功标准，修复本次改动造成的问题并验证；相关检查通过后停止，不扩大到无关修复或反复打磨。无法执行的验证说明限制，不以等待替代仍可完成的工作。
 
 ### 反过度工程 / 反防御性编程
 
@@ -71,15 +60,15 @@
 
 ## Testing Rules
 
-- 修改数据库相关代码时，必须补充或更新 `src/db/__tests__/` 下的测试。
+- 修改数据库结构、SQL 或数据读写行为时，必须补充或更新 `src/db/__tests__/` 下的相关测试；仅改注释或格式不要求新增测试。
 - 新增 migration 至少覆盖：升级后的结构、代表性旧数据保留、表重建时字段一致。
 - 修改 TypeScript 类型、共享工具、Repository 或测试辅助代码时，至少跑 `npx tsc --noEmit`。
-- 提交前常规基线是 `npx tsc --noEmit` 和 `npm test -- --runInBand`。
+- 代码提交前常规基线是 `npx tsc --noEmit` 和 `npm test -- --runInBand`；纯文档和不影响代码行为的静态材料改动只检查内容与引用。同一代码状态已通过的检查无需重复。
 - 如果 Jest 缓存写入或空间问题导致异常，改用 `npm test -- --runInBand --no-cache` 复核。
 
 ## Product And UI Rules
 
-- 设计事实以当前代码为准；设计意图、验收标准和页面规范见 `docs/product/ui-ux.md`。
+- 设计事实以当前代码为准；跨页面规则见 `docs/product/ui-ux.md`，页面规范和验收标准按其中链接查阅对应专题。
 - UI 改动先复用现有 theme、共享组件和页面结构，不做无关重绘。
 - 宽屏布局按窗口宽度（`src/utils/windowMode.ts`）切换，不按设备型号判断；页面水平边距统一使用 `ReadingContainer` / `DashboardContainer`（`src/components/adaptive/AppContainers.tsx`），不硬编码 16px。
 - 如果 UI 方向未定，优先在 `design/` 做一次性 HTML 原型；除非用户明确要求，不把原型纳入功能提交。
@@ -91,5 +80,5 @@
 - commit 正文可用中文说明改动内容、范围、注意事项和验证方法。
 - 发版按 `docs/workflows/release.md` 执行，并同步 `package.json`、`package-lock.json`、`app.json`、`src/utils/appInfo.ts` 和 `CHANGELOG.md`；关于页通过 `APP_VERSION_LABEL` 显示版本，无需重复硬编码版本号。
 - 生成 App Store 截图前必须阅读 `docs/workflows/app-store-screenshots.md`：使用隔离的 `ota-log Store ` 模拟器和虚构演示数据，先核对实际上传栏位尺寸，再采集、排版、自动校验和逐张检查。不得写入用户日常模拟器，不得提交原始截图、生成图片、QA 数据或 ZIP；未经用户明确授权不得上传 App Store Connect。
-- 提交前检查 `AGENTS.md` 和 `docs/` 是否需要同步更新。
+- 本次改动改变了文档中的行为、约束或工作流时，同步对应权威文档；无需为每次提交遍历或更新全部文档。
 - 工作区可能有用户未提交改动；只处理本任务相关文件，不回退无关改动。

@@ -8,7 +8,7 @@
 |------|------|
 | 框架 | Expo SDK 57 + Expo Router v6 |
 | 语言 | TypeScript strict |
-| 样式 | inline styles + `useColorScheme()` |
+| 样式 | inline styles + `useAppTheme()`；系统外观由主题层处理 |
 | 数据库 | expo-sqlite |
 | 图片 | expo-image-picker + 本地永久 URI |
 | 渐变 | expo-linear-gradient |
@@ -22,7 +22,7 @@
 - `react-native-worklets` 使用 Expo SDK 57 匹配的 0.10.x。
 - expo-file-system SDK 57 使用 class-based API：`File`、`Paths`；`File.pickFileAsync()` 返回 `{ canceled, result }`。
 - 图标统一通过 `src/components/AppIcon.tsx` 业务名映射到 `@react-native-vector-icons/lucide`。
-- 数据库使用 `PRAGMA user_version` 管理 migration，当前主线为 v22。
+- 数据库使用 `PRAGMA user_version` 管理 migration，当前版本以 [migrations.ts](../../src/db/migrations.ts) 的 `CURRENT_VERSION` 为准。
 
 ## Android 本地构建
 

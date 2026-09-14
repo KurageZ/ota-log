@@ -4,7 +4,7 @@
 
 范围：从 `ievent.life` 活动详情页和其子活动生成一次性、可编辑的活动草稿
 
-参考调查：[iEvent 活动 10365 一手数据调查](../research/ievent-event-10365.md)
+历史调查使用活动 10365 作为样本；原调查文件未保存在仓库中。样本预期见本文 Further Notes，当前解析行为以实现和回归测试为准。
 
 ## Problem Statement
 
@@ -198,3 +198,7 @@ iEvent 页面本身包含比可见文本更完整的结构化活动数据，包�
 - Its source contains 23 performer objects. The source data includes at least one leading-whitespace name that must be trimmed before entering existing artist matching.
 - Its original activity object does not contain an ending time, while JSON-LD exposes `13:00`. This is the motivating example for ignoring JSON-LD `endDate`.
 - The current activity schema remains intentionally lossy for this feature. Activity / Session granularity belongs to the user; canonical metadata, structured places, ticket types, timetable grouping and external-source synchronization remain out of scope.
+
+## 导入入口文案
+
+活动解析页统一使用「公告链接」和通用预填文案。支持的链接按格式自动进入对应解析流程；界面不展示来源品牌，也不额外宣传某个外部来源。结构化链接解析结果继续进入既有草稿、未知艺人确认和活动表单流程。
