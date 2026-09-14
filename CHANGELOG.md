@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.2] - 2026-09-14
+
+### Added
+- iOS 拍立得记录表单新增扫描入口
+- 切册新增可配置的展示布局与预览，支持五寸横版照片跨两格展示
+
+### Changed
+- 官网更新为真实 App 截图与场景预览，并优化移动端和深色模式展示
+- 将应用版本与关于页版本标识更新至 2.0.2，Android versionCode 更新为 20002
+
+### Fixed
+- 统一拍立得选择器网格，修复拖拽排序实时让位与拖拽状态残留问题
+- 修复贴纸相机混排时不同规格拍立得的相对尺寸，保持预览与导出布局一致
+- 优化横版拍立得小组件的布局与间距
+- 修复小组件签名标识与应用构建变体不一致的问题
+
 ## [2.0.1] - 2026-09-07
 
 ### Changed
