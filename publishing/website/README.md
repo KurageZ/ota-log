@@ -17,7 +17,7 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 - `index.html`：首页内容、实际界面预览及 iOS / Android 下载入口。
 - `styles.css`：响应式布局、浅色 / 深色主题与减少动态效果支持。
 - `website.js`：场景截图切换、Android 下载配置校验和页脚年份。
-- `android-download.js`：默认空的 Android 下载配置，部署脚本在发布产物中替换。
+- `android-download.js`：Android 下载配置，包含 GitHub Releases 和夸克网盘入口。
 - `assets/`：网站专用 WebP 截图、自托管中文衬线字体子集和字体许可证。
 - `DESIGN.md`：本站已实现的设计规范与截图使用边界。
 - `privacy/index.html`：可独立部署和访问的隐私政策页面。
@@ -31,7 +31,7 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 
 - 已包含最小可用的隐私政策和技术支持页面；未来更新计划不在本版范围。
 - App 界面是真实 iOS 截图；人物与记录为虚构演示数据，页面已有标注。来源与版本限制见下文。
-- Android APK 地址由部署时的 `android-download.js` 配置提供；未配置时按钮不可点击。TestFlight 已接入公开测试入口。
+- Android 下载提供 GitHub Releases 和夸克网盘两个入口；夸克链接需在 `android-download.js` 中配置。iOS 已接入 App Store 正式版入口。
 - 首页不展示发布版本号；后续发布仍需核对功能文案、截图与隐私说明。
 - 审阅截图属于本地产物，不纳入源码管理；本次浏览器 QA 位于 `/private/tmp/ota-website-review/`。
 
@@ -84,6 +84,6 @@ cwebp -q 88 -resize 792 0 publishing/app-store/screenshots/2026-09-09/raw/iphone
 
 部署完成后可访问：
 
-- 官网：`https://kuragez.github.io/ota-log/`
-- 隐私政策：`https://kuragez.github.io/ota-log/privacy/`
-- 技术支持：`https://kuragez.github.io/ota-log/support/`
+- 官网：`https://www.otalog.com/`
+- 隐私政策：`https://www.otalog.com/privacy/`
+- 技术支持：`https://www.otalog.com/support/`

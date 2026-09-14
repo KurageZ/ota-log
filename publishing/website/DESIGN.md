@@ -97,7 +97,7 @@ components:
 
 导航锚点通向功能、界面、常见问题和下载。页面提供键盘可见的跳过导航入口。链接、按钮和 FAQ 标题聚焦时显示（3px）蓝色轮廓与（6px）外偏移；主按钮悬停上移（2px）。下载区 Android 使用描边变体。
 
-Android 下载地址读取 `window.OTA_LOG_APK_URL`，保留部署脚本 `--apk-url` 配置方式。仅接受无用户名密码的 HTTP(S) 地址；空值或无效值维持无链接的禁用状态，并提供文字说明。有效下载及 TestFlight 在新标签页打开。
+Android 下载地址读取 `window.OTA_LOG_GITHUB_RELEASES_URL` 和 `window.OTA_LOG_QUARK_URL`。仅接受无用户名密码的 HTTP(S) 地址；空值或无效值维持无链接的禁用状态，并提供文字说明。有效下载及 App Store 在新标签页打开。
 
 ### Scene preview and screenshot collection
 

@@ -43,25 +43,31 @@
     });
   });
 
-  // Treat config as data, and keep an explicit unavailable state if it is absent/invalid.
-  try {
-    const configured = window.OTA_LOG_APK_URL;
-    if (typeof configured !== "string" || !configured.trim()) return;
+  // Treat download links as data, and keep an explicit unavailable state if absent/invalid.
+  const configureDownload = (selector, configured) => {
+    if (typeof configured !== "string" || !configured.trim()) return false;
     const url = new URL(configured);
     if (
       !["http:", "https:"].includes(url.protocol) ||
       url.username ||
       url.password
-    )
-      return;
-    document.querySelectorAll("[data-android-download]").forEach((link) => {
+    ) return false;
+    document.querySelectorAll(selector).forEach((link) => {
       link.href = url.href;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.removeAttribute("aria-disabled");
     });
-    document.querySelector("#android-status").textContent =
-      "安装时，Android 可能会提示允许浏览器安装未知来源应用。";
+    return true;
+  };
+
+  try {
+    const githubReady = configureDownload("[data-android-github]", window.OTA_LOG_GITHUB_RELEASES_URL);
+    const quarkReady = configureDownload("[data-android-quark]", window.OTA_LOG_QUARK_URL);
+    if (githubReady || quarkReady) {
+      document.querySelector("#android-status").textContent =
+        "安装时，Android 可能会提示允许浏览器安装未知来源应用。";
+    }
   } catch {
     // The static fallback remains usable; other website controls are unaffected.
   }

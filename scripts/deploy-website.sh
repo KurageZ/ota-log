@@ -10,6 +10,8 @@ DEPLOY_HOST="${OTA_LOG_DEPLOY_HOST:-root@8.133.166.21}"
 DEPLOY_PATH="${OTA_LOG_DEPLOY_PATH:-/var/www/ota-log}"
 SITE_URL="${OTA_LOG_SITE_URL:-}"
 APK_URL="${OTA_LOG_APK_URL:-}"
+GITHUB_RELEASES_URL="${OTA_LOG_GITHUB_RELEASES_URL:-https://github.com/KurageZ/ota-log/releases/latest}"
+QUARK_URL="${OTA_LOG_QUARK_URL:-}"
 STAGING_DIR=""
 
 DRY_RUN=false
@@ -31,6 +33,8 @@ Environment overrides:
   OTA_LOG_DEPLOY_HOST  SSH target (default: root@8.133.166.21)
   OTA_LOG_DEPLOY_PATH  Remote website directory (default: /var/www/ota-log)
   OTA_LOG_APK_URL      Android APK download URL (overridden by --apk-url)
+  OTA_LOG_GITHUB_RELEASES_URL  GitHub Releases URL
+  OTA_LOG_QUARK_URL    Quark cloud-drive URL
   OTA_LOG_SITE_URL     Optional public URL used for post-deploy HTTP checks
 EOF
 }
@@ -80,14 +84,14 @@ fi
 # Generate configuration in a temporary copy; never modify tracked website files.
 STAGING_DIR="$(mktemp -d /tmp/ota-log-website.XXXXXX)"
 trap 'rm -rf "$STAGING_DIR"' EXIT
-python3 - "$SOURCE_DIR" "$STAGING_DIR" "$APK_URL" <<'PYCONFIG'
+python3 - "$SOURCE_DIR" "$STAGING_DIR" "$APK_URL" "$GITHUB_RELEASES_URL" "$QUARK_URL" <<'PYCONFIG'
 import json
 import shutil
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-source, destination, url = sys.argv[1:]
+source, destination, url, github_url, quark_url = sys.argv[1:]
 if url:
     try:
         parsed = urlsplit(url)
@@ -102,7 +106,10 @@ if url:
         raise SystemExit("APK URL must be an absolute HTTP(S) URL without credentials or whitespace")
 shutil.copytree(source, destination, dirs_exist_ok=True)
 (Path(destination) / "android-download.js").write_text(
-    "window.OTA_LOG_APK_URL = " + json.dumps(url or None) + ";\n", encoding="utf-8"
+    "window.OTA_LOG_APK_URL = " + json.dumps(url or None) + ";\n"
+    "window.OTA_LOG_GITHUB_RELEASES_URL = " + json.dumps(github_url or None) + ";\n"
+    "window.OTA_LOG_QUARK_URL = " + json.dumps(quark_url or None) + ";\n",
+    encoding="utf-8",
 )
 PYCONFIG
 

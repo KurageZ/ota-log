@@ -6,7 +6,7 @@ import { useAppTheme } from '../theme/appTheme';
 import { APP_VERSION_LABEL } from '../utils/appInfo';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../utils/safeArea';
 
-const PRIVACY_POLICY_URL = 'https://kuragez.github.io/ota-log/privacy/';
+const PRIVACY_POLICY_URL = 'https://www.otalog.com/privacy/';
 
 type PrivacyInfoItem = {
   icon: AppIconName;

@@ -83,9 +83,9 @@ ota log 是一款本地优先的演出记录 App，核心数据保存在你的�
 
 | 字段 | 当前值 |
 | --- | --- |
-| 技术支持网址 | 未填写 |
-| 营销网址 | 未填写 |
-| 隐私政策网址 | 本次访问的版本信息与 App Information 页面未显示，需在 App 隐私配置中继续确认 |
+| 技术支持网址 | https://www.otalog.com/support/ |
+| 营销网址 | https://www.otalog.com/ |
+| 隐私政策网址 | https://www.otalog.com/privacy/ |
 | 版权 | 未填写 |
 | 此版本更新内容 | 首个商店版本不提供该字段 |
 
