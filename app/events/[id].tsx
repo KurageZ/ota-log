@@ -17,7 +17,7 @@ import { formatDateWithWeekday, formatDate, daysUntil } from '../../src/utils/da
 import { STATUS_LABELS, STATUS_VALUES } from '../../src/utils/labels';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
-import { buildChekiViewerItems, getChekiManualCount, getChekiAlbumColumnSpan } from '../../src/utils/cheki';
+import { buildChekiViewerItems, getChekiManualCount, getChekiAlbumFrame, getChekiJustifiedRowHeight, chunkChekiPhysicalRows } from '../../src/utils/cheki';
 import { ChekiViewerModal } from '../../src/components/ChekiViewerModal';
 import type { ChekiViewerItem } from '../../src/types/chekiViewer';
 import {
@@ -427,7 +427,7 @@ export function EventDetailScreen({
   const id = eventId ?? routeId;
   const db = useDB();
   const insets = useSafeAreaInsets();
-  const { colors, isDark, chekiDisplayMode } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode, chekiTidyMode, chekiFillGaps } = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
   const screenWidth = availableWidth ?? windowWidth;
   const chekiW = Math.floor((screenWidth - 80) / 3);
@@ -887,9 +887,11 @@ export function EventDetailScreen({
     }
   }, [db]);
 
+  const previewChekiList = useMemo(() => chekiList.slice(0, CHEKI_PREVIEW_LIMIT), [chekiList]);
+  const previewRows = useMemo(() => chunkChekiPhysicalRows(previewChekiList, 3, chekiDisplayMode, chekiW, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps), [previewChekiList, chekiDisplayMode, chekiW, chekiTidyMode, chekiFillGaps]);
   const viewerItems = useMemo(
-    () => buildChekiViewerItems(chekiList, allArtistsMap, new Map(event ? [[event.id, event]] : [])),
-    [allArtistsMap, chekiList, event],
+    () => buildChekiViewerItems([...previewRows.flat(), ...chekiList.slice(CHEKI_PREVIEW_LIMIT)], allArtistsMap, new Map(event ? [[event.id, event]] : [])),
+    [allArtistsMap, chekiList, event, previewRows],
   );
   const infoPhotoViewerItems = useMemo<FullscreenImageItem[]>(
     () => infoPhotos.map((photo) => ({
@@ -898,7 +900,6 @@ export function EventDetailScreen({
     })),
     [infoPhotos],
   );
-  const previewChekiList = useMemo(() => chekiList.slice(0, CHEKI_PREVIEW_LIMIT), [chekiList]);
   const hasMoreCheki = chekiList.length > CHEKI_PREVIEW_LIMIT;
   const totalChekiCount = chekiList.length + getChekiManualCount(manualEntries);
   const visibleArtists = artistsExpanded ? prioritizedArtists : prioritizedArtists.slice(0, 8);
@@ -974,25 +975,28 @@ export function EventDetailScreen({
           <>
             <View
               style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
                 gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
               }}
             >
-              {previewChekiList.map((ck) => (
+              {previewRows.map((row, rowIndex) => {
+                const rowHeight = chekiTidyMode ? getChekiJustifiedRowHeight(row, 3, chekiW, CHEKI_GRID_GAP, rowIndex === previewRows.length - 1) : undefined;
+                return (
+                <View key={row[0].id} style={{ flexDirection: 'row', alignItems: 'center', gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : CHEKI_GRID_GAP }}>
+              {row.map((ck) => (
                 <TouchableOpacity key={ck.id} onPress={() => setViewerSelectedId(ck.id)} activeOpacity={0.8}>
                   <ChekiGridThumbnail
                     uri={ck.photo_uri}
-                    width={getChekiAlbumColumnSpan(ck.spec, chekiDisplayMode) === 2
-                      ? chekiW * 2 + CHEKI_GRID_GAP : chekiW}
-                    height={chekiH}
+                    width={chekiDisplayMode === 'original' ? chekiW : getChekiAlbumFrame(ck.spec, chekiW, rowHeight).width}
+                    height={chekiDisplayMode === 'original' ? chekiH : getChekiAlbumFrame(ck.spec, chekiW, rowHeight).height}
                     colors={{ ...colors, card: isDark ? colors.inputBorder : colors.cardAlt }}
                     variant={chekiDisplayMode}
                     spec={ck.spec}
-                    fiveInchLandscape
                   />
                 </TouchableOpacity>
               ))}
+                </View>
+                );
+              })}
             </View>
             {hasMoreCheki ? (
               <TouchableOpacity

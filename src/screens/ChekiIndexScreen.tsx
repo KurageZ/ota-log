@@ -16,8 +16,8 @@ import {
   ChekiArtistGroup,
   ChekiGridDensity,
   ChekiGridColumns,
-  chunkChekiAlbumRows,
-  getChekiAlbumColumnSpan,
+  chunkChekiPhysicalRows,
+  getChekiAlbumFrame, getChekiJustifiedRowHeight,
   groupChekiRecordsByArtist,
   sortChekisDesc,
 } from '../utils/cheki';
@@ -64,7 +64,6 @@ import {
   ChekiBrowseMode,
   ChekiAlbumGrouping,
   ChekiViewPreferences,
-  type ChekiLandscapeRotation,
   DEFAULT_CHEKI_VIEW_PREFERENCES,
   loadChekiViewPreferences,
   saveChekiViewPreferences,
@@ -115,7 +114,6 @@ function ChekiThumbnailButton({
   colors,
   onOpen,
   displayMode,
-  landscapeRotation,
 }: {
   cheki: Cheki;
   viewerChekis: Cheki[];
@@ -124,12 +122,10 @@ function ChekiThumbnailButton({
   colors: ThemeColors;
   onOpen: (cheki: Cheki, chekis: Cheki[], origin: FullscreenImageTransitionOrigin | null) => void;
   displayMode: 'portrait' | 'original';
-  landscapeRotation: ChekiLandscapeRotation;
 }) {
   const thumbnailRef = useRef<View>(null);
   const thumbnailImageRef = useRef<Image>(null);
   const cancelPendingMeasurementRef = useRef<(() => void) | null>(null);
-  const [isRotated, setIsRotated] = useState(false);
 
   useEffect(() => () => {
     cancelPendingMeasurementRef.current?.();
@@ -137,10 +133,6 @@ function ChekiThumbnailButton({
 
   const handlePress = useCallback(() => {
     cancelPendingMeasurementRef.current?.();
-    if (isRotated) {
-      onOpen(cheki, viewerChekis, null);
-      return;
-    }
     const node = thumbnailImageRef.current ?? thumbnailRef.current;
     if (!node) {
       onOpen(cheki, viewerChekis, null);
@@ -155,7 +147,7 @@ function ChekiThumbnailButton({
         onOpen(cheki, viewerChekis, origin);
       },
     );
-  }, [cheki, isRotated, onOpen, viewerChekis]);
+  }, [cheki, onOpen, viewerChekis]);
 
   return (
     <View ref={thumbnailRef} collapsable={false}>
@@ -171,29 +163,28 @@ function ChekiThumbnailButton({
           imageRef={thumbnailImageRef}
           variant={displayMode}
           spec={cheki.spec}
-          landscapeRotation={landscapeRotation}
-          fiveInchLandscape
-          onRotationChange={setIsRotated}
         />
       </TouchableOpacity>
     </View>
   );
 }
 
-function buildArtistGridItems(groups: ChekiArtistGroup[], columns: ChekiGridColumns, displayMode: 'portrait' | 'original'): ChekiGalleryItem[] {
+function buildArtistGridItems(groups: ChekiArtistGroup[], columns: ChekiGridColumns, displayMode: 'portrait' | 'original', itemWidth: number, chekiTidyMode: boolean, chekiFillGaps: boolean): ChekiGalleryItem[] {
   const items: ChekiGalleryItem[] = [];
   for (const group of groups) {
     const groupKey = group.artist?.id ?? '__null__';
     items.push({ type: 'header', key: `${groupKey}:header`, groupKey, group });
 
-    chunkChekiAlbumRows(group.chekis, columns, displayMode).forEach((row, rowIndex, rows) => {
+    const photoRows = chunkChekiPhysicalRows(group.chekis, columns, displayMode, itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps);
+    const viewerChekis = photoRows.flat();
+    photoRows.forEach((row, rowIndex, rows) => {
       const isLastPhotoRow = rowIndex === rows.length - 1;
       items.push({
         type: 'row',
         key: `${groupKey}:row:${rowIndex}`,
         groupKey,
         chekis: row,
-        viewerChekis: group.chekis,
+        viewerChekis,
         isLastPhotoRow,
       });
     });
@@ -238,14 +229,19 @@ function buildAlbumGridItems(
   columns: ChekiGridColumns,
   sortOrder: ChekiSortOrder,
   displayMode: 'portrait' | 'original',
+  itemWidth: number,
+  chekiTidyMode: boolean,
+  chekiFillGaps: boolean,
 ): ChekiGalleryItem[] {
   const sortedChekis = sortChekiRecords(chekis, sortOrder);
-  const items: ChekiGalleryItem[] = chunkChekiAlbumRows(sortedChekis, columns, displayMode).map((row, index, rows) => ({
+  const photoRows = chunkChekiPhysicalRows(sortedChekis, columns, displayMode, itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps);
+  const viewerChekis = photoRows.flat();
+  const items: ChekiGalleryItem[] = photoRows.map((row, index, rows) => ({
     type: 'row',
     key: `album:row:${index}`,
     groupKey: '__album__',
     chekis: row,
-    viewerChekis: sortedChekis,
+    viewerChekis,
     isLastPhotoRow: index === rows.length - 1,
   }));
   return items;
@@ -256,15 +252,20 @@ function buildDateGroupedAlbumGridItems(
   columns: ChekiGridColumns,
   sortOrder: ChekiSortOrder,
   displayMode: 'portrait' | 'original',
+  itemWidth: number,
+  chekiTidyMode: boolean,
+  chekiFillGaps: boolean,
 ): ChekiGalleryItem[] {
   return buildChekiDateSections(chekis, sortOrder).flatMap(({ key, items }) => {
     const groupChekis = items;
-    const rows: ChekiGalleryItem[] = chunkChekiAlbumRows(groupChekis, columns, displayMode).map((row, index, allRows) => ({
+    const photoRows = chunkChekiPhysicalRows(groupChekis, columns, displayMode, itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps);
+    const viewerChekis = photoRows.flat();
+    const rows: ChekiGalleryItem[] = photoRows.map((row, index, allRows) => ({
       type: 'row',
       key: `date:${key}:row:${index}`,
       groupKey: `date:${key}`,
       chekis: row,
-      viewerChekis: groupChekis,
+      viewerChekis,
       isLastPhotoRow: index === allRows.length - 1,
     }));
     return [{
@@ -366,7 +367,7 @@ const BROWSE_MODE_OPTIONS: ReadonlyArray<ModeChoiceOption<ChekiBrowseMode>> = [
 export default function ChekiLibraryScreen() {
   const params = useLocalSearchParams<ChekiFilterRouteParams>();
   const db = useDB();
-  const { colors, isDark, chekiDisplayMode } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode, chekiTidyMode: defaultTidyMode, chekiFillGaps: defaultFillGaps } = useAppTheme();
   const { contentBottomPadding } = useFloatingTabBarSpacing();
   const isAndroid = Platform.OS === 'android';
   const androidHeader = useAndroidCollapsibleTabHeader();
@@ -379,7 +380,7 @@ export default function ChekiLibraryScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [viewPreferences, setViewPreferences] = useState<ChekiViewPreferences>(DEFAULT_CHEKI_VIEW_PREFERENCES);
   const [viewPreferencesLoaded, setViewPreferencesLoaded] = useState(false);
-  const [albumDisplayOverride, setAlbumDisplayOverride] = useState<'portrait' | 'original' | null>(null);
+  const [albumDisplayOverride, setAlbumDisplayOverride] = useState<'physical' | 'justified' | 'square' | null>(null);
   const consumedDeepLinkRef = useRef<string | null>(null);
   const [viewSettingsVisible, setViewSettingsVisible] = useState(false);
   const [galleryViewportHeight, setGalleryViewportHeight] = useState(0);
@@ -389,7 +390,11 @@ export default function ChekiLibraryScreen() {
     240,
     (galleryViewportHeight || screenHeight) - galleryHeaderHeight - 40,
   );
-  const albumDisplayMode = albumDisplayOverride ?? chekiDisplayMode;
+  const albumStyle = albumDisplayOverride ?? (chekiDisplayMode === 'original' ? 'square' : defaultTidyMode ? 'justified' : 'physical');
+  const albumDisplayMode = albumStyle === 'square' ? 'original' : 'portrait';
+  const chekiTidyMode = albumStyle === 'justified';
+  const [fillGapsOverride, setFillGapsOverride] = useState<boolean | null>(null);
+  const chekiFillGaps = fillGapsOverride ?? defaultFillGaps;
   const gridLayout = useChekiAlbumGridLayout({
     density: viewPreferences.density,
     availableWidth: galleryContentWidth,
@@ -598,11 +603,11 @@ export default function ChekiLibraryScreen() {
     }
 
     if (viewPreferences.albumGrouping === 'none') {
-      return buildAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode);
+      return buildAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode, chekiW, chekiTidyMode, chekiFillGaps);
     }
 
     if (viewPreferences.albumGrouping === 'date') {
-      return buildDateGroupedAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode);
+      return buildDateGroupedAlbumGridItems(filteredChekiList, columns, viewPreferences.albumSortOrder, albumDisplayMode, chekiW, chekiTidyMode, chekiFillGaps);
     }
 
     const sortedGroups = groups.map((group) => ({
@@ -611,9 +616,12 @@ export default function ChekiLibraryScreen() {
       manualEntries: [],
       totalCount: group.chekis.length,
     })).filter((group) => group.chekis.length > 0);
-    return buildArtistGridItems(sortedGroups, columns, albumDisplayMode);
+    return buildArtistGridItems(sortedGroups, columns, albumDisplayMode, chekiW, chekiTidyMode, chekiFillGaps);
   }, [
     albumDisplayMode,
+    chekiW,
+    chekiTidyMode,
+    chekiFillGaps,
     columns,
     filteredChekiList,
     filteredRecordList,
@@ -860,9 +868,6 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, density });
   }, [persistViewPreferences, viewPreferences]);
 
-  const handleChangeLandscapeRotation = useCallback((landscapeRotation: ChekiLandscapeRotation) => {
-    persistViewPreferences({ ...viewPreferences, landscapeRotation });
-  }, [persistViewPreferences, viewPreferences]);
 
   const handleChangeRecordThumbnails = useCallback((showRecordThumbnails: boolean) => {
     persistViewPreferences({ ...viewPreferences, showRecordThumbnails });
@@ -872,7 +877,7 @@ export default function ChekiLibraryScreen() {
     persistViewPreferences({ ...viewPreferences, albumModeHintDismissed: true });
   }, [persistViewPreferences, viewPreferences]);
 
-  const handleChangeAlbumDisplayMode = useCallback((mode: 'portrait' | 'original') => {
+  const handleChangeAlbumDisplayMode = useCallback((mode: 'physical' | 'justified' | 'square') => {
     // 电子切册页内的切换只影响本次会话，不写入持久化；持久化默认值由设置页「拍立得展示方式」决定。
     setAlbumDisplayOverride(mode);
   }, []);
@@ -1081,10 +1086,12 @@ export default function ChekiLibraryScreen() {
       );
     }
 
+    const rowHeight = chekiTidyMode ? getChekiJustifiedRowHeight(item.chekis, columns, chekiW, CHEKI_GRID_GAP, item.isLastPhotoRow) : undefined;
     return (
       <View
         style={{
           flexDirection: 'row',
+          alignItems: 'center',
           gap: albumDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : CHEKI_GRID_GAP,
           marginBottom: item.isLastPhotoRow
             ? 24
@@ -1096,14 +1103,11 @@ export default function ChekiLibraryScreen() {
             key={cheki.id}
             cheki={cheki}
             viewerChekis={item.viewerChekis}
-            width={getChekiAlbumColumnSpan(cheki.spec, albumDisplayMode) === 2
-              ? chekiW * 2 + CHEKI_GRID_GAP
-              : chekiW}
-            height={chekiH}
+            width={albumDisplayMode === 'original' ? chekiW : getChekiAlbumFrame(cheki.spec, chekiW, rowHeight).width}
+            height={albumDisplayMode === 'original' ? chekiH : getChekiAlbumFrame(cheki.spec, chekiW, rowHeight).height}
             colors={colors}
             onOpen={openViewer}
             displayMode={albumDisplayMode}
-            landscapeRotation={viewPreferences.landscapeRotation}
           />
         ))}
       </View>
@@ -1112,6 +1116,8 @@ export default function ChekiLibraryScreen() {
     artistNameMap,
     chekiH,
     chekiW,
+    chekiTidyMode,
+    chekiFillGaps,
     colors,
     columns,
     eventMap,
@@ -1119,7 +1125,6 @@ export default function ChekiLibraryScreen() {
     openViewer,
     oshiArtistId,
     albumDisplayMode,
-    viewPreferences.landscapeRotation,
     viewPreferences.albumGrouping,
     viewPreferences.showRecordThumbnails,
   ]);
@@ -1383,30 +1388,21 @@ export default function ChekiLibraryScreen() {
                   <SegmentedOptions
                     colors={colors}
                     options={[
-                      { value: 'portrait', label: '拍立得' },
-                      { value: 'original', label: '正方形网格' },
+                      { value: 'physical', label: '实物比例' },
+                      { value: 'justified', label: '等高排列' },
+                      { value: 'square', label: '方形网格' },
                     ]}
-                    value={albumDisplayMode}
-                    onChange={(value) => handleChangeAlbumDisplayMode(value as 'portrait' | 'original')}
+                    value={albumStyle}
+                    onChange={(value) => handleChangeAlbumDisplayMode(value as 'physical' | 'justified' | 'square')}
                   />
+                  {albumStyle === 'physical' ? (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>允许提前补位</Text>
+                      <SegmentedOptions colors={colors} options={[{ value: 'yes', label: '允许补位' }, { value: 'no', label: '严格排序' }]}
+                        value={chekiFillGaps ? 'yes' : 'no'} onChange={(value) => setFillGapsOverride(value === 'yes')} />
+                    </View>
+                  ) : null}
                 </View>
-                {albumDisplayMode === 'portrait' ? (
-                  <View style={{ marginTop: 16 }}>
-                    <Text style={{ marginBottom: 8, fontSize: 12, lineHeight: 16, fontWeight: '800', color: colors.textMuted }}>
-                      横版拍立得方向
-                    </Text>
-                    <SegmentedOptions
-                      colors={colors}
-                      options={[
-                        { value: 'original', label: '保持原图' },
-                        { value: 'clockwise', label: '顺时针 90°' },
-                        { value: 'counterclockwise', label: '逆时针 90°' },
-                      ]}
-                      value={viewPreferences.landscapeRotation}
-                      onChange={(value) => handleChangeLandscapeRotation(value as ChekiLandscapeRotation)}
-                    />
-                  </View>
-                ) : null}
               </View>
             )}
           </View>

@@ -31,7 +31,7 @@ describe('ChekiWidgetGroupPreviewGrid', () => {
     jest.clearAllMocks();
   });
 
-  test('uses the same medium-density image sizing as the manual content grid', () => {
+  test('uses physical portrait dimensions without rotating five-inch photos', () => {
     act(() => {
       renderer = create(<ChekiWidgetGroupPreviewGrid items={[{
         id: 'item-1',
@@ -51,8 +51,9 @@ describe('ChekiWidgetGroupPreviewGrid', () => {
     expect(list.props.data[0][0].spec).toBe('five_inch_portrait');
     expect(list.props.numColumns).toBeUndefined();
     const thumbnail = renderer!.root.findByType('ChekiGridThumbnail' as React.ElementType);
-    expect(thumbnail.props.width).toBe(168);
-    expect(thumbnail.props.fiveInchLandscape).toBe(true);
+    expect(thumbnail.props.width).toBeCloseTo(80 * 86 / 54);
+    expect(thumbnail.props.height).toBe(160);
+    expect(thumbnail.props.fiveInchLandscape).toBeUndefined();
     expect(list.props.initialNumToRender).toBe(12);
     expect(list.props.windowSize).toBe(7);
   });

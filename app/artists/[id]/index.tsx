@@ -52,7 +52,7 @@ import { Artist, ArtistGroupMembershipWithArtist, Cheki, ChekiManualEntry, Event
 import { resolveAvatarSource } from '../../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../../src/utils/artistDisplay';
 import { deriveArtistBackdropPalette, extractArtistBackgroundColor } from '../../../src/utils/artistBackdrop';
-import { buildChekiViewerItems, getChekiManualCount, chunkChekiAlbumRows, getChekiAlbumColumnSpan } from '../../../src/utils/cheki';
+import { buildChekiViewerItems, getChekiManualCount, chunkChekiPhysicalRows, getChekiAlbumFrame, getChekiJustifiedRowHeight } from '../../../src/utils/cheki';
 import { buildEventMonthSections } from '../../../src/utils/eventSections';
 import { sortArtistsWithOshi } from '../../../src/utils/filter';
 import { showDeleteFailedAlert } from '../../../src/utils/failureAlert';
@@ -88,12 +88,15 @@ function buildArtistChekiItems(
   chekiList: Cheki[],
   manualEntries: ChekiManualEntry[],
   displayMode: 'portrait' | 'original',
+  itemWidth: number,
+  chekiTidyMode: boolean,
+  chekiFillGaps: boolean,
 ): ArtistChekiListItem[] {
   const items: ArtistChekiListItem[] = [];
 
-  const rows = chunkChekiAlbumRows(chekiList, 3, displayMode);
+  const rows = chunkChekiPhysicalRows(chekiList, 3, displayMode, itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps);
   for (const [rowIndex, row] of rows.entries()) {
-    const isLastPhotoRow = rowIndex === rows.length - 1 && manualEntries.length === 0;
+    const isLastPhotoRow = rowIndex === rows.length - 1;
     items.push({
       type: 'row',
       key: `row:${rowIndex}`,
@@ -126,7 +129,7 @@ export function ArtistDetailScreen({
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: screenHeight } = useWindowDimensions();
   const screenWidth = availableWidth ?? windowWidth;
-  const { colors, isDark, chekiDisplayMode } = useAppTheme();
+  const { colors, isDark, chekiDisplayMode, chekiTidyMode, chekiFillGaps } = useAppTheme();
   const isIOS = Platform.OS === 'ios';
   const usesNativeHeader = isIOS && !embedded;
 
@@ -371,12 +374,12 @@ export function ArtistDetailScreen({
     : Math.round((chekiCellW * 86) / 54);
   const eventSections = useMemo(() => buildEventMonthSections(events), [events]);
   const viewerItems = useMemo(
-    () => buildChekiViewerItems(chekiList, new Map(artist ? [[artist.id, artist]] : []), eventMap),
-    [artist, chekiList, eventMap],
+    () => buildChekiViewerItems(chunkChekiPhysicalRows(chekiList, 3, chekiDisplayMode, chekiCellW, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps).flat(), new Map(artist ? [[artist.id, artist]] : []), eventMap),
+    [artist, chekiList, eventMap, chekiDisplayMode, chekiCellW, chekiTidyMode, chekiFillGaps],
   );
   const artistChekiItems = useMemo(
-    () => buildArtistChekiItems(chekiList, manualEntries, chekiDisplayMode),
-    [chekiList, manualEntries, chekiDisplayMode],
+    () => buildArtistChekiItems(chekiList, manualEntries, chekiDisplayMode, chekiCellW, chekiTidyMode, chekiFillGaps),
+    [chekiList, manualEntries, chekiDisplayMode, chekiCellW, chekiTidyMode, chekiFillGaps],
   );
   const totalChekiCount = chekiList.length + getChekiManualCount(manualEntries);
   const loadingBg = colors.screen;
@@ -719,11 +722,13 @@ export function ArtistDetailScreen({
       );
     }
 
+    const rowHeight = chekiTidyMode ? getChekiJustifiedRowHeight(item.chekis, 3, chekiCellW, CHEKI_GRID_GAP, item.isLastPhotoRow) : undefined;
     return (
       <View style={{ paddingHorizontal: 16 }}>
         <View
           style={{
             flexDirection: 'row',
+            alignItems: 'center',
             gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
             marginBottom: item.isLastPhotoRow
               ? 24
@@ -738,13 +743,11 @@ export function ArtistDetailScreen({
             >
               <ChekiGridThumbnail
                 uri={cheki.photo_uri}
-                width={getChekiAlbumColumnSpan(cheki.spec, chekiDisplayMode) === 2
-                  ? chekiCellW * 2 + CHEKI_GRID_GAP : chekiCellW}
-                height={chekiCellH}
+                width={chekiDisplayMode === 'original' ? chekiCellW : getChekiAlbumFrame(cheki.spec, chekiCellW, rowHeight).width}
+                height={chekiDisplayMode === 'original' ? chekiCellH : getChekiAlbumFrame(cheki.spec, chekiCellW, rowHeight).height}
                 colors={{ ...colors, card: galleryPlaceholderBg }}
                 variant={chekiDisplayMode}
                 spec={cheki.spec}
-                fiveInchLandscape
               />
               {chekiDisplayMode === 'portrait' ? (
                 <View pointerEvents="none" style={{ position: 'absolute', inset: 0, borderRadius: 10, borderWidth: 1, borderColor: galleryPlaceholderBorder }} />

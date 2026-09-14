@@ -148,6 +148,91 @@ export function chunkChekiAlbumRows<T extends { spec?: ChekiSpec }>(
   return rows;
 }
 
+/** All frames share the scale of a 54 × 86 three-inch portrait. */
+export function getChekiAlbumFrame(spec: ChekiSpec | undefined, width: number, rowHeight?: number): { width: number; height: number } {
+  const scale = width / 54;
+  if (rowHeight !== undefined) {
+    const physical = getChekiAlbumFrame(spec, width);
+    return { width: rowHeight * physical.width / physical.height, height: rowHeight };
+  }
+  switch (spec) {
+    case 'three_inch_landscape': return { width: 86 * scale, height: 54 * scale };
+    case 'five_inch_portrait': return { width: 86 * scale, height: 108 * scale };
+    case 'five_inch_landscape': return { width: 108 * scale, height: 86 * scale };
+    case 'square': return { width, height: width };
+    default: return { width, height: 86 * scale };
+  }
+}
+
+/** Justify a complete row; keep an incomplete final row at the target height. */
+export function getChekiJustifiedRowHeight(
+  row: { spec?: ChekiSpec }[], columns: ChekiGridColumns, itemWidth: number, gap: number, isLast: boolean,
+): number {
+  const availableWidth = columns * itemWidth + (columns - 1) * gap;
+  const ratios = row.reduce((sum, item) => {
+    const frame = getChekiAlbumFrame(item.spec, itemWidth);
+    return sum + frame.width / frame.height;
+  }, 0);
+  const height = (availableWidth - (row.length - 1) * gap) / ratios;
+  return isLast ? Math.min(height, itemWidth * 86 / 54) : height;
+}
+
+/** Fill each row with the earliest remaining photos that fit, retaining the order of deferred photos. */
+export function chunkChekiPhysicalRows<T extends { spec?: ChekiSpec }>(
+  records: T[],
+  columns: ChekiGridColumns,
+  displayMode: 'portrait' | 'original',
+  itemWidth = 54,
+  gap = 8,
+  tidy = false,
+  fillGaps = true,
+): T[][] {
+  if (displayMode === 'original') return chunkChekis(records, columns);
+  const availableWidth = columns * itemWidth + (columns - 1) * gap;
+  const rows: T[][] = [];
+  if (tidy) {
+    const targetHeight = itemWidth * 86 / 54;
+    let start = 0;
+    while (start < records.length) {
+      let ratioSum = 0;
+      let previousHeight = Infinity;
+      let end = start;
+      for (; end < records.length; end++) {
+        const frame = getChekiAlbumFrame(records[end].spec, itemWidth);
+        ratioSum += frame.width / frame.height;
+        const height = (availableWidth - (end - start) * gap) / ratioSum;
+        if (height <= targetHeight) {
+          if (end === start || targetHeight - height <= previousHeight - targetHeight) end++;
+          break;
+        }
+        previousHeight = height;
+      }
+      rows.push(records.slice(start, end));
+      start = end;
+    }
+    return rows;
+  }
+  let remaining = records;
+  while (remaining.length) {
+    const row: T[] = [];
+    const deferred: T[] = [];
+    let occupied = 0;
+    for (const record of remaining) {
+      const width = getChekiAlbumFrame(record.spec, itemWidth).width;
+      const required = width + (row.length ? gap : 0);
+      if ((fillGaps || deferred.length === 0) && (occupied + required <= availableWidth || row.length === 0)) {
+        row.push(record);
+        occupied += required;
+      } else {
+        deferred.push(record);
+      }
+    }
+    rows.push(row);
+    remaining = deferred;
+  }
+  return rows;
+}
+
 export function calculateChekiStackPreview({
   total,
   columns,

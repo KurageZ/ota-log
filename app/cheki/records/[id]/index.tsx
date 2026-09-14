@@ -1,5 +1,5 @@
-import { getChekiAlbumColumnSpan } from '../../../../src/utils/cheki';
-import { useCallback, useMemo, useState } from 'react';
+import { getChekiAlbumFrame, getChekiJustifiedRowHeight, chunkChekiPhysicalRows } from '../../../../src/utils/cheki';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -62,7 +62,7 @@ function formatPrice(value: number | null): string {
 export default function ChekiRecordDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useDB();
-  const { colors, chekiDisplayMode } = useAppTheme();
+  const { colors, chekiDisplayMode, chekiTidyMode, chekiFillGaps } = useAppTheme();
   const { width } = useWindowDimensions();
   const [record, setRecord] = useState<ChekiRecordWithItems | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -96,9 +96,12 @@ export default function ChekiRecordDetailScreen() {
     void load();
   }, [load]));
 
+  const itemWidth = Math.floor((width - 32 - 16) / 3);
+  const photoRows = useMemo(() => chunkChekiPhysicalRows(record?.items.filter((item) => item.images.length > 0) ?? [], 3, chekiDisplayMode, itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps), [record, chekiDisplayMode, itemWidth, chekiTidyMode, chekiFillGaps]);
+
   const viewerItems = useMemo<ChekiViewerItem[]>(() => {
     if (!record) return [];
-    return record.items.flatMap((item) => {
+    return photoRows.flat().flatMap((item) => {
       const frontPhotoUri = item.images.find((image) => image.side === 'front')?.photo_uri ?? null;
       const backPhotoUri = item.images.find((image) => image.side === 'back')?.photo_uri ?? null;
       const photoUri = frontPhotoUri ?? backPhotoUri;
@@ -121,7 +124,7 @@ export default function ChekiRecordDetailScreen() {
         eventTitle: event?.title ?? null,
       }];
     });
-  }, [artist, event, record]);
+  }, [artist, event, record, photoRows]);
 
   const handleDeleteItem = useCallback((viewerItem: ChekiViewerItem) => {
     const itemId = viewerItem.itemId ?? viewerItem.id;
@@ -233,7 +236,6 @@ export default function ChekiRecordDetailScreen() {
     );
   }
 
-  const itemWidth = Math.floor((width - 32 - 16) / 3);
   const itemHeight = chekiDisplayMode === 'original'
     ? itemWidth
     : Math.round((itemWidth * 86) / 54);
@@ -371,12 +373,14 @@ export default function ChekiRecordDetailScreen() {
           {photoItems.length > 0 || hasMissingImages ? (
             <View
               style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
+                flexDirection: chekiDisplayMode === 'original' ? 'row' : 'column',
+                flexWrap: chekiDisplayMode === 'original' ? 'wrap' : 'nowrap',
                 gap: chekiDisplayMode === 'original' ? CHEKI_SQUARE_GRID_GAP : 8,
               }}
             >
-              {photoItems.map((item) => {
+              {photoRows.map((row, rowIndex) => {
+                const rowHeight = chekiTidyMode ? getChekiJustifiedRowHeight(row, 3, itemWidth, CHEKI_GRID_GAP, rowIndex === photoRows.length - 1) : undefined;
+                const thumbnails = row.map((item) => {
                 const uri = getItemPreviewUri(item);
                 const previewSide = getItemPreviewSide(item);
                 if (!uri || !previewSide) return null;
@@ -390,13 +394,11 @@ export default function ChekiRecordDetailScreen() {
                   >
                     <ChekiGridThumbnail
                       uri={uri}
-                      width={getChekiAlbumColumnSpan(item.spec, chekiDisplayMode) === 2
-                        ? itemWidth * 2 + CHEKI_GRID_GAP : itemWidth}
-                      height={itemHeight}
+                      width={chekiDisplayMode === 'original' ? itemWidth : getChekiAlbumFrame(item.spec, itemWidth, rowHeight).width}
+                      height={chekiDisplayMode === 'original' ? itemHeight : getChekiAlbumFrame(item.spec, itemWidth, rowHeight).height}
                       colors={{ ...colors, card: colors.cardAlt }}
                       variant={chekiDisplayMode}
                       spec={item.spec}
-                      fiveInchLandscape
                     />
                     {item.notes?.trim() ? (
                       <View style={{ position: 'absolute', left: 6, bottom: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.scrim }}>
@@ -414,6 +416,14 @@ export default function ChekiRecordDetailScreen() {
                       </View>
                     ) : null}
                   </TouchableOpacity>
+                );
+                });
+                return chekiDisplayMode === 'original' ? (
+                  <Fragment key={row[0].id}>{thumbnails}</Fragment>
+                ) : (
+                  <View key={row[0].id} style={{ flexDirection: 'row', alignItems: 'center', gap: CHEKI_GRID_GAP }}>
+                    {thumbnails}
+                  </View>
                 );
               })}
               {hasMissingImages ? (

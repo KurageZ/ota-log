@@ -30,6 +30,8 @@ const baseRecord = {
   items: [],
 };
 
+let mockDisplayMode: 'portrait' | 'original' = 'portrait';
+
 const mockEventCardProps: { event?: { id: string } }[] = [];
 
 jest.mock('expo-router', () => {
@@ -60,6 +62,7 @@ jest.mock('../../context/DBContext', () => ({
 
 jest.mock('../../theme/appTheme', () => ({
   useAppTheme: () => ({
+    chekiDisplayMode: mockDisplayMode,
     colors: {
       accent: '#6750a4',
       accentSofter: '#eee8ff',
@@ -107,6 +110,7 @@ describe('ChekiRecordDetailScreen', () => {
   let renderer: ReactTestRenderer;
 
   beforeEach(() => {
+    mockDisplayMode = 'portrait';
     mockDb.chekiRecords.findRecordById.mockResolvedValue({ ...baseRecord });
     mockDb.artists.findById.mockResolvedValue({
       id: 'artist-1',
@@ -127,6 +131,27 @@ describe('ChekiRecordDetailScreen', () => {
   afterEach(() => {
     act(() => renderer.unmount());
     jest.clearAllMocks();
+  });
+
+  test.each([0, 1, 2, 3, 4])('square mode keeps the add tile in the wrapping photo grid with %i photos', async (count) => {
+    mockDisplayMode = 'original';
+    mockDb.chekiRecords.findRecordById.mockResolvedValue({ ...baseRecord, quantity: count + 1,
+      items: Array.from({ length: count }, (_, i) => ({ id: `item-${i}`, sort_order: i, spec: 'three_inch_portrait',
+        images: [{ side: 'front', photo_uri: `file:///photo-${i}.jpg` }], is_favorite: 0, notes: null })),
+    });
+    await act(async () => { renderer = create(<ChekiRecordDetailScreen />); });
+    const { View, TouchableOpacity } = require('react-native');
+    const add = renderer.root.findAllByType(TouchableOpacity).find((node) => node.props.accessibilityLabel === '添加图片')!;
+    let grid = add.parent!;
+    while (grid.type !== View) grid = grid.parent!;
+    expect(grid.props.style).toEqual(expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' }));
+    const photoButtons = grid.findAllByType(TouchableOpacity).filter((node) => node.props.accessibilityRole === 'imagebutton');
+    expect(photoButtons).toHaveLength(count);
+    for (const photo of photoButtons) {
+      let parent = photo.parent!;
+      while (parent.props.style?.flexDirection !== 'row') parent = parent.parent!;
+      expect(parent.props.style.flexWrap).toBe('wrap');
+    }
   });
 
   test('renders the associated artist avatar instead of a generic artist icon', async () => {

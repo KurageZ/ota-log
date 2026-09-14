@@ -1,4 +1,4 @@
-import { chunkChekiAlbumRows, getChekiAlbumColumnSpan } from '../utils/cheki';
+import { chunkChekiPhysicalRows, getChekiAlbumFrame, getChekiJustifiedRowHeight } from '../utils/cheki';
 import type { ReactElement } from 'react';
 import { FlatList, useWindowDimensions, View } from 'react-native';
 import type { ResolvedChekiWidgetItem } from '../types/chekiWidgetGroups';
@@ -20,21 +20,22 @@ export function ChekiWidgetGroupPreviewGrid({
   footer?: ReactElement;
   scrollEnabled?: boolean;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, chekiTidyMode, chekiFillGaps } = useAppTheme();
   const { width, height } = useWindowDimensions();
   const contentWidth = Math.max(1, Math.min(width, 960) - 32);
-  const { columns, itemWidth, itemHeight } = useChekiAlbumGridLayout({
+  const { columns, itemWidth } = useChekiAlbumGridLayout({
     density: 'medium',
     availableWidth: contentWidth,
     availableHeight: height,
     displayMode: 'portrait',
   });
+  const rows = chunkChekiPhysicalRows(items, columns, 'portrait', itemWidth, CHEKI_GRID_GAP, chekiTidyMode, chekiFillGaps);
   return (
     <FlatList
       key={`cheki-widget-preview-${columns}`}
       accessibilityRole="list"
       contentInsetAdjustmentBehavior="automatic"
-      data={chunkChekiAlbumRows(items, columns, 'portrait')}
+      data={rows}
       keyExtractor={(row) => row[0].id}
       contentContainerStyle={{
         flexGrow: 1,
@@ -52,24 +53,25 @@ export function ChekiWidgetGroupPreviewGrid({
       initialNumToRender={12}
       maxToRenderPerBatch={12}
       windowSize={7}
-      renderItem={({ item: row }) => (
-        <View style={{ flexDirection: 'row', gap: CHEKI_GRID_GAP }}>
+      renderItem={({ item: row, index }) => {
+        const rowHeight = chekiTidyMode ? getChekiJustifiedRowHeight(row, columns, itemWidth, CHEKI_GRID_GAP, index === rows.length - 1) : undefined;
+        return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: CHEKI_GRID_GAP }}>
           {row.map((item) => (
             <View key={item.id} accessibilityRole="image" accessibilityLabel="拍立得正面照片">
               <ChekiGridThumbnail
                 uri={item.frontPhotoUri}
-                width={getChekiAlbumColumnSpan(item.spec, 'portrait') === 2
-                  ? itemWidth * 2 + CHEKI_GRID_GAP : itemWidth}
-                height={itemHeight}
+                width={getChekiAlbumFrame(item.spec, itemWidth, rowHeight).width}
+                height={getChekiAlbumFrame(item.spec, itemWidth, rowHeight).height}
                 colors={colors}
                 variant="portrait"
                 spec={item.spec}
-                fiveInchLandscape
               />
             </View>
           ))}
         </View>
-      )}
+        );
+      }}
     />
   );
 }

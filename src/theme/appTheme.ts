@@ -706,11 +706,16 @@ export function useAppTheme() {
     calendarWeekStart,
     calendarDisplay,
     chekiDisplayMode,
+    chekiTidyMode,
+    chekiFillGaps,
     isHydrated,
     setAppearance,
     setCalendarWeekStart,
     setCalendarDisplay,
     setChekiDisplayMode,
+    setChekiTidyMode,
+    setChekiDisplayStyle,
+    setChekiFillGaps,
     setThemeId,
   } = useThemePreferences();
   const mode = resolveMode(appearance, systemColorScheme);
@@ -723,6 +728,8 @@ export function useAppTheme() {
     calendarWeekStart,
     calendarDisplay,
     chekiDisplayMode,
+    chekiTidyMode,
+    chekiFillGaps,
     mode,
     isDark: mode === 'dark',
     colors,
@@ -731,6 +738,9 @@ export function useAppTheme() {
     setCalendarWeekStart,
     setCalendarDisplay,
     setChekiDisplayMode,
+    setChekiTidyMode,
+    setChekiDisplayStyle,
+    setChekiFillGaps,
     setThemeId,
   };
 }

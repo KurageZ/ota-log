@@ -5,6 +5,7 @@ import {
   AppCalendarWeekStart,
   AppThemeId,
   ChekiDisplayMode,
+  ChekiDisplayStyle,
   CalendarDisplayOptions,
   DEFAULT_APPEARANCE,
   DEFAULT_CALENDAR_DISPLAY,
@@ -21,6 +22,8 @@ export interface ThemePreferences {
   calendarWeekStart: AppCalendarWeekStart;
   calendarDisplay: CalendarDisplayOptions;
   chekiDisplayMode: ChekiDisplayMode;
+  chekiTidyMode: boolean;
+  chekiFillGaps: boolean;
 }
 
 interface ThemePreferencesContextValue extends ThemePreferences {
@@ -29,6 +32,9 @@ interface ThemePreferencesContextValue extends ThemePreferences {
   setCalendarWeekStart: (weekStart: AppCalendarWeekStart) => Promise<void>;
   setCalendarDisplay: (display: CalendarDisplayOptions) => Promise<void>;
   setChekiDisplayMode: (mode: ChekiDisplayMode) => Promise<void>;
+  setChekiTidyMode: (enabled: boolean) => Promise<void>;
+  setChekiDisplayStyle: (style: ChekiDisplayStyle) => Promise<void>;
+  setChekiFillGaps: (enabled: boolean) => Promise<void>;
   setThemeId: (themeId: AppThemeId) => Promise<void>;
 }
 
@@ -38,6 +44,8 @@ const defaultPreferences: ThemePreferences = {
   calendarWeekStart: DEFAULT_CALENDAR_WEEK_START,
   calendarDisplay: DEFAULT_CALENDAR_DISPLAY,
   chekiDisplayMode: DEFAULT_CHEKI_DISPLAY_MODE,
+  chekiTidyMode: false,
+  chekiFillGaps: true,
 };
 
 const ThemePreferencesContext = createContext<ThemePreferencesContextValue | null>(null);
@@ -103,6 +111,8 @@ function parseStoredPreferences(rawValue: string | null): ThemePreferences {
       calendarWeekStart,
       calendarDisplay,
       chekiDisplayMode,
+      chekiTidyMode: 'chekiTidyMode' in parsed && parsed.chekiTidyMode === true,
+      chekiFillGaps: !('chekiFillGaps' in parsed) || parsed.chekiFillGaps !== false,
     };
   } catch {
     return defaultPreferences;
@@ -179,6 +189,21 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     [persistPreferences],
   );
 
+  const setChekiTidyMode = useCallback(
+    async (chekiTidyMode: boolean) => persistPreferences({ ...latestPreferencesRef.current, chekiTidyMode }),
+    [persistPreferences],
+  );
+
+  const setChekiDisplayStyle = useCallback(
+    async (style: ChekiDisplayStyle) => persistPreferences({ ...latestPreferencesRef.current,
+      chekiDisplayMode: style === 'square' ? 'original' : 'portrait', chekiTidyMode: style === 'justified',
+    }), [persistPreferences],
+  );
+  const setChekiFillGaps = useCallback(
+    async (chekiFillGaps: boolean) => persistPreferences({ ...latestPreferencesRef.current, chekiFillGaps }),
+    [persistPreferences],
+  );
+
   const setThemeId = useCallback(
     async (themeId: AppThemeId) => persistPreferences({ ...latestPreferencesRef.current, themeId }),
     [persistPreferences],
@@ -191,6 +216,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setCalendarWeekStart,
     setCalendarDisplay,
     setChekiDisplayMode,
+    setChekiTidyMode,
+    setChekiDisplayStyle,
+    setChekiFillGaps,
     setThemeId,
   }), [
     isHydrated,
@@ -199,6 +227,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setCalendarWeekStart,
     setCalendarDisplay,
     setChekiDisplayMode,
+    setChekiTidyMode,
+    setChekiDisplayStyle,
+    setChekiFillGaps,
     setThemeId,
   ]);
 

@@ -40,3 +40,6 @@ export const CHEKI_DISPLAY_MODE_LABELS: Record<ChekiDisplayMode, string> = {
   portrait: '拍立得',
   original: '正方形网格',
 };
+
+export type ChekiDisplayStyle = 'physical' | 'justified' | 'square';
+export const CHEKI_DISPLAY_STYLE_LABELS: Record<ChekiDisplayStyle, string> = { physical: '实物比例', justified: '等高排列', square: '方形网格' };
