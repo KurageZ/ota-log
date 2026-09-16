@@ -148,7 +148,7 @@ export default function PrivacyScreen() {
         <View style={{ marginBottom: 20 }}>
           <SectionLabel label="联网与第三方服务" />
           <PrivacyTextCard>
-            当你主动使用微博解析、微博登录、关注导入或 iEvent 活动导入时，ota log 会直接连接对应的第三方服务以完成请求。微博登录状态只保存在当前设备，可在“微博登录”页面清除。第三方服务会按其自身规则处理网络请求。
+            当你主动使用微博解析、微博登录、关注导入、iEvent 活动导入或公告链接解析时，ota log 会直接连接对应的第三方服务或你提供的网站以完成请求。普通链接提取出的正文在本机解析。微博登录状态只保存在当前设备，可在“微博登录”页面清除。第三方服务会按其自身规则处理网络请求。
           </PrivacyTextCard>
         </View>
 

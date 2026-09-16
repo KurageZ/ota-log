@@ -62,11 +62,11 @@ const NON_TICKET_PRICE_LINE = /抽奖|抽门票|红包|见评论|见评|见详�
 const DATE_PREFIX = /(?:\d{2,4}[.．/\-]\d{1,2}[.．/\-]\d{1,2}\s+)?/;
 const TITLE_NOISE = /活动情报|主催活动|情报公开|情报|公開|公开|解禁|转抽|抽奖|见评|见评论|ticket|票务|开售|开票/i;
 const ARTIST_SECTION_LABEL =
-  /(?:GUEST|SIGNAL SOURCE|出演(?:嘉宾|团体)?|出席(?:嘉宾|团体)?|参演(?:嘉宾|团体)?|演出团体|阵容|LINEUP)/i;
+  /(?:GUEST|SIGNAL SOURCE|出演(?:嘉宾|团体|艺人|アーティスト)?|出席(?:嘉宾|团体)?|参演(?:嘉宾|团体)?|演出团体|阵容|LINEUP)/i;
 const ARTIST_SECTION_STOP =
   /(?:TICKET|票务|门票|特典|SET LIST|时间表|OPEN|START|TIME|PLACE|地点|地址|情报公开|商品|开售|链接|见评论|见评|🎫|VIP|普通\d|一般\d|当日\d|现场\d)/i;
 const NON_PERFORMER_LINE =
-  /(?:衣装感谢|感谢|联合主催|生日SP|生诞SP|birthday\s*sp|birthday|🎂|抽奖|抽门票|转\+?关|评\+?关|\+評\+关|特典|票务|商品|上架|开售|评论|微博视频|客服|官v|携手|消费|吧台|应援|登记|禁止录像|禁止录音|禁止摄影|入场资格)/i;
+  /(?:衣装感谢|感谢|联合主催|生日SP|生诞SP|birthday\s*sp|birthday|🎂|抽奖|抽门票|转\+?关|评\+?关|\+評\+关|特典|票务|商品|上架|开售|评论|微博视频|客服|官v|携手|消费|吧台|应援|登记|禁止录像|禁止录音|禁止摄影|入场资格|決済|结算|支付|整理券|抽選券|贩售|贩卖|物販|物贩|含税)/i;
 const TITLE_PREFERRED =
   /(?:BIRTHDAY|SPECIAL|ONEMAN|TWO MAN|2MAN|TWOMAN|FES|FEST|LIVE|Vol\.?|vol\.?|公演|主催|巡演|茶話会|情报|茶话会)/i;
 function normalizeVenueName(venue: string): string {
@@ -165,7 +165,7 @@ function isStageHeading(line: string): boolean {
 }
 
 function isVenueLabelOnlyLine(line: string): boolean {
-  return /^(?:活动地点|演出地点|演出场地|活动场地|地点|place|venue)$/i.test(stripSectionDecor(line));
+  return /^(?:会場|会场|場所|场地|活动地点|演出地点|演出场地|活动场地|地点|place|venue)$/i.test(stripSectionDecor(line));
 }
 
 function isTicketLabelOnlyLine(line: string): boolean {
@@ -359,10 +359,15 @@ function extractArtistsFromLine(line: string, options: { allowPlainLine?: boolea
   }
 
   const inlineSection = line.replace(/^[^\S\n]*/, '');
+  const performerSuffix = inlineSection.match(/^(.+?)\s*出演$/u);
+  if (performerSuffix) {
+    pushArtist(performerSuffix[1]);
+    return artistNames;
+  }
   const slashCount = (inlineSection.match(/\//g) ?? []).length;
   const hasArtistLabel = ARTIST_SECTION_LABEL.test(inlineSection);
   const afterLabel = inlineSection
-    .replace(/^(?:.*?(?:GUEST|SIGNAL SOURCE|出演(?:嘉宾|团体)?|出席(?:嘉宾|团体)?|参演(?:嘉宾|团体)?|演出团体|阵容|LINEUP))\s*[:：]?\s*/i, '')
+    .replace(/^(?:.*?(?:GUEST|SIGNAL SOURCE|出演(?:嘉宾|团体|艺人|アーティスト)?|出席(?:嘉宾|团体)?|参演(?:嘉宾|团体)?|演出团体|阵容|LINEUP))\s*[:：]?\s*/i, '')
     .replace(/^[⛲️❤️🎸🌟✨👤🔮🪸🩷🦋🎤]+\s*/, '')
     .trim();
   if (
@@ -622,7 +627,8 @@ export function parseAnnouncement(
 
   const ticketLines = scopedRawLines.filter((line) =>
     /票|ticket|TICKET|入场|無料|无料|1D|¥|￥|元/i.test(line)
-    && !/上架|配送|海报|周边|微商城|相卡|邮寄|拍立得|T恤|立牌|键帽|护腕/i.test(line),
+    && (!/含税|税込/.test(line) || /票|ticket|入场|入場|指定席|自由席/i.test(line))
+    && !/上架|配送|海报|周边|微商城|相卡|邮寄|拍立得|T恤|立牌|键帽|护腕|物販|物贩|贩售|贩卖/i.test(line),
   );
   const nonVipText = ticketLines
     .filter((l) => !VIP_LINE.test(l) && !NON_TICKET_PRICE_LINE.test(l))
@@ -794,6 +800,7 @@ export function parseAnnouncement(
       if (isStageHeading(normalizedLine)) score -= 12;
       if (/^[^#]*【[^】]*(?:live|活动情报|情报公开|公开|解禁)[^】]*】/i.test(normalizedLine)) score -= 10;
       if (TITLE_NOISE.test(normalizedLine)) score -= 5;
+      if (/[｜|]/.test(line)) score -= 3;
       if (normalizedLine.includes('#')) score -= 12;
       if (normalizedLine.includes('@')) score -= 4;
       if (looksLikeTitleStop(normalizedLine)) score -= 8;
@@ -806,10 +813,10 @@ export function parseAnnouncement(
       if (/路\d+号/.test(normalizedLine)) score -= 4;
       if (/[¥￥]\d+|💰\d+/.test(normalizedLine)) score -= 5;
       if (normalizedLine.length > 70) score -= 4;
-      if (index > 5) score -= 1;
+      if (index > 5) score -= 4;
       return { line, index, score };
     })
-    .filter(({ line }) => !decorLine.test(line));
+    .filter(({ line }) => !decorLine.test(line) && !/^(?:演出详情|活动详情|最后更新|相关新闻)$/.test(line));
   const bestLine = scoredLines
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index)[0];

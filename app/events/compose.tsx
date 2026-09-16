@@ -1,3 +1,4 @@
+import { fetchAnnouncementText, isAnnouncementUrl } from '../../src/utils/announcementWebText';
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator,
@@ -58,7 +59,7 @@ interface ParseModalProps {
   onClose: () => void;
   onManual: () => void;
   onRetryArtistContext: () => void;
-  onSubmit: (text: string) => Promise<void>;
+  onSubmit: (text: string, sourceUrl?: string) => Promise<void>;
 }
 
 function ParseModal({
@@ -111,7 +112,7 @@ function ParseModal({
   const handleSubmit = () => {
     const url = urlValue.trim();
     const text = textValue.trim();
-    onSubmit(url || text);
+    onSubmit(text || url, text && isAnnouncementUrl(url) ? url : undefined);
   };
 
   const hasInput = urlValue.trim().length > 0 || textValue.trim().length > 0;
@@ -125,7 +126,7 @@ function ParseModal({
       return;
     }
 
-    if (WEIBO_URL_RE.test(clipboardText) || IEVENT_URL_RE.test(clipboardText)) {
+    if (isAnnouncementUrl(clipboardText)) {
       setUrlValue(clipboardText);
       setTextValue('');
     } else {
@@ -254,7 +255,7 @@ function ParseModal({
               }}>
                 <AppIcon name="sparkles" size={18} color={colors.accent} />
                 <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, color: isDark ? colors.accentBorder : colors.accentText }}>
-                  解析失败或识别不准时，可以手动修改标题、日期、场地等信息。
+                  支持公开网页链接或公告正文；两者都填写时优先解析正文。识别不准时可在草稿中修改。
                 </Text>
               </View>
             </View>
@@ -621,7 +622,7 @@ export default function NewEventScreen() {
       parsed.artist_mentions.length > 0
     );
 
-    if (!hasUsefulFields && Object.keys(extraFields).length === 0) {
+    if (!hasUsefulFields) {
       showFailureAlert({
         title: '没有解析出足够信息',
         reason: '没有识别到标题、日期、场地或出演者。',
@@ -692,7 +693,7 @@ export default function NewEventScreen() {
     );
   };
 
-  const handleParse = async (text: string) => {
+  const handleParse = async (text: string, sourceUrl?: string) => {
     const trimmed = text.trim();
     if (!trimmed) {
       Alert.alert('请粘贴公告内容', '可以粘贴公告链接或公告全文，也可以直接手动创建。', [
@@ -702,7 +703,7 @@ export default function NewEventScreen() {
       return;
     }
 
-    if (IEVENT_URL_RE.test(trimmed)) {
+    if (isAnnouncementUrl(trimmed) && IEVENT_URL_RE.test(trimmed)) {
       setParseLoading(true);
       try {
         const result = await fetchImportedEvent(trimmed);
@@ -740,7 +741,7 @@ export default function NewEventScreen() {
       return;
     }
 
-    if (WEIBO_URL_RE.test(trimmed)) {
+    if (isAnnouncementUrl(trimmed) && WEIBO_URL_RE.test(trimmed)) {
       setParseLoading(true);
       try {
         const result = await fetchWeiboPost(trimmed, weiboCookie);
@@ -785,7 +786,29 @@ export default function NewEventScreen() {
       return;
     }
 
-    applyParsedText(trimmed);
+    if (isAnnouncementUrl(trimmed)) {
+      setParseLoading(true);
+      try {
+        const announcementText = await fetchAnnouncementText(trimmed);
+        applyParsedText(announcementText, { url: trimmed });
+      } catch (error) {
+        showFailureAlert({
+          title: '抓取失败',
+          reason: '未能提取网页正文。',
+          nextStep: '可以复制网页中的活动正文，粘贴到公告文本后重试，或手动创建。',
+          details: error instanceof Error ? error.message : String(error),
+          buttons: [
+            { text: '重新输入', style: 'cancel' },
+            { text: '手动创建', onPress: enterManualForm },
+          ],
+        });
+      } finally {
+        setParseLoading(false);
+      }
+      return;
+    }
+
+    applyParsedText(trimmed, sourceUrl ? { url: sourceUrl } : {});
   };
 
   const handleConfirmArtists = async (confirmed: ArtistCandidate[]) => {
