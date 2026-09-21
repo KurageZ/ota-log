@@ -5,7 +5,8 @@ import { MenuCard, MenuItem, SectionLabel } from '../../src/components/SettingsM
 import { useAppTheme } from '../../src/theme/appTheme';
 import { SCROLL_SCREEN_SAFE_AREA_EDGES } from '../../src/utils/safeArea';
 
-const MIX_AND_CALL_URL = 'https://dzyxdd.github.io/MixAndCall/mix/mix/';
+const MIX_AND_CALL_URL = 'https://dzyxdd.github.io/MixAndCall/';
+const IEVENT_URL = 'https://ievent.life/';
 
 export default function ToolboxScreen() {
   const { colors } = useAppTheme();
@@ -76,15 +77,22 @@ export default function ToolboxScreen() {
         </View>
 
         <View>
-          <SectionLabel label="外部工具" />
+          <SectionLabel label="外部网站" />
           <MenuCard>
             <MenuItem
               icon="weibo"
-              label="MIX & Call"
-              subtitle="将打开外部网站"
+              label="MixAndCall"
+              subtitle="查 call 本 · 找 mix · 对公演 / EP / 单曲"
+              tint={toolTints.external}
+              onPress={() => Linking.openURL(MIX_AND_CALL_URL)}
+            />
+            <MenuItem
+              icon="externalLink"
+              label="推活日记"
+              subtitle="查看 Live、见面会和演出情报"
               tint={toolTints.external}
               isLast
-              onPress={() => Linking.openURL(MIX_AND_CALL_URL)}
+              onPress={() => Linking.openURL(IEVENT_URL)}
             />
           </MenuCard>
         </View>
