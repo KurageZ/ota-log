@@ -4,7 +4,7 @@ import { File } from 'expo-file-system';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '../../src/components/AppIcon';
-import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
+import { BottomSheetDialog, BottomSheetAction } from '../../src/components/BottomSheetDialog';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
 import { MenuCard, SectionLabel } from '../../src/components/SettingsMenu';
 import { useDB } from '../../src/context/DBContext';
@@ -488,7 +488,6 @@ export default function ChekirokuImportScreen() {
             title="艺人处理名单"
             onClose={() => setShowArtistList(false)}
             scrollable
-            contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 12 }}
           >
             {plan.artists.map((artist, index) => {
               const parentName = artist.parentId
@@ -521,9 +520,8 @@ export default function ChekirokuImportScreen() {
             visible={showConfirmation}
             title={`导入 ${preview.quantity} 张拍立得？`}
             onClose={() => setShowConfirmation(false)}
-            contentContainerStyle={{ paddingHorizontal: 18 }}
             footer={(
-              <ActionButton
+              <BottomSheetAction
                 label={status === 'applying' ? '正在导入' : '开始导入'}
                 loading={status === 'applying'}
                 onPress={() => { void confirmImport(); }}

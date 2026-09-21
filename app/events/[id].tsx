@@ -1662,8 +1662,7 @@ export function EventDetailScreen({
         onClose={() => {
           if (!shareBusy) setShareMenuVisible(false);
         }}
-        enablePanDownToClose={!shareBusy}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}
+        dismissible={!shareBusy}
       >
         <TouchableOpacity
           accessibilityRole="button"
@@ -1750,7 +1749,6 @@ export function EventDetailScreen({
         title="添加到日历"
         onClose={() => setCalendarSessionPickerVisible(false)}
         scrollable
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}
       >
         {sessions.map((session, index) => {
           const sessionTitle = session.title?.trim() || `场次 ${index + 1}`;

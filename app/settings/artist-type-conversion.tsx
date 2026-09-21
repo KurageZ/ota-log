@@ -15,7 +15,7 @@ import { useDB } from '../../src/context/DBContext';
 import { useAppTheme } from '../../src/theme/appTheme';
 import { OshiAvatar } from '../../src/components/Oshi';
 import { AppIcon } from '../../src/components/AppIcon';
-import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
+import { BottomSheetDialog, BottomSheetAction } from '../../src/components/BottomSheetDialog';
 import { MenuCard, MenuIconTile } from '../../src/components/SettingsMenu';
 import { resolveAvatarSource } from '../../src/utils/avatarSource';
 import { getArtistPrimaryName } from '../../src/utils/artistDisplay';
@@ -701,41 +701,8 @@ export default function ArtistTypeConversionScreen() {
         scrollable
         footer={(
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setConfirmOpen(false)}
-              disabled={saving}
-              style={{
-                flex: 1,
-                height: 48,
-                borderRadius: 14,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: colors.cardAlt,
-                borderWidth: 1,
-                borderColor: colors.divider,
-              }}
-            >
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>取消</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityRole="button"
-              disabled={saving}
-              onPress={() => { setConfirmOpen(false); void apply(); }}
-              style={{
-                flex: 1.4,
-                height: 48,
-                borderRadius: 14,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: colors.accent,
-                opacity: saving ? 0.45 : 1,
-              }}
-            >
-              {saving ? <ActivityIndicator color={colors.onAccent} /> : (
-                <Text style={{ color: colors.onAccent, fontSize: 15, fontWeight: '800' }}>确认转换</Text>
-              )}
-            </TouchableOpacity>
+            <BottomSheetAction label="取消" variant="secondary" style={{ flex: 1 }} disabled={saving} onPress={() => setConfirmOpen(false)} />
+            <BottomSheetAction label="确认转换" style={{ flex: 1.4 }} loading={saving} onPress={() => { setConfirmOpen(false); void apply(); }} />
           </View>
         )}
       >

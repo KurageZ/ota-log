@@ -1,18 +1,13 @@
 import { fetchAnnouncementText, isAnnouncementUrl } from '../../src/utils/announcementWebText';
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator,
-  ScrollView, useWindowDimensions,
+  View, Text, TouchableOpacity, Alert,
   InteractionManager,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { BottomSheetModalProvider, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetDialog, BottomSheetAction } from '../../src/components/BottomSheetDialog';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { AppIcon } from '../../src/components/AppIcon';
 import type { EventFormPrefill } from '../../src/components/EventForm';
@@ -48,8 +43,7 @@ import {
 } from '../../src/utils/artistConfirmation';
 
 // ── ParseModal ────────────────────────────────────────────────────────────────
-// Owns its own text state so typing never re-renders the parent screen
-// (which would dismiss the keyboard on iOS pageSheet).
+// Keep the input mounted so returning from performer confirmation preserves it.
 
 interface ParseModalProps {
   visible: boolean;
@@ -73,42 +67,8 @@ function ParseModal({
   onSubmit,
 }: ParseModalProps) {
   const { colors } = useAppTheme();
-  const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
   const [textValue, setTextValue] = useState('');
   const [urlValue, setUrlValue] = useState('');
-  const overlayOpacity = useSharedValue(0);
-  const sheetTranslateY = useSharedValue(28);
-  const sheetOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (!visible) {
-      setTextValue('');
-      setUrlValue('');
-      overlayOpacity.value = 0;
-      sheetTranslateY.value = 28;
-      sheetOpacity.value = 0;
-      return;
-    }
-
-    overlayOpacity.value = 0;
-    sheetTranslateY.value = 28;
-    sheetOpacity.value = 0;
-    overlayOpacity.value = withTiming(1, { duration: 180 });
-    sheetTranslateY.value = withTiming(0, { duration: 240 });
-    sheetOpacity.value = withTiming(1, { duration: 200 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const sheetAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: sheetOpacity.value,
-    transform: [{ translateY: sheetTranslateY.value }],
-  }));
-
   const handleSubmit = () => {
     const url = urlValue.trim();
     const text = textValue.trim();
@@ -138,173 +98,81 @@ function ParseModal({
   };
 
   const cardBg = colors.card;
-  const sheetMaxHeight = Math.min(screenHeight - insets.top - 24, 680);
-  const actionBottomPadding = Math.max(insets.bottom - 28, 4);
   const labelStyle = {
     fontSize: 11, fontWeight: '700' as const, letterSpacing: 1.2,
     textTransform: 'uppercase' as const,
     color: isDark ? colors.textMuted : colors.placeholder, marginBottom: 8,
   };
 
-  if (!visible) return null;
-
   return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 20,
-          backgroundColor: isDark ? withAlpha(colors.screen, 0.72) : withAlpha(colors.heading, 0.26),
-        },
-        overlayAnimatedStyle,
-      ]}
+    <BottomSheetDialog
+      visible={visible}
+      title="解析公告"
+      onClose={onClose}
+      footer={(
+        <View style={{ gap: 8 }}>
+          <BottomSheetAction
+            label={artistContextStatus === 'error' ? '载入失败，点击重试' : hasInput ? '解析并创建草稿' : '粘贴并识别'}
+            onPress={artistContextStatus === 'error' ? onRetryArtistContext : hasInput ? handleSubmit : () => { void handlePasteAndSubmit(); }}
+            disabled={isPrimaryDisabled}
+            loading={loading || isArtistContextLoading}
+          />
+          <BottomSheetAction label="不使用解析，手动输入" variant="secondary" disabled={loading} onPress={onManual} />
+        </View>
+      )}
     >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-      />
-      <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View
-          style={[
-            {
-              maxHeight: sheetMaxHeight,
-              backgroundColor: colors.screen,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderBottomRightRadius: 24,
-              borderBottomLeftRadius: 24,
-              overflow: 'hidden',
-            },
-            sheetAnimatedStyle,
-          ]}
-        >
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-            paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1,
-            borderBottomColor: colors.inputBorder,
-          }}>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: colors.heading }}>
-              解析公告
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={{ color: colors.textMuted, fontSize: 15 }}>取消</Text>
-            </TouchableOpacity>
-          </View>
-
-          <KeyboardAwareScrollView
-            style={{ maxHeight: sheetMaxHeight - 64 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            enableOnAndroid={true}
-            enableAutomaticScroll={true}
-            extraHeight={140}
-            extraScrollHeight={20}
-          >
-            <View style={{ padding: 16, paddingBottom: 8 }}>
-              <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 16 }}>
-                <Text style={labelStyle}>公告链接</Text>
-                <TextInput
-                  value={urlValue}
-                  style={{
-                    fontSize: 14, color: colors.text,
-                    height: 44, borderRadius: 10,
-                    backgroundColor: isDark ? colors.screen : colors.cardAlt,
-                    paddingHorizontal: 12,
-                  }}
-                  placeholder="https://..."
-                  placeholderTextColor={colors.placeholder}
-                  onChangeText={setUrlValue}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.inputBorder }} />
-                <Text style={{ marginHorizontal: 12, fontSize: 12, color: colors.placeholder }}>或</Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.inputBorder }} />
-              </View>
-
-              <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 16 }}>
-                <Text style={labelStyle}>公告文本</Text>
-                <TextInput
-                  value={textValue}
-                  style={{
-                    fontSize: 14, color: colors.text,
-                    minHeight: 88, textAlignVertical: 'top', lineHeight: 22,
-                  }}
-                  placeholder="粘贴演出公告文本，自动识别演出信息。"
-                  placeholderTextColor={colors.placeholder}
-                  onChangeText={setTextValue}
-                  multiline
-                />
-              </View>
-
-              <View style={{
-                flexDirection: 'row', gap: 10, alignItems: 'flex-start',
-                backgroundColor: isDark ? withAlpha(colors.accent, 0.14) : withAlpha(colors.accent, 0.08),
-                borderRadius: 14, padding: 12,
-              }}>
-                <AppIcon name="sparkles" size={18} color={colors.accent} />
-                <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, color: isDark ? colors.accentBorder : colors.accentText }}>
-                  支持公开网页链接或公告正文；两者都填写时优先解析正文。识别不准时可在草稿中修改。
-                </Text>
-              </View>
-            </View>
-
-            <View style={{
-              paddingHorizontal: 16,
-              paddingTop: 0,
-              paddingBottom: actionBottomPadding,
-              borderTopWidth: 1,
-              borderTopColor: colors.inputBorder,
-              backgroundColor: colors.screen,
-            }}>
-              <TouchableOpacity
-                onPress={artistContextStatus === 'error'
-                  ? onRetryArtistContext
-                  : hasInput ? handleSubmit : () => { void handlePasteAndSubmit(); }}
-                disabled={isPrimaryDisabled}
-                style={{
-                  backgroundColor: colors.accent, borderRadius: 14,
-                  paddingVertical: 14, alignItems: 'center',
-                  opacity: isPrimaryDisabled ? 0.5 : 1,
-                }}
-              >
-                {loading || isArtistContextLoading
-                  ? <ActivityIndicator color={colors.onAccent} />
-                  : (
-                    <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>
-                      {artistContextStatus === 'error'
-                        ? '载入失败，点击重试'
-                        : hasInput ? '解析并创建草稿' : '粘贴并识别'}
-                    </Text>
-                  )
-                }
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={onManual}
-                disabled={loading}
-                style={{ alignItems: 'center', paddingTop: 16, paddingBottom: 16, opacity: loading ? 0.5 : 1 }}
-              >
-                <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '700' }}>
-                  不使用解析，手动输入
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </KeyboardAwareScrollView>
-        </Animated.View>
+      <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+        <Text style={labelStyle}>公告链接</Text>
+        <BottomSheetTextInput
+          value={urlValue}
+          style={{
+            fontSize: 14, color: colors.text,
+            height: 44, borderRadius: 10,
+            backgroundColor: isDark ? colors.screen : colors.cardAlt,
+            paddingHorizontal: 12,
+          }}
+          placeholder="https://..."
+          placeholderTextColor={colors.placeholder}
+          onChangeText={setUrlValue}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+        />
       </View>
-    </Animated.View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <View style={{ flex: 1, height: 1, backgroundColor: colors.inputBorder }} />
+        <Text style={{ marginHorizontal: 12, fontSize: 12, color: colors.placeholder }}>或</Text>
+        <View style={{ flex: 1, height: 1, backgroundColor: colors.inputBorder }} />
+      </View>
+
+      <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+        <Text style={labelStyle}>公告文本</Text>
+        <BottomSheetTextInput
+          value={textValue}
+          style={{
+            fontSize: 14, color: colors.text,
+            minHeight: 88, textAlignVertical: 'top', lineHeight: 22,
+          }}
+          placeholder="粘贴演出公告文本，自动识别演出信息。"
+          placeholderTextColor={colors.placeholder}
+          onChangeText={setTextValue}
+          multiline
+        />
+      </View>
+
+      <View style={{
+        flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+        backgroundColor: isDark ? withAlpha(colors.accent, 0.14) : withAlpha(colors.accent, 0.08),
+        borderRadius: 14, padding: 12,
+      }}>
+        <AppIcon name="sparkles" size={18} color={colors.accent} />
+        <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, color: isDark ? colors.accentBorder : colors.accentText }}>
+          支持公开网页链接或公告正文；两者都填写时优先解析正文。识别不准时可在草稿中修改。
+        </Text>
+      </View>
+    </BottomSheetDialog>
   );
 }
 
@@ -315,6 +183,9 @@ interface ConfirmModalProps {
   interactive: boolean;
   isDark: boolean;
   initialCandidates: ArtistCandidate[];
+  saving: boolean;
+  onClose: () => void;
+  onBack: () => void;
   onConfirm: (candidates: ArtistCandidate[]) => void;
 }
 
@@ -323,11 +194,12 @@ function NewArtistConfirmModal({
   interactive,
   isDark,
   initialCandidates,
+  saving,
+  onClose,
+  onBack,
   onConfirm,
 }: ConfirmModalProps) {
   const { colors } = useAppTheme();
-  const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
   const [candidates, setCandidates] = useState<ArtistCandidate[]>([]);
 
   useEffect(() => {
@@ -343,195 +215,157 @@ function NewArtistConfirmModal({
   const selectedCount = candidates.filter((c) => c.resolution !== 'skip').length;
   const allSelected = candidates.length > 0 && selectedCount === candidates.length;
   const cardBg = colors.card;
-  const sheetMaxHeight = Math.min(screenHeight - insets.top - 24, 720);
-  const actionBottomPadding = Math.max(insets.bottom, 16);
-
-  if (!visible) return null;
 
   return (
-    <View style={{
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      zIndex: 30,
-      backgroundColor: isDark ? withAlpha(colors.screen, 0.82) : withAlpha(colors.heading, 0.26),
-    }}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={() => {}}
-        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-      />
-      <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <View style={{
-          maxHeight: sheetMaxHeight,
-          backgroundColor: colors.screen,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          overflow: 'hidden',
-        }}>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-            paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1,
-            borderBottomColor: colors.inputBorder,
-          }}>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: colors.heading }}>
-              确认出演者
-            </Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={allSelected ? '取消全选出演者' : '全选出演者'}
-              disabled={!interactive}
-              activeOpacity={0.7}
-              onPress={() => setCandidates((current) => (
-                allSelected
-                  ? current.map((candidate) => ({ ...candidate, resolution: 'skip' }))
-                  : selectAllArtistCandidates(current)
-              ))}
-              style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 16 }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>
-                {allSelected ? '取消全选' : '全选'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            contentContainerStyle={{ padding: 16, paddingBottom: actionBottomPadding }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 }}>
-              选择要添加的出演者；也可以将其匹配到艺人库中的已有艺人。
-            </Text>
-
-            <View style={{
-              backgroundColor: cardBg, borderRadius: 16, overflow: 'hidden', marginBottom: 20,
-              borderWidth: 1, borderColor: colors.inputBorder,
-            }}>
-              {candidates.map((c, i) => (
-                <View
-                  key={i}
-                  style={{
-                    paddingHorizontal: 14, paddingVertical: 12,
-                    borderBottomWidth: i < candidates.length - 1 ? 1 : 0,
-                    borderBottomColor: isDark ? withAlpha(colors.accent, 0.22) : colors.cardAlt,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity
-                      accessibilityRole="checkbox"
-                      accessibilityLabel={`${c.editName || c.rawName}，${c.resolution === 'skip' ? '未选择' : '已选择'}`}
-                      accessibilityState={{ checked: c.resolution !== 'skip', disabled: !interactive }}
-                      disabled={!interactive}
-                      onPress={() => setResolution(i, c.resolution === 'skip' ? 'create' : 'skip')}
-                      style={{ marginRight: 12 }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <AppIcon
-                        name="checkbox"
-                        variant={c.resolution !== 'skip' ? 'selected' : 'unselected'}
-                        size={22}
-                        color={c.resolution !== 'skip' ? colors.accent : colors.chevron}
-                      />
-                    </TouchableOpacity>
-                    <TextInput
-                      style={{
-                        flex: 1, fontSize: 14, fontWeight: '500', paddingVertical: 2,
-                        color: c.resolution !== 'skip'
-                          ? colors.text
-                          : colors.placeholder,
-                      }}
-                      value={c.editName}
-                      onChangeText={(t) => rename(i, t)}
-                      editable={interactive && c.resolution === 'create'}
-                      returnKeyType="done"
-                      placeholderTextColor={colors.placeholder}
-                    />
-                  </View>
-                  {c.suggestions.length > 0 ? (
-                    <View style={{ marginTop: 10, marginLeft: 34, gap: 8 }}>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                        可能匹配到以下已有艺人，请选择：
-                      </Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {c.suggestions.map((suggestion) => {
-                          const selected = c.resolution === suggestion.artistId;
-                          return (
-                            <TouchableOpacity
-                              key={suggestion.artistId}
-                              disabled={!interactive}
-                              onPress={() => setResolution(i, suggestion.artistId)}
-                              style={{
-                                borderRadius: 999,
-                                borderWidth: 1,
-                                borderColor: selected ? colors.accent : colors.chevron,
-                                backgroundColor: selected
-                                  ? (isDark ? withAlpha(colors.accent, 0.2) : withAlpha(colors.accent, 0.08))
-                                  : 'transparent',
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                              }}
-                            >
-                              <Text style={{
-                                fontSize: 12,
-                                fontWeight: selected ? '700' : '500',
-                                color: selected ? colors.accent : isDark ? colors.textSecondary : colors.placeholder,
-                              }}>
-                                {suggestion.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <View style={{
-                        borderTopWidth: 1,
-                        borderTopColor: isDark ? withAlpha(colors.accent, 0.18) : colors.cardAlt,
-                        paddingTop: 10,
-                        alignItems: 'flex-start',
-                      }}>
-                        <TouchableOpacity
-                          disabled={!interactive}
-                          onPress={() => setResolution(i, 'create')}
-                          style={{
-                            paddingVertical: 2,
-                            opacity: interactive ? 1 : 0.6,
-                          }}
-                        >
-                          <Text style={{
-                            fontSize: 12,
-                            fontWeight: c.resolution === 'create' ? '700' : '500',
-                            color: c.resolution === 'create'
-                              ? colors.accent
-                              : colors.textSecondary,
-                          }}>
-                            都不是，作为新艺人创建
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              disabled={!interactive}
-              onPress={() => onConfirm(candidates)}
-              style={{
-                backgroundColor: colors.accent,
-                borderRadius: 14, paddingVertical: 14, alignItems: 'center',
-                opacity: interactive ? 1 : 0.6,
-              }}
-            >
-              <Text style={{ color: colors.onAccent, fontSize: 16, fontWeight: '800' }}>
-                {selectedCount > 0 ? `确认 ${selectedCount} 位出演者` : '不添加并继续'}
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
+    <BottomSheetDialog
+      visible={visible}
+      title="确认出演者"
+      onClose={onClose}
+      dismissible={!saving}
+      headerAccessory={(
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={allSelected ? '取消全选出演者' : '全选出演者'}
+          disabled={!interactive}
+          activeOpacity={0.7}
+          onPress={() => setCandidates((current) => (
+            allSelected
+              ? current.map((candidate) => ({ ...candidate, resolution: 'skip' }))
+              : selectAllArtistCandidates(current)
+          ))}
+          style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 16 }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.accent }}>
+            {allSelected ? '取消全选' : '全选'}
+          </Text>
+        </TouchableOpacity>
+      )}
+      footer={(
+        <View style={{ gap: 8 }}>
+          <BottomSheetAction
+            label={selectedCount > 0 ? `确认 ${selectedCount} 位出演者` : '不添加并继续'}
+            disabled={!interactive}
+            loading={saving}
+            onPress={() => onConfirm(candidates)}
+          />
+          <BottomSheetAction label="返回解析" variant="secondary" disabled={saving} onPress={onBack} />
         </View>
+      )}
+    >
+      <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 }}>
+        选择要添加的出演者；也可以将其匹配到艺人库中的已有艺人。
+      </Text>
+
+      <View style={{
+        backgroundColor: cardBg, borderRadius: 16, overflow: 'hidden', marginBottom: 20,
+        borderWidth: 1, borderColor: colors.inputBorder,
+      }}>
+        {candidates.map((c, i) => (
+          <View
+            key={i}
+            style={{
+              paddingHorizontal: 14, paddingVertical: 12,
+              borderBottomWidth: i < candidates.length - 1 ? 1 : 0,
+              borderBottomColor: isDark ? withAlpha(colors.accent, 0.22) : colors.cardAlt,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                accessibilityRole="checkbox"
+                accessibilityLabel={`${c.editName || c.rawName}，${c.resolution === 'skip' ? '未选择' : '已选择'}`}
+                accessibilityState={{ checked: c.resolution !== 'skip', disabled: !interactive }}
+                disabled={!interactive}
+                onPress={() => setResolution(i, c.resolution === 'skip' ? 'create' : 'skip')}
+                style={{ marginRight: 12 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <AppIcon
+                  name="checkbox"
+                  variant={c.resolution !== 'skip' ? 'selected' : 'unselected'}
+                  size={22}
+                  color={c.resolution !== 'skip' ? colors.accent : colors.chevron}
+                />
+              </TouchableOpacity>
+              <BottomSheetTextInput
+                style={{
+                  flex: 1, fontSize: 14, fontWeight: '500', paddingVertical: 2,
+                  color: c.resolution !== 'skip'
+                    ? colors.text
+                    : colors.placeholder,
+                }}
+                value={c.editName}
+                onChangeText={(t) => rename(i, t)}
+                editable={interactive && c.resolution === 'create'}
+                returnKeyType="done"
+                placeholderTextColor={colors.placeholder}
+              />
+            </View>
+            {c.suggestions.length > 0 ? (
+              <View style={{ marginTop: 10, marginLeft: 34, gap: 8 }}>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  可能匹配到以下已有艺人，请选择：
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {c.suggestions.map((suggestion) => {
+                    const selected = c.resolution === suggestion.artistId;
+                    return (
+                      <TouchableOpacity
+                        key={suggestion.artistId}
+                        disabled={!interactive}
+                        onPress={() => setResolution(i, suggestion.artistId)}
+                        style={{
+                          borderRadius: 999,
+                          borderWidth: 1,
+                          borderColor: selected ? colors.accent : colors.chevron,
+                          backgroundColor: selected
+                            ? (isDark ? withAlpha(colors.accent, 0.2) : withAlpha(colors.accent, 0.08))
+                            : 'transparent',
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 12,
+                          fontWeight: selected ? '700' : '500',
+                          color: selected ? colors.accent : isDark ? colors.textSecondary : colors.placeholder,
+                        }}>
+                          {suggestion.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={{
+                  borderTopWidth: 1,
+                  borderTopColor: isDark ? withAlpha(colors.accent, 0.18) : colors.cardAlt,
+                  paddingTop: 10,
+                  alignItems: 'flex-start',
+                }}>
+                  <TouchableOpacity
+                    disabled={!interactive}
+                    onPress={() => setResolution(i, 'create')}
+                    style={{
+                      paddingVertical: 2,
+                      opacity: interactive ? 1 : 0.6,
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: c.resolution === 'create' ? '700' : '500',
+                      color: c.resolution === 'create'
+                        ? colors.accent
+                        : colors.textSecondary,
+                    }}>
+                      都不是，作为新艺人创建
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        ))}
       </View>
-    </View>
+    </BottomSheetDialog>
   );
 }
 
@@ -541,6 +375,8 @@ export default function NewEventScreen() {
   const db = useDB();
   const { isDark } = useAppTheme();
   const [parseLoading, setParseLoading] = useState(false);
+  const activeRef = useRef(true);
+  const [artistSaving, setArtistSaving] = useState(false);
   const [pendingPhotoUris, setPendingPhotoUris] = useState<string[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [weiboCookie, setWeiboCookie] = useState<string>('');
@@ -582,11 +418,15 @@ export default function NewEventScreen() {
     };
   }, [artistContextReloadKey, db]);
 
-  useEffect(() => () => {
-    confirmVisibilityTaskRef.current?.cancel();
-    if (confirmInteractionTimerRef.current) {
-      clearTimeout(confirmInteractionTimerRef.current);
-    }
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+      confirmVisibilityTaskRef.current?.cancel();
+      if (confirmInteractionTimerRef.current) {
+        clearTimeout(confirmInteractionTimerRef.current);
+      }
+    };
   }, []);
 
   const openCreateForm = (
@@ -595,7 +435,9 @@ export default function NewEventScreen() {
     photoUris: string[] = pendingPhotoUris,
     prefillWarning: string | null = null,
   ) => {
+    if (!activeRef.current) return;
     setEventDraft({ prefill, photoUris, showPrefillNotice, prefillWarning });
+    activeRef.current = false;
     router.replace('/events/create');
   };
 
@@ -604,6 +446,10 @@ export default function NewEventScreen() {
   };
 
   const closeParseModal = () => {
+    if (!activeRef.current) return;
+    activeRef.current = false;
+    confirmVisibilityTaskRef.current?.cancel();
+    if (confirmInteractionTimerRef.current) clearTimeout(confirmInteractionTimerRef.current);
     router.back();
   };
 
@@ -646,6 +492,7 @@ export default function NewEventScreen() {
     photoUris: string[] = pendingPhotoUris,
     prefillWarning: string | null = null,
   ) => {
+    if (!activeRef.current) return;
     const { matchedIds, candidates, fields } = draft;
     const confirmationCandidates = getArtistCandidatesForConfirmation(
       candidates,
@@ -694,6 +541,7 @@ export default function NewEventScreen() {
   };
 
   const handleParse = async (text: string, sourceUrl?: string) => {
+    if (!activeRef.current) return;
     const trimmed = text.trim();
     if (!trimmed) {
       Alert.alert('请粘贴公告内容', '可以粘贴公告链接或公告全文，也可以直接手动创建。', [
@@ -707,6 +555,7 @@ export default function NewEventScreen() {
       setParseLoading(true);
       try {
         const result = await fetchImportedEvent(trimmed);
+        if (!activeRef.current) return;
         if (!result.ok) {
           showFailureAlert({
             title: '抓取失败',
@@ -726,6 +575,7 @@ export default function NewEventScreen() {
           allArtists,
           pendingPhotoUris,
         );
+        if (!activeRef.current) return;
         const nextPhotoUris = handoff.photoUris;
         if (nextPhotoUris.length > pendingPhotoUris.length) {
           setPendingPhotoUris(nextPhotoUris);
@@ -736,7 +586,7 @@ export default function NewEventScreen() {
           : null;
         applyDraftResult(handoff.draft, nextPhotoUris, prefillWarning);
       } finally {
-        setParseLoading(false);
+        if (activeRef.current) setParseLoading(false);
       }
       return;
     }
@@ -745,6 +595,7 @@ export default function NewEventScreen() {
       setParseLoading(true);
       try {
         const result = await fetchWeiboPost(trimmed, weiboCookie);
+        if (!activeRef.current) return;
         if (!result.ok) {
           showFailureAlert({
             title: result.kind === 'captcha' ? '需要验证' : '抓取失败',
@@ -766,6 +617,7 @@ export default function NewEventScreen() {
           downloadWeiboFile(url, 'weibo', weiboCookie)
         );
         const pics = await Promise.all(downloads);
+        if (!activeRef.current) return;
         const validPics = pics.filter((uri) => uri !== null) as string[];
         if (result.post.pics.length > 0 && validPics.length === 0) {
           Alert.alert(
@@ -781,7 +633,7 @@ export default function NewEventScreen() {
         }
         applyParsedText(result.post.text, { url: trimmed }, nextPhotoUris);
       } finally {
-        setParseLoading(false);
+        if (activeRef.current) setParseLoading(false);
       }
       return;
     }
@@ -790,8 +642,10 @@ export default function NewEventScreen() {
       setParseLoading(true);
       try {
         const announcementText = await fetchAnnouncementText(trimmed);
+        if (!activeRef.current) return;
         applyParsedText(announcementText, { url: trimmed });
       } catch (error) {
+        if (!activeRef.current) return;
         showFailureAlert({
           title: '抓取失败',
           reason: '未能提取网页正文。',
@@ -803,7 +657,7 @@ export default function NewEventScreen() {
           ],
         });
       } finally {
-        setParseLoading(false);
+        if (activeRef.current) setParseLoading(false);
       }
       return;
     }
@@ -812,61 +666,74 @@ export default function NewEventScreen() {
   };
 
   const handleConfirmArtists = async (confirmed: ArtistCandidate[]) => {
-    setArtistConfirmVisible(false);
-    setArtistConfirmInteractive(false);
-    const selected = confirmed.filter((c) => c.resolution === 'create');
-    const resolvedIds = confirmed
-      .map((candidate) => candidate.resolution)
-      .filter((resolution) => resolution !== 'create' && resolution !== 'skip');
-    const newIds: string[] = [];
-    const timetableResolutions = new Map<string, string>();
+    setArtistSaving(true);
+    try {
+      const selected = confirmed.filter((c) => c.resolution === 'create');
+      const resolvedIds = confirmed
+        .map((candidate) => candidate.resolution)
+        .filter((resolution) => resolution !== 'create' && resolution !== 'skip');
+      const newIds: string[] = [];
+      const timetableResolutions = new Map<string, string>();
 
-    for (const c of selected) {
-      const { name, short_name } = splitArtistHandle(c.editName.trim() || c.rawName);
-      const newArtist = await db.artists.create({ name, short_name });
-      newIds.push(newArtist.id);
-      timetableResolutions.set(c.rawName.trim(), newArtist.id);
-      setAllArtists((prev) => [...prev, newArtist]);
-    }
-
-    for (const candidate of confirmed) {
-      if (candidate.resolution !== 'create' && candidate.resolution !== 'skip') {
-        timetableResolutions.set(candidate.rawName.trim(), candidate.resolution);
+      for (const c of selected) {
+        const { name, short_name } = splitArtistHandle(c.editName.trim() || c.rawName);
+        const newArtist = await db.artists.create({ name, short_name });
+        newIds.push(newArtist.id);
+        timetableResolutions.set(c.rawName.trim(), newArtist.id);
+        setAllArtists((prev) => [...prev, newArtist]);
       }
-    }
 
-    const allIds = [...new Set([...pendingMatchedIds, ...resolvedIds, ...newIds])];
-    const resolvedFields = pendingFields
-      ? applyImportedTimetableArtistResolutions(pendingFields, timetableResolutions)
-      : pendingFields;
-    openCreateForm(
-      { ...resolvedFields, ...(allIds.length ? { artist_ids: allIds } : {}) },
-      true,
-      pendingPhotoUris,
-      pendingPrefillWarning,
-    );
+      for (const candidate of confirmed) {
+        if (candidate.resolution !== 'create' && candidate.resolution !== 'skip') {
+          timetableResolutions.set(candidate.rawName.trim(), candidate.resolution);
+        }
+      }
+
+      const allIds = [...new Set([...pendingMatchedIds, ...resolvedIds, ...newIds])];
+      const resolvedFields = pendingFields
+        ? applyImportedTimetableArtistResolutions(pendingFields, timetableResolutions)
+        : pendingFields;
+      openCreateForm(
+        { ...resolvedFields, ...(allIds.length ? { artist_ids: allIds } : {}) },
+        true,
+        pendingPhotoUris,
+        pendingPrefillWarning,
+      );
+    } catch (error) {
+      showFailureAlert({ title: '创建艺人失败', reason: '出演者未能全部创建。', nextStep: '请返回解析，重新匹配已有艺人后继续。', details: String(error) });
+    } finally {
+      setArtistSaving(false);
+    }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      <ParseModal
-        visible={!artistConfirmVisible}
-        isDark={isDark}
-        loading={parseLoading}
-        artistContextStatus={artistContextStatus}
-        onClose={closeParseModal}
-        onManual={enterManualForm}
-        onRetryArtistContext={() => setArtistContextReloadKey((key) => key + 1)}
-        onSubmit={handleParse}
-      />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <ParseModal
+          visible={!artistConfirmVisible}
+          isDark={isDark}
+          loading={parseLoading}
+          artistContextStatus={artistContextStatus}
+          onClose={closeParseModal}
+          onManual={enterManualForm}
+          onRetryArtistContext={() => setArtistContextReloadKey((key) => key + 1)}
+          onSubmit={handleParse}
+        />
 
-      <NewArtistConfirmModal
-        visible={artistConfirmVisible}
-        interactive={artistConfirmInteractive}
-        isDark={isDark}
-        initialCandidates={artistCandidates}
-        onConfirm={handleConfirmArtists}
-      />
-    </View>
+        <NewArtistConfirmModal
+          visible={artistConfirmVisible}
+          interactive={artistConfirmInteractive && !artistSaving}
+          saving={artistSaving}
+          onClose={closeParseModal}
+          onBack={() => {
+            setArtistConfirmVisible(false);
+            setArtistConfirmInteractive(false);
+          }}
+          isDark={isDark}
+          initialCandidates={artistCandidates}
+          onConfirm={handleConfirmArtists}
+        />
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, type DateData } from 'react-native-calendars';
-import { BottomSheetDialog } from './BottomSheetDialog';
+import { BottomSheetDialog, BottomSheetAction } from './BottomSheetDialog';
 import { StatsDateRangePicker } from './StatsDateRangePicker';
 import { AppIcon } from './AppIcon';
 import { useAppTheme } from '../theme/appTheme';
@@ -45,6 +45,7 @@ export function ChekiDatePicker({ visible, mode, value, onCancel, onConfirm, onC
     return (
       <StatsDateRangePicker
         visible={visible}
+        confirmLabel="完成"
         initialStartDate={value?.startDate ?? null}
         initialEndDate={value?.endDate ?? null}
         onCancel={onCancel}
@@ -70,31 +71,13 @@ export function ChekiDatePicker({ visible, mode, value, onCancel, onConfirm, onC
       visible={visible}
       title={mode === 'day' ? '选择日期' : mode === 'month' ? '选择月份' : '选择年份'}
       onClose={onCancel}
-      showCloseButton={false}
       maxHeightRatio={0.72}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
       headerAccessory={(
         <TouchableOpacity onPress={onClear} style={{ minWidth: 80, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.accent }}>全部时间</Text>
         </TouchableOpacity>
       )}
-      footer={(
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="完成日期选择"
-          onPress={confirm}
-          activeOpacity={0.72}
-          style={{
-            minHeight: 48,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.accent,
-          }}
-        >
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>完成</Text>
-        </TouchableOpacity>
-      )}
+      footer={<BottomSheetAction label="完成" accessibilityLabel="完成日期选择" onPress={confirm} />}
     >
       {mode === 'day' ? (
         <Calendar

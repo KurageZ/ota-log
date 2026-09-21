@@ -19,7 +19,7 @@ import { ThemeColors, useAppTheme } from '../../src/theme/appTheme';
 import { ArtistSearchPicker } from '../../src/components/ArtistSearchPicker';
 import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 import { NativeTextToolbar } from '../../src/components/native-text-toolbar';
-import { BottomSheetDialog } from '../../src/components/BottomSheetDialog';
+import { BottomSheetDialog, BottomSheetAction } from '../../src/components/BottomSheetDialog';
 import { SectionLabel } from '../../src/components/SettingsMenu';
 import type { HydratedDateItem } from '../../src/repositories/DateItemRepository';
 import { getArtistDisplayText, getArtistPrimaryName } from '../../src/utils/artistDisplay';
@@ -699,7 +699,8 @@ export default function HomeSettingsScreen() {
         title={isPinnedArtistSelector ? '选择置顶艺人' : '选择关注艺人'}
         onClose={closeArtistSelector}
         snapPoints={['72%']}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, flex: 1 }}
+        scrollable={false}
+        contentContainerStyle={{ flex: 1 }}
         headerAccessory={!isPinnedArtistSelector ? (
           <View
             style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.accentSoft }}
@@ -739,7 +740,6 @@ export default function HomeSettingsScreen() {
         onClose={closeDateItemSelector}
         snapPoints={['72%']}
         scrollable
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}
         headerAccessory={(
           <View
             style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.accentSoft }}
@@ -846,7 +846,7 @@ export default function HomeSettingsScreen() {
         title="最近完成"
         onClose={closeRecentCompletedEditor}
         maxHeightRatio={0.48}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}
+        footer={<BottomSheetAction label="保存" onPress={handleSaveRecentCompletedLimit} />}
       >
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
           <TouchableOpacity
@@ -909,21 +909,7 @@ export default function HomeSettingsScreen() {
           }}
         />
 
-        <TouchableOpacity
-          activeOpacity={0.72}
-          onPress={handleSaveRecentCompletedLimit}
-          style={{
-            height: 44,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.accent,
-          }}
-        >
-          <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '800', color: colors.onAccent }}>
-            保存
-          </Text>
-        </TouchableOpacity>
+
       </BottomSheetDialog>
     </SafeAreaView>
   );

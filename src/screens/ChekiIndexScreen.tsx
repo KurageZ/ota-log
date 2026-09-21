@@ -1261,7 +1261,6 @@ export default function ChekiLibraryScreen() {
           onClose={() => setViewSettingsVisible(false)}
           maxHeightRatio={0.7}
           scrollable
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
         >
           <View style={{ marginBottom: 24 }}>
             <Text style={{ fontSize: 16, lineHeight: 22, fontWeight: '800', color: colors.heading }}>

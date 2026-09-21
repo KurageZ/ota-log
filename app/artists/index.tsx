@@ -38,6 +38,18 @@ import { ArtistDetailScreen } from './[id]/index';
 type FilterTab = 'all' | 'favorites';
 type ArtistEventFilter = 'attended' | null;
 type ArtistTypeFilter = 'person' | 'group' | 'unset' | null;
+interface ArtistFilterDraft {
+  hasChekiOnly: boolean;
+  eventFilter: ArtistEventFilter;
+  groupFilter: ArtistGroupFilter;
+  typeFilter: ArtistTypeFilter;
+}
+const EMPTY_ARTIST_FILTERS: ArtistFilterDraft = {
+  hasChekiOnly: false,
+  eventFilter: null,
+  groupFilter: null,
+  typeFilter: null,
+};
 const IS_IOS = process.env.EXPO_OS === 'ios';
 const ARTIST_TYPE_NOTICE_DISMISSED_KEY = 'artist_type_notice_dismissed_v1';
 
@@ -57,6 +69,7 @@ export default function ArtistsScreen() {
   const [showTypeNotice, setShowTypeNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
+  const [filterDraft, setFilterDraft] = useState<ArtistFilterDraft>(EMPTY_ARTIST_FILTERS);
   const [oshiArtistId, setOshiArtistId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -144,10 +157,8 @@ export default function ArtistsScreen() {
     {
       key: 'type',
       title: '艺人类型',
-      value: typeFilter,
-      onChange: (value) => setTypeFilter(
-        value === 'person' || value === 'group' || value === 'unset' ? value : null,
-      ),
+      value: filterDraft.typeFilter,
+      onChange: (value) => setFilterDraft((draft) => ({ ...draft, typeFilter: value as ArtistTypeFilter })),
       options: [
         { value: 'person', label: '个人' },
         { value: 'group', label: '团体' },
@@ -157,30 +168,28 @@ export default function ArtistsScreen() {
     {
       key: 'cheki',
       title: '拍立得记录',
-      value: hasChekiOnly ? 'has_cheki' : null,
-      onChange: (value) => setHasChekiOnly(value === 'has_cheki'),
+      value: filterDraft.hasChekiOnly ? 'has_cheki' : null,
+      onChange: (value) => setFilterDraft((draft) => ({ ...draft, hasChekiOnly: value === 'has_cheki' })),
       options: [{ value: 'has_cheki', label: '有拍立得' }],
     },
     {
       key: 'event',
       title: '活动记录',
-      value: eventFilter,
-      onChange: (value) => setEventFilter(value === 'attended' ? 'attended' : null),
+      value: filterDraft.eventFilter,
+      onChange: (value) => setFilterDraft((draft) => ({ ...draft, eventFilter: value as ArtistEventFilter })),
       options: [{ value: 'attended', label: '参加过活动' }],
     },
     {
       key: 'group',
       title: '所属团体',
-      value: groupFilter,
-      onChange: (value) => {
-        setGroupFilter(value === 'has_parent' || value === 'no_parent' ? value : null);
-      },
+      value: filterDraft.groupFilter,
+      onChange: (value) => setFilterDraft((draft) => ({ ...draft, groupFilter: value as ArtistGroupFilter })),
       options: [
         { value: 'has_parent', label: '有所属团体' },
         { value: 'no_parent', label: '无所属团体' },
       ],
     },
-  ], [hasChekiOnly, eventFilter, groupFilter, typeFilter]);
+  ], [filterDraft]);
 
   const clearFilter = useCallback(() => {
     setSearchQuery('');
@@ -326,7 +335,10 @@ export default function ArtistsScreen() {
             keyword={searchQuery}
             onKeywordChange={setSearchQuery}
             placeholder="输入关键词搜索"
-            onOpenFilter={() => setFilterVisible(true)}
+            onOpenFilter={() => {
+              setFilterDraft({ hasChekiOnly, eventFilter, groupFilter, typeFilter });
+              setFilterVisible(true);
+            }}
             activeFilters={activeSearchFilters}
             activeCount={activeSearchFilters.length}
             isDark={isDark}
@@ -516,8 +528,15 @@ export default function ArtistsScreen() {
           visible={filterVisible}
           sections={filterSections}
           isDark={isDark}
-          onReset={clearFilter}
+          onReset={() => setFilterDraft(EMPTY_ARTIST_FILTERS)}
           onClose={() => setFilterVisible(false)}
+          onApply={() => {
+            setHasChekiOnly(filterDraft.hasChekiOnly);
+            setEventFilter(filterDraft.eventFilter);
+            setGroupFilter(filterDraft.groupFilter);
+            setTypeFilter(filterDraft.typeFilter);
+            setFilterVisible(false);
+          }}
         />
       </SafeAreaView>
       {IS_IOS && !isWide ? (

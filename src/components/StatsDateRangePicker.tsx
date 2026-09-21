@@ -14,7 +14,7 @@ import {
   normalizeDateInput,
   toISODate,
 } from '../utils/date';
-import { BottomSheetDialog } from './BottomSheetDialog';
+import { BottomSheetDialog, BottomSheetAction } from './BottomSheetDialog';
 
 LocaleConfig.locales['zh-cn'] = {
   monthNames: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
@@ -32,6 +32,7 @@ interface Props {
   onCancel: () => void;
   onConfirm: (startDate: string, endDate: string) => void;
   onSelectAll: () => void;
+  confirmLabel?: '应用' | '完成';
 }
 
 function buildMarkedDates(
@@ -66,6 +67,7 @@ export function StatsDateRangePicker({
   onCancel,
   onConfirm,
   onSelectAll,
+  confirmLabel = '应用',
 }: Props) {
   const { colors } = useAppTheme();
   const { fontScale } = useWindowDimensions();
@@ -113,12 +115,10 @@ export function StatsDateRangePicker({
       onClose={onCancel}
       scrollable
       snapPoints={['66%']}
-      showCloseButton={false}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}
       headerAccessory={(
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="统计全部时间"
+          accessibilityLabel="全部时间"
           onPress={onSelectAll}
           activeOpacity={0.7}
           style={{ minWidth: 80, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
@@ -127,25 +127,14 @@ export function StatsDateRangePicker({
         </TouchableOpacity>
       )}
       footer={(
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="应用日期范围"
+        <BottomSheetAction
+          label={confirmLabel}
+          accessibilityLabel={`${confirmLabel}日期范围`}
           disabled={!canConfirm}
           onPress={() => {
             if (validRange) onConfirm(validRange.startDate!, validRange.endDate!);
           }}
-          activeOpacity={0.72}
-          style={{
-            minHeight: 48,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 12,
-            backgroundColor: colors.accent,
-            opacity: canConfirm ? 1 : 0.4,
-          }}
-        >
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onAccent }}>应用</Text>
-        </TouchableOpacity>
+        />
       )}
     >
       <View style={{ flexDirection: stackDateInputs ? 'column' : 'row', gap: 10, marginBottom: 10 }}>

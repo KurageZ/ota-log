@@ -84,9 +84,7 @@ export function StatsPeriodPicker({ visible, preset, period, onClose, onSelect }
       visible={visible}
       title={titleForPreset(preset)}
       onClose={onClose}
-      showCloseButton={false}
       maxHeightRatio={0.72}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
     >
       {preset === 'week' ? (
         <Calendar

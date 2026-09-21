@@ -32,9 +32,7 @@ export function CalendarMonthPicker({ visible, selectedMonth, onClose, onSelect 
       visible={visible}
       title="选择月份"
       onClose={onClose}
-      showCloseButton={false}
       maxHeightRatio={0.72}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}
     >
       <View
         style={{

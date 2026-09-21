@@ -1,6 +1,6 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ComponentType, ForwardedRef, ReactNode } from 'react';
-import { View } from 'react-native';
+import { BackHandler, View } from 'react-native';
 import type { Artist } from '../../types/models';
 import { FilterSheet, type FilterSection } from '../FilterSheet';
 
@@ -214,6 +214,41 @@ describe('FilterSheet', () => {
 
     expect(latestFooterMarginAdjustment).toBe(true);
     expect(renderer.root.findByProps({ accessibilityLabel: '应用筛选' })).toBeTruthy();
+  });
+
+  test('dialog shell separates reset, apply, and dismiss and handles Android back', () => {
+    const onReset = jest.fn();
+    const onApply = jest.fn();
+    const onClose = jest.fn();
+    const backListener = jest.spyOn(BackHandler, 'addEventListener');
+    act(() => {
+      renderer = create(
+        <FilterSheet
+          visible
+          sections={sections}
+          isDark={false}
+          onReset={onReset}
+          onClose={onClose}
+          onApply={onApply}
+        />,
+      );
+    });
+    expect(mockPresent).toHaveBeenCalledTimes(1);
+    expect(latestFooterMarginAdjustment).toBe(true);
+    act(() => renderer.root.findByProps({ accessibilityLabel: '重置筛选' }).props.onPress());
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(onApply).not.toHaveBeenCalled();
+    act(() => renderer.root.findByProps({ accessibilityLabel: '应用筛选' }).props.onPress());
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAllByProps({ accessibilityLabel: '关闭', accessibilityRole: 'button' })).toHaveLength(0);
+    act(() => latestOnDismiss?.());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const handleBack = backListener.mock.calls.find(([event]) => event === 'hardwareBackPress')![1];
+    act(() => { expect(handleBack({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true); });
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledTimes(1);
+    backListener.mockRestore();
   });
 
   test('can present again after an internal swipe-down dismiss', () => {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   Text,
+  BackHandler,
+  ActivityIndicator,
   TouchableOpacity,
   View,
   useWindowDimensions,
@@ -18,7 +20,8 @@ import {
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../theme/appTheme';
-import { AppIcon } from './AppIcon';
+import { getWindowMode } from '../utils/windowMode';
+import { ADAPTIVE_GUTTER, READING_MAX_WIDTH } from './adaptive/AppContainers';
 
 interface BottomSheetDialogProps {
   visible: boolean;
@@ -31,9 +34,54 @@ interface BottomSheetDialogProps {
   maxDynamicContentSize?: number;
   maxHeightRatio?: number;
   contentContainerStyle?: StyleProp<ViewStyle>;
-  enablePanDownToClose?: boolean;
-  showCloseButton?: boolean;
+  dismissible?: boolean;
   footer?: ReactNode;
+}
+
+/** Shared primary/secondary actions for the fixed sheet footer. */
+export function BottomSheetAction({
+  label,
+  onPress,
+  disabled = false,
+  loading = false,
+  variant = 'primary',
+  accessibilityLabel = label,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  variant?: 'primary' | 'secondary';
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { colors } = useAppTheme();
+  const foreground = variant === 'primary' ? colors.onAccent : colors.accent;
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      disabled={disabled || loading}
+      onPress={onPress}
+      activeOpacity={0.72}
+      style={[{
+        minHeight: 48,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: variant === 'primary' ? colors.accent : colors.cardAlt,
+        opacity: disabled || loading ? 0.5 : 1,
+      }, style]}
+    >
+      {loading ? <ActivityIndicator color={foreground} /> : (
+        <Text style={{ fontSize: 16, fontWeight: '800', color: foreground, textAlign: 'center' }}>{label}</Text>
+      )}
+    </TouchableOpacity>
+  );
 }
 
 export function BottomSheetActionFooter({
@@ -42,12 +90,13 @@ export function BottomSheetActionFooter({
 }: BottomSheetFooterProps & { children: ReactNode }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
 
   return (
     <BottomSheetFooter animatedFooterPosition={animatedFooterPosition} bottomInset={0}>
       <View
         style={{
-          paddingHorizontal: 16,
+          paddingHorizontal: ADAPTIVE_GUTTER[getWindowMode(width)],
           paddingTop: 10,
           paddingBottom: Math.max(insets.bottom, 12),
           borderTopWidth: 1,
@@ -67,18 +116,17 @@ export function BottomSheetDialog({
   onClose,
   children,
   headerAccessory,
-  scrollable = false,
+  scrollable = true,
   snapPoints,
   maxDynamicContentSize,
   maxHeightRatio = 0.82,
   contentContainerStyle,
-  enablePanDownToClose = true,
-  showCloseButton = true,
+  dismissible = true,
   footer,
 }: BottomSheetDialogProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width } = useWindowDimensions();
   const sheetModalRef = useRef<BottomSheetModal>(null);
   const wasVisibleRef = useRef(false);
   const dismissedInternallyRef = useRef(false);
@@ -86,7 +134,7 @@ export function BottomSheetDialog({
 
   const resolvedMaxDynamicContentSize = useMemo(() => {
     if (maxDynamicContentSize != null) return maxDynamicContentSize;
-    const availableHeight = Math.max(320, windowHeight - insets.top - 24);
+    const availableHeight = Math.max(0, windowHeight - insets.top - 24);
     return Math.min(availableHeight, Math.max(320, Math.floor(windowHeight * maxHeightRatio)));
   }, [insets.top, maxDynamicContentSize, maxHeightRatio, windowHeight]);
 
@@ -102,6 +150,15 @@ export function BottomSheetDialog({
     wasVisibleRef.current = visible;
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (dismissible) sheetModalRef.current?.dismiss();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [dismissible, visible]);
+
   const handleDismiss = () => {
     const shouldNotifyClose = !hiddenByParentRef.current;
     hiddenByParentRef.current = false;
@@ -116,7 +173,7 @@ export function BottomSheetDialog({
       appearsOnIndex={0}
       disappearsOnIndex={-1}
       opacity={0.82}
-      pressBehavior="close"
+      pressBehavior={dismissible ? 'close' : 'none'}
       style={{ backgroundColor: colors.scrim }}
     />
   );
@@ -126,28 +183,12 @@ export function BottomSheetDialog({
   ), [footer]);
 
   const header = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+    <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
       <Text style={{ flex: 1, fontSize: 18, lineHeight: 23, fontWeight: '800', color: colors.heading }}>
         {title}
       </Text>
       {headerAccessory}
-      {showCloseButton ? (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => sheetModalRef.current?.dismiss()}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.cardAlt,
-            marginLeft: headerAccessory ? 10 : 0,
-          }}
-        >
-          <AppIcon name="close" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      ) : null}
+
     </View>
   );
 
@@ -157,12 +198,13 @@ export function BottomSheetDialog({
       enableDynamicSizing={!snapPoints}
       snapPoints={snapPoints}
       enableDismissOnClose
-      enablePanDownToClose={enablePanDownToClose}
+      enablePanDownToClose={dismissible}
       maxDynamicContentSize={snapPoints ? undefined : resolvedMaxDynamicContentSize}
       // Let the sheet background extend through the system safe area. The
       // content wrapper below owns the inset padding so the bottom never
       // becomes a transparent strip.
       bottomInset={0}
+      style={{ marginHorizontal: Math.max(0, (width - READING_MAX_WIDTH) / 2) }}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       enableBlurKeyboardOnGesture
@@ -187,7 +229,7 @@ export function BottomSheetDialog({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           enableFooterMarginAdjustment={Boolean(footer)}
-          contentContainerStyle={[{ paddingHorizontal: 16 }, contentContainerStyle]}
+          contentContainerStyle={[{ paddingHorizontal: ADAPTIVE_GUTTER[getWindowMode(width)], paddingTop: 8, paddingBottom: 12 }, contentContainerStyle]}
         >
           <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}
@@ -197,7 +239,7 @@ export function BottomSheetDialog({
       ) : (
         <BottomSheetView
           enableFooterMarginAdjustment={Boolean(footer)}
-          style={[{ paddingHorizontal: 16 }, contentContainerStyle]}
+          style={[{ paddingHorizontal: ADAPTIVE_GUTTER[getWindowMode(width)], paddingTop: 8, paddingBottom: 12 }, contentContainerStyle]}
         >
           <View style={{ paddingBottom: footer ? 0 : insets.bottom }}>
             {header}

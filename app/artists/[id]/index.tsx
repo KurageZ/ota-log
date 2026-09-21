@@ -1660,7 +1660,6 @@ export function ArtistDetailScreen({
         title="更多"
         onClose={() => setAttributesSheetVisible(false)}
         scrollable
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
       >
         {renderArtistAttributes()}
       </BottomSheetDialog>
