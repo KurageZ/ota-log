@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 type FloatingTabBarVisibilityContextValue = {
   isHidden: boolean;
@@ -72,12 +72,32 @@ export function useFloatingTabBarScroll({
   const { setHidden } = useFloatingTabBarVisibility();
   const lastOffsetY = useRef(0);
   const deltaBuffer = useRef(0);
+  const contentHeight = useRef(0);
+  const viewportHeight = useRef(0);
+
+  const showForShortContent = useCallback(() => {
+    if (contentHeight.current <= 0 || viewportHeight.current <= 0) return false;
+    if (contentHeight.current > viewportHeight.current + 1) return false;
+
+    setHidden(false);
+    lastOffsetY.current = 0;
+    deltaBuffer.current = 0;
+    return true;
+  }, [setHidden]);
 
   useEffect(() => {
     setHidden(false);
   }, [setHidden]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    contentHeight.current = event.nativeEvent.contentSize.height;
+    viewportHeight.current = event.nativeEvent.layoutMeasurement.height;
+
+    if (showForShortContent()) {
+      onScroll?.(event);
+      return;
+    }
+
     const offsetY = Math.max(event.nativeEvent.contentOffset.y, 0);
     const deltaY = offsetY - lastOffsetY.current;
 
@@ -100,9 +120,21 @@ export function useFloatingTabBarScroll({
 
     lastOffsetY.current = offsetY;
     onScroll?.(event);
-  }, [hideThreshold, onScroll, setHidden, showThreshold, topRevealOffset]);
+  }, [hideThreshold, onScroll, setHidden, showForShortContent, showThreshold, topRevealOffset]);
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    viewportHeight.current = event.nativeEvent.layout.height;
+    showForShortContent();
+  }, [showForShortContent]);
+
+  const handleContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeight.current = height;
+    showForShortContent();
+  }, [showForShortContent]);
 
   return {
+    onContentSizeChange: handleContentSizeChange,
+    onLayout: handleLayout,
     onScroll: handleScroll,
     scrollEventThrottle: 16 as const,
   };

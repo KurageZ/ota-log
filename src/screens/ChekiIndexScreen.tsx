@@ -1131,7 +1131,6 @@ export default function ChekiLibraryScreen() {
 
   const galleryList = (
     <FlatList
-      onLayout={handleGalleryLayout}
       data={galleryItems}
       keyExtractor={(item) => item.key}
       renderItem={renderGalleryItem}
@@ -1146,6 +1145,10 @@ export default function ChekiLibraryScreen() {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       {...tabBarScroll}
+      onLayout={(event) => {
+        tabBarScroll.onLayout?.(event);
+        handleGalleryLayout(event);
+      }}
       ListHeaderComponent={
         <>
           {isAndroid ? (
