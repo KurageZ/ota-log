@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '../theme/appTheme';
-import { Artist } from '../types/models';
+import { Artist, Event } from '../types/models';
+import { EventSearchPicker } from './EventSearchPicker';
 import { ArtistSearchPicker } from './ArtistSearchPicker';
 import { BottomSheetDialog, BottomSheetAction } from './BottomSheetDialog';
 
@@ -42,6 +43,7 @@ export interface FilterSection {
   input?: { placeholder?: string };
   /** 设置后，该分区改用共享的 ArtistSearchPicker 渲染艺人选择 */
   artistSearch?: ArtistSearchSectionConfig;
+  eventSearch?: { events: Event[] };
   /** 标题下方、选择器/已选中区域上方的附加内容（例如批量快捷 chip） */
   beforeContent?: ReactNode;
   /** 设置后，该分区改为渲染多组独立 chip 行，不再渲染 options 的默认 chips */
@@ -205,7 +207,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
         const selectedValues = section.values ?? (section.value != null ? [section.value] : []);
         const selectedSet = new Set(selectedValues);
         const showAllChip = !section.input;
-        const showArtistSearch = Boolean(section.artistSearch);
+        const showSearchPicker = Boolean(section.artistSearch || section.eventSearch);
 
         return (
           <View key={section.key} style={{ marginBottom: 18 }}>
@@ -257,6 +259,23 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
               />
             ) : null}
 
+            {section.eventSearch ? (
+              <EventSearchPicker
+                events={section.eventSearch.events}
+                selectedIds={selectedValues}
+                searchValue={drafts[section.key] ?? ''}
+                onSearchChange={(text) => setDrafts((prev) => ({ ...prev, [section.key]: text }))}
+                onSelect={(id) => {
+                  if (section.multiple) section.onValuesChange?.([...selectedValues, id]);
+                  else setSectionValue(section, id);
+                }}
+                onRemove={(id) => {
+                  if (section.multiple) section.onValuesChange?.(selectedValues.filter((value) => value !== id));
+                  else setSectionValue(section, null);
+                }}
+              />
+            ) : null}
+
             {section.input ? (
               <BottomSheetTextInput
                 style={{ ...inputStyle, marginBottom: options.length > 0 ? 10 : 0 }}
@@ -281,7 +300,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
               />
             ) : null}
 
-            {!showArtistSearch && section.chipGroups ? (
+            {!showSearchPicker && section.chipGroups ? (
               <View style={{ gap: 12 }}>
                 {section.chipGroups.map((group) => {
                   const groupSelected = group.values ?? (group.value != null ? [group.value] : []);
@@ -335,7 +354,7 @@ export function FilterSheet({ visible, sections, isDark, header, onReset, onClos
                   );
                 })}
               </View>
-            ) : !showArtistSearch && (options.length > 0 || showAllChip) ? (
+            ) : !showSearchPicker && (options.length > 0 || showAllChip) ? (
               // 限制最多三行（chip 34 + gap 8），超出部分裁掉，靠输入找其余项
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                 {showAllChip ? (

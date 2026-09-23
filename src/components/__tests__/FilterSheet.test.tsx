@@ -1,7 +1,7 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ComponentType, ForwardedRef, ReactNode } from 'react';
 import { BackHandler, View } from 'react-native';
-import type { Artist } from '../../types/models';
+import type { Artist, Event } from '../../types/models';
 import { FilterSheet, type FilterSection } from '../FilterSheet';
 
 const mockPresent = jest.fn();
@@ -705,5 +705,36 @@ describe('FilterSheet', () => {
 
     act(() => props.onRemoveExtraSelectedRow('deleted'));
     expect(onValuesChange).toHaveBeenCalledWith(['a1']);
+  });
+});
+
+
+describe('活动搜索筛选', () => {
+  it.each([false, true])('按名称和日期搜索，并保留已选项供移除（深色：%s）', (isDark) => {
+    const onValuesChange = jest.fn();
+    const events = [
+      { id: 'e1', title: 'Summer Live', event_date: '2026-08-01' },
+      { id: 'e2', title: 'Birthday Live', event_date: '2026-09-22' },
+      { id: 'e3', title: 'Winter Live', event_date: '2026-12-01' },
+    ] as Event[];
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<FilterSheet visible isDark={isDark} onReset={jest.fn()} onClose={jest.fn()} sections={[{
+        key: 'event', title: '活动', value: null, values: ['e1'], multiple: true,
+        onChange: jest.fn(), onValuesChange, eventSearch: { events },
+      }]} />);
+    });
+    const search = (value: string) => act(() => renderer.root.findByProps({ accessibilityLabel: '搜索活动' }).props.onChangeText(value));
+    search(' birthday ');
+    expect(renderer.root.findAllByProps({ accessibilityLabel: '选择活动 Winter Live 2026-12-01' })).toHaveLength(0);
+    act(() => renderer.root.findByProps({ accessibilityLabel: '选择活动 Birthday Live 2026-09-22' }).props.onPress());
+    expect(onValuesChange).toHaveBeenLastCalledWith(['e1', 'e2']);
+    search('2026-12');
+    expect(renderer.root.findByProps({ accessibilityLabel: '选择活动 Winter Live 2026-12-01' })).toBeTruthy();
+    search('无匹配');
+    expect(JSON.stringify(renderer.toJSON())).toContain('没有找到匹配的活动');
+    act(() => renderer.root.findByProps({ accessibilityLabel: '移除活动 Summer Live 2026-08-01' }).props.onPress());
+    expect(onValuesChange).toHaveBeenLastCalledWith([]);
+    act(() => renderer.unmount());
   });
 });

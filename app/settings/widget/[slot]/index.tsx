@@ -300,7 +300,7 @@ export default function ChekiWidgetGroupEditorScreen() {
       key: 'event', title: '活动', value: null, values: filterRulesDraft.eventIds, multiple: true,
       onChange: (value) => updateFilterRulesDraft({ eventIds: value ? [value] : [] }),
       onValuesChange: (values) => updateFilterRulesDraft({ eventIds: values }),
-      options: events.map((event) => ({ value: event.id, label: event.title })),
+      eventSearch: { events },
     },
   ] : [];
 
