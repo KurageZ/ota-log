@@ -109,6 +109,7 @@ function RootNavigator() {
         options={{ presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal', sheetAllowedDetents: Platform.OS === 'ios' ? [0.9, 1] : undefined, sheetGrabberVisible: Platform.OS === 'ios', title: '编辑艺人' }}
       />
       <Stack.Screen name="cheki/new" options={{ presentation: 'modal', title: '添加拍立得记录' }} />
+      <Stack.Screen name="cheki/event-quick-add" options={{ presentation: 'modal', title: '按活动快速添加' }} />
       <Stack.Screen name="cheki/records/[id]/index" options={{ title: '拍立得记录' }} />
       <Stack.Screen name="cheki/records/[id]/edit" options={{ presentation: 'modal', title: '编辑拍立得记录' }} />
       <Stack.Screen name="cheki/[id]/edit" options={{ presentation: 'modal', title: '编辑拍立得' }} />

@@ -142,28 +142,45 @@ export class ChekiRecordRepository {
   async createRecordWithItems(
     input: CreateChekiRecordWithItemsInput,
   ): Promise<ChekiRecordWithItems> {
-    const items = input.items ?? [];
-    if (items.length > input.quantity) {
-      throw new Error('Cheki item count cannot exceed record quantity');
-    }
     let created: ChekiRecordWithItems | null = null;
     await this.db.withTransactionAsync(async () => {
-      assertUnitPrice(input.unit_price);
-      const record = await this.insertRecord(input);
-      const createdItems: ChekiItemWithImages[] = [];
-      for (let index = 0; index < input.quantity; index += 1) {
-        const item = items[index] ?? {};
-        createdItems.push(await this.insertItem(record.id, {
-          ...item,
-          unitPrice: item.unitPrice ?? input.unit_price ?? 0,
-          spec: item.spec ?? input.spec ?? DEFAULT_CHEKI_SPEC,
-        }));
-      }
-      created = { ...record, items: createdItems };
+      created = await this.insertRecordWithItems(input);
     });
     if (!created) throw new Error('Failed to create cheki record');
     this.changes.notify();
     return created;
+  }
+
+  async createRecords(inputs: CreateChekiRecordInput[]): Promise<ChekiRecordWithItems[]> {
+    const created: ChekiRecordWithItems[] = [];
+    await this.db.withTransactionAsync(async () => {
+      for (const input of inputs) {
+        created.push(await this.insertRecordWithItems(input));
+      }
+    });
+    this.changes.notify();
+    return created;
+  }
+
+  private async insertRecordWithItems(
+    input: CreateChekiRecordWithItemsInput,
+  ): Promise<ChekiRecordWithItems> {
+    const items = input.items ?? [];
+    if (items.length > input.quantity) {
+      throw new Error('Cheki item count cannot exceed record quantity');
+    }
+    assertUnitPrice(input.unit_price);
+    const record = await this.insertRecord(input);
+    const createdItems: ChekiItemWithImages[] = [];
+    for (let index = 0; index < input.quantity; index += 1) {
+      const item = items[index] ?? {};
+      createdItems.push(await this.insertItem(record.id, {
+        ...item,
+        unitPrice: item.unitPrice ?? input.unit_price ?? 0,
+        spec: item.spec ?? input.spec ?? DEFAULT_CHEKI_SPEC,
+      }));
+    }
+    return { ...record, items: createdItems };
   }
 
   private async insertRecord(input: CreateChekiRecordInput): Promise<ChekiRecord> {

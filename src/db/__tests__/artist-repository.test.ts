@@ -210,6 +210,26 @@ describe('ArtistRepository artist media metadata support', () => {
     ).toBeUndefined();
   });
 
+  test('findCurrentMembers selects members valid on the activity date, including date boundaries', async () => {
+    rawDb.prepare("INSERT INTO artists (id, name, artist_type, created_at) VALUES ('event-group', 'Event Group', 'group', '2026-01-01')").run();
+    const insertPerson = rawDb.prepare("INSERT INTO artists (id, name, artist_type, created_at) VALUES (?, ?, 'person', '2026-01-01')");
+    insertPerson.run('event-member-old', 'Old');
+    insertPerson.run('event-member-keep', 'Active');
+    insertPerson.run('event-member-new', 'New');
+    const insert = rawDb.prepare(`INSERT INTO artist_group_memberships
+      (id, person_artist_id, group_artist_id, start_date, end_date, created_at, updated_at)
+      VALUES (?, ?, 'event-group', ?, ?, '2026-01-01', '2026-01-01')`);
+    insert.run('old-membership', 'event-member-old', null, '2026-10-08');
+    insert.run('active-membership', 'event-member-keep', '2026-10-09', '2026-10-09');
+    insert.run('future-membership', 'event-member-new', '2026-10-10', null);
+    expect((await artistRepository.findCurrentMembers('event-group', '2026-10-09')).map((artist) => artist.id))
+      .toEqual(['event-member-keep']);
+    expect((await artistRepository.findCurrentMembers('event-group', '2026-10-08')).map((artist) => artist.id))
+      .toEqual(['event-member-old']);
+    expect((await artistRepository.findCurrentMembers('event-group', '2026-10-10')).map((artist) => artist.id))
+      .toEqual(['event-member-new']);
+  });
+
   test('findAll falls back to current memberships for parent_id', async () => {
     rawDb.prepare(
       `INSERT INTO artists (id, name, short_name, artist_type, avatar_uri, background_uri, background_color, url, is_favorite, created_at)

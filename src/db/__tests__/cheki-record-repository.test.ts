@@ -31,6 +31,49 @@ describe('ChekiRecordRepository', () => {
     expect(created?.items.every((item) => item.images.length === 0)).toBe(true);
   });
 
+  test('creates a batch with separate artists, shared event and date, and per-artist prices', async () => {
+    raw.prepare("INSERT INTO artists (id, name, created_at) VALUES (?, ?, '2026-10-09T00:00:00.000Z')").run('artist-a', 'A');
+    raw.prepare("INSERT INTO artists (id, name, created_at) VALUES (?, ?, '2026-10-09T00:00:00.000Z')").run('artist-b', 'B');
+    raw.prepare("INSERT INTO events (id, title, status, created_at, updated_at) VALUES (?, ?, 'completed', '2026-10-09T00:00:00.000Z', '2026-10-09T00:00:00.000Z')").run('event-a', 'Live');
+    const listener = jest.fn();
+    repository.subscribeToChanges(listener);
+    const records = await repository.createRecords([
+      { event_id: 'event-a', date: '2026-10-09', artist_id: 'artist-a', quantity: 3, unit_price: 100 },
+      { event_id: 'event-a', date: '2026-10-09', artist_id: 'artist-b', quantity: 2, unit_price: 0 },
+    ]);
+    expect(records).toHaveLength(2);
+    const saved = await repository.findRecords({ eventId: 'event-a' });
+    expect(saved).toHaveLength(2);
+    expect(saved.map((record) => record.date)).toEqual(['2026-10-09', '2026-10-09']);
+    expect(saved.find((record) => record.artist_id === 'artist-a')?.items.map((item) => item.unit_price)).toEqual([100, 100, 100]);
+    expect(saved.find((record) => record.artist_id === 'artist-b')?.items.map((item) => item.unit_price)).toEqual([0, 0]);
+    expect(saved.every((record) => record.items.every((item) => item.images.length === 0))).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test('rolls back the entire batch on a later write failure and allows retry', async () => {
+    const adapter = createAsyncSQLiteAdapter(raw);
+    let itemInserts = 0;
+    const failingAdapter = {
+      ...adapter,
+      runAsync: async (sql: string, params?: unknown[]) => {
+        if (sql.includes('INSERT INTO cheki_items') && ++itemInserts === 2) throw new Error('write failed');
+        return adapter.runAsync(sql, params as never);
+      },
+    };
+    const failing = new ChekiRecordRepository(failingAdapter as typeof adapter, () => `batch-${nextId++}`);
+    const listener = jest.fn();
+    failing.subscribeToChanges(listener);
+    const inputs = [{ quantity: 1, unit_price: 10 }, { quantity: 2, unit_price: 20 }];
+    await expect(failing.createRecords(inputs)).rejects.toThrow('write failed');
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_records').get()).toEqual({ count: 0 });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM cheki_items').get()).toEqual({ count: 0 });
+    expect(listener).not.toHaveBeenCalled();
+    await failing.createRecords(inputs);
+    expect(await repository.findRecords()).toHaveLength(2);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   test('treats an omitted unit price as zero and rejects invalid prices', async () => {
     const record = await repository.createRecord({ quantity: 1 });
     expect((await repository.findRecordById(record.id))?.items[0]?.unit_price).toBe(0);

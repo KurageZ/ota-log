@@ -970,6 +970,14 @@ export function EventDetailScreen({
           actionLabel="添加"
           onActionPress={handleOpenChekiCreate}
         />
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => router.push({ pathname: '/cheki/event-quick-add', params: { event_id: id } })}
+          style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}
+        >
+          <AppIcon name="add" size={18} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '600', flexShrink: 1 }}>按活动快速添加</Text>
+        </TouchableOpacity>
 
         {chekiList.length > 0 ? (
           <>
