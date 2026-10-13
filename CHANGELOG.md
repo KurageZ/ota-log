@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.1.0] - 2026-10-13
+
+### Added
+- 支持从普通网页链接提取并解析活动公告
+- 新增按活动快速录入拍立得，支持批量选择成员、复用最近单价和事务保存
+- 工具箱新增推活日记入口
+
+### Changed
+- 统一底部面板与固定操作区，优化筛选草稿和日期选择反馈
+- 小组件活动筛选改为可搜索列表，支持按名称和日期搜索及移除已选项
+- 升级 Expo SDK 至 57.0.28，并同步兼容依赖
+- iOS 启用 UIKit Scene 生命周期支持
+- 将应用版本更新至 2.1.0，Android versionCode 更新为 20100
+
+### Fixed
+- 修复 Android 短页面底部导航栏隐藏后无法恢复的问题
+- 修正 MixAndCall 网站地址与说明
+- 修复官网部署参数与 Android 下载入口配置不一致的问题
+
 ## [2.0.2] - 2026-09-14
 
 ### Added
