@@ -27,6 +27,7 @@
 
 - commit message 第一行使用英文 Conventional Commits。
 - 版本发布说明维护在 `CHANGELOG.md`；`app/about.tsx` 展示产品介绍，仅在介绍内容变化时更新。
+- 官网更新日志维护在 `publishing/website/changelog/index.html`，依据 `CHANGELOG.md` 同步正式版本的日期与用户可感知的变化；省略内部实现细节，并运行 `rtk proxy ./scripts/deploy-website.sh --check-only` 校验本地链接。
 
 ## 注意事项
 

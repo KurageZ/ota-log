@@ -22,12 +22,15 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory publishing/website
 - `DESIGN.md`：本站已实现的设计规范与截图使用边界。
 - `privacy/index.html`：可独立部署和访问的隐私政策页面。
 - `support/index.html`：App Store 技术支持页面和问题反馈入口。
+- `changelog/index.html`：面向用户的更新日志，首版收录 2.0.0 至 2.1.0 的正式版本；专用布局在 `changelog/changelog.css`，颜色与基础样式复用官网。
 - `icon.png`：来自 App 的 `assets/icon.png`，保留本地副本以便独立预览与部署。
 - 文案来源：[`App Store Connect 元数据快照`](../app-store/metadata/zh-Hans.md)。
 
 首页包含产品介绍、记录流程、主要功能、本地存储与数据备份说明，以及 iOS / Android 获取入口。
 
 ## 当前边界
+
+- 更新日志为无需 JavaScript 的静态页面。发版时依据根目录 `CHANGELOG.md`，在页面顶部补充版本、日期及用户可感知的变化；不自动生成，也不展示内部构建与依赖变更。更早版本通过完整更新日志链接查看。
 
 - 已包含最小可用的隐私政策和技术支持页面；未来更新计划不在本版范围。
 - App 界面是真实 iOS 截图；人物与记录为虚构演示数据，页面已有标注。来源与版本限制见下文。
